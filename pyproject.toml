@@ -1,0 +1,57 @@
+[project]
+name = "rupert"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "aioboto3==15.5.0",
+    "asyncpg>=0.31.0",
+    "bcrypt>=5.0.0",
+    "coredis>=6.3.0",
+    "fastapi>=0.135.2",
+    "fastapi-jwt[authlib]>=0.3.0",
+    "loguru>=0.7.3",
+    "miniopy-async>=1.23.5",
+    "pillow>=12.2.0",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.13.1",
+    "redis[hiredis]>=7.4.0",
+    "sqlalchemy>=2.0.48",
+    "types-aioboto3[s3]>=15.5.0",
+    "uvicorn[standard]>=0.42.0",
+]
+
+[dependency-groups]
+dev = [
+    "alembic>=1.18.4",
+    "basedpyright>=1.38.4",
+    "black>=26.3.1",
+    "ruff>=0.15.8",
+]
+
+
+[tool.pyrefly]
+python-interpreter-path = ".venv/bin/python"
+
+[tool.pyright]
+exclude = [".venv", "deploy"]
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+
+
+[tool.black]
+line-length = 180
+
+[tool.ruff]
+line-length = 180
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+mypy_path = [".venv"]
+files = ["./", "./pod/"]
+strict = true
+ignore_missing_imports = false

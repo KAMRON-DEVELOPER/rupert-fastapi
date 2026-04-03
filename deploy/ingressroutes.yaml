@@ -1,0 +1,24 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: rupert
+  namespace: rupert
+spec:
+  entryPoints: []
+    # If not specified, HTTP routers will accept requests from all EntryPoints in the list of default EntryPoints.
+    # - web
+    # - websecure
+  routes:
+    - match: Host(`rupert.uz`) && PathPrefix(`/`)
+      kind: Rule
+      services:
+        - name: frontend
+          port: 80
+
+    - match: Host(`rupert.uz`) && PathPrefix(`/api/v1/`)
+      kind: Rule
+      services:
+        - name: backend
+          port: 80
+  # tls:
+  #   secretName: wildcard-tls-secret
