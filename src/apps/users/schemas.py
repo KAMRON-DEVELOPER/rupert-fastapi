@@ -3,11 +3,22 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from src.apps.shared.enums import FollowPolicy, UserRole, UserStatus
 from src.utils.exceptions import ValidationException
 from src.utils.validators import validate_email, validate_length, validate_password, validate_username, violent_words_regex
+
+
+class AuthProbeRes(BaseModel):
+    is_authenticated: bool
+
+
+class EmailAuthReq(BaseModel):
+    first_name: Optional[str] = Field(default=None, min_length=8, max_length=24, description="First name should be long between 8 and 24")
+    last_name: Optional[str] = Field(default=None, min_length=8, max_length=24, description="Last name should be long between 8 and 24")
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=24, description="Password should be long between 8 and 24")
 
 
 class RegisterSchema(BaseModel):
@@ -217,3 +228,16 @@ class ProfileSearchSchema(ProfileSchema):
 class UserSearchResponseSchema(BaseModel):
     users: list[ProfileSearchSchema]
     end: int
+
+
+class SessionSchema(BaseModel):
+    id: UUID
+    user_id: UUID
+    user_agent: Optional[str] = None
+    ip_address: Optional[str] = None
+    device_name: Optional[str] = None
+    refresh_token: Optional[str] = None
+    is_active: bool
+    last_activity_at: datetime
+    created_at: datetime
+    updated_at: datetime

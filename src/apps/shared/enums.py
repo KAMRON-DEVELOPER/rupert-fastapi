@@ -7,6 +7,12 @@ class AutoName(Enum):
         return name
 
 
+# --- OAuthUsers ---
+class Provider(AutoName):
+    google = auto()
+    github = auto()
+
+
 # --- Users ---
 class FollowStatus(AutoName):
     pending = auto()
@@ -27,6 +33,7 @@ class UserRole(AutoName):
 class UserStatus(AutoName):
     active = auto()
     suspended = auto()
+    pending_verification = auto()
     deleted = auto()
 
 

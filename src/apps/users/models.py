@@ -1,13 +1,25 @@
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func, literal_column, select
+from sqlalchemy import TIMESTAMP, Boolean, CheckConstraint, Date, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func, literal_column, select
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
-from src.apps.shared.enums import EmploymentType, FollowPolicy, FollowStatus, JobSearchStatus, ProficiencyLevel, SalaryCurrency, Specialization, UserRole, UserStatus, WorkFormat
-from src.apps.shared.models import BaseModel, WithLocation
+from src.apps.shared.enums import (
+    EmploymentType,
+    FollowPolicy,
+    FollowStatus,
+    JobSearchStatus,
+    ProficiencyLevel,
+    Provider,
+    SalaryCurrency,
+    Specialization,
+    UserRole,
+    UserStatus,
+    WorkFormat,
+)
+from src.apps.shared.models import Base, BaseModel, WithLocation
 
 if TYPE_CHECKING:
     from src.apps.chats.models import ChatMessageModel, ChatModel, ChatParticipantModel
@@ -113,6 +125,28 @@ class WorkExperienceModel(BaseModel):
         return "<WorkExperienceModel>"
 
 
+class OAuthUserModel(Base):
+    __tablename__ = "oauth_users"
+    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_oauth_user_provider"),)
+
+    id: Mapped[str] = mapped_column(String(length=255), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    provider: Mapped[Provider] = mapped_column(Enum(Provider, name="provider"), nullable=False)
+    username: Mapped[Optional[str]] = mapped_column(String(length=128))
+    email: Mapped[Optional[str]] = mapped_column(String(length=128))
+    picture: Mapped[Optional[str]] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now(), onupdate=func.now())
+
+    # Relationships
+    user: Mapped["UserModel"] = relationship(back_populates="oauth_users")
+
+    def __repr__(self):
+        return "<OAuthUserModel>"
+
+
 class UserModel(BaseModel, WithLocation):
     __tablename__ = "users"
 
@@ -146,10 +180,12 @@ class UserModel(BaseModel, WithLocation):
     job_search_status: Mapped[JobSearchStatus] = mapped_column(Enum(JobSearchStatus, name="job_search_status"), default=JobSearchStatus.not_looking, nullable=False)
 
     # Relationships
+    oauth_users: Mapped[list["OAuthUserModel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     resumes: Mapped[list["ResumeModel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     skill_links: Mapped[list["UserSkillLink"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     skills: Mapped[list["SkillModel"]] = relationship(secondary="user_skill_links", back_populates="users", viewonly=True)
     work_experiences: Mapped[list["WorkExperienceModel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    sessions: Mapped[list["SessionModel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
     # Following
     follower_links: Mapped[list["FollowModel"]] = relationship(back_populates="following", foreign_keys="[FollowModel.following_id]", cascade="all, delete-orphan")
@@ -189,3 +225,21 @@ class UserModel(BaseModel, WithLocation):
 
     def __repr__(self):
         return f"<UserModel {self.first_name} {self.last_name}>"
+
+
+class SessionModel(BaseModel):
+    __tablename__ = "sessions"
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_agent: Mapped[Optional[str]] = mapped_column(Text)
+    ip_addr: Mapped[Optional[str]] = mapped_column(String(45))
+    device_name: Mapped[Optional[str]] = mapped_column(String(128))
+    refresh_token: Mapped[str] = mapped_column(Text, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_activity_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now())
+
+    # Relationships
+    user: Mapped["UserModel"] = relationship(back_populates="sessions")
+
+    def __repr__(self):
+        return f"<SessionModel id={self.id}>"

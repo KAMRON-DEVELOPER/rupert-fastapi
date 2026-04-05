@@ -4,7 +4,7 @@ from logging import Filter, getLogger
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-
+from fastapi.middleware.cors import CORSMiddleware
 from src.apps.companies.routes import companies_router
 from src.apps.users.routes import users_router
 from src.apps.vacancies.routes import vacancies_router
@@ -47,14 +47,24 @@ async def lifespan(app: FastAPI):
 app: FastAPI = FastAPI(lifespan=lifespan)
 
 
-@app.get(path="/", tags=["root"])
-async def root() -> dict:
-    return {"status": "ok"}
+origins = ["http://localhost:5173"]
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(router=users_router, prefix="/api/v1/users", tags=["users"])
 app.include_router(router=companies_router, prefix="/api/v1/companies", tags=["companies"])
 app.include_router(router=vacancies_router, prefix="/api/v1/vacancies", tags=["vacancies"])
+
+
+@app.get(path="/", tags=["root"])
+async def root() -> dict:
+    return {"status": "ok"}
 
 
 @app.exception_handler(ApiException)

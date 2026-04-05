@@ -73,10 +73,12 @@ class S3Config(BaseModel):
 class JwtConfig(BaseModel):
     secret_key: str = ""
     algorithm: str = "HS256"
+    domain: Optional[str] = None
     access_token_expire_in_minutes: int = 60
     refresh_token_expire_in_days: int = 90
     email_verification_token_expire_in_hours: int = 24
     password_setup_token_expire_in_minutes: int = 60
+    access_token_renewal_threshold_minutes: int = 5
     refresh_token_renewal_threshold_days: int = 5
 
 
@@ -84,6 +86,7 @@ class Settings(BaseSettings):
     base_dir: Path = Path(__file__).parent.parent.parent.resolve()
 
     debug: bool = True
+    frontend_endpoint: str = "http://localhost:5173"
     database: DatabaseConfig = DatabaseConfig()
     redis: RedisConfig = RedisConfig()
     google_oauth: GoogleOauthConfig = GoogleOauthConfig()
