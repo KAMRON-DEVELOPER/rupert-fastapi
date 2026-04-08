@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: ba3e41bf5c96
+Revision ID: f354d0cc6f3d
 Revises: 
-Create Date: 2026-04-03 21:20:33.849556
+Create Date: 2026-04-08 13:43:03.837711
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'ba3e41bf5c96'
+revision: str = 'f354d0cc6f3d'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -87,7 +87,7 @@ def upgrade() -> None:
     sa.Column('linkedin_url', sa.Text(), nullable=True),
     sa.Column('portfolio_url', sa.Text(), nullable=True),
     sa.Column('role', sa.Enum('user', 'admin', name='user_role'), nullable=False),
-    sa.Column('status', sa.Enum('active', 'suspended', 'deleted', name='user_status'), nullable=False),
+    sa.Column('status', sa.Enum('active', 'suspended', 'pending_verification', 'deleted', name='user_status'), nullable=False),
     sa.Column('follow_policy', sa.Enum('auto_accept', 'require_approval', name='follow_policy'), nullable=False),
     sa.Column('job_search_status', sa.Enum('actively_looking', 'open_to_offers', 'interviewing', 'not_looking', name='job_search_status'), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
@@ -190,6 +190,19 @@ def upgrade() -> None:
     sa.UniqueConstraint('name', name='uq_group_name')
     )
     op.create_index(op.f('ix_groups_owner_id'), 'groups', ['owner_id'], unique=False)
+    op.create_table('oauth_users',
+    sa.Column('id', sa.String(length=255), nullable=False),
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('provider', sa.Enum('google', 'github', name='provider'), nullable=False),
+    sa.Column('username', sa.String(length=128), nullable=True),
+    sa.Column('email', sa.String(length=128), nullable=True),
+    sa.Column('picture', sa.Text(), nullable=True),
+    sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id', 'provider', name='uq_oauth_user_provider')
+    )
     op.create_table('posts',
     sa.Column('author_id', sa.UUID(), nullable=False),
     sa.Column('title', sa.String(length=128), nullable=False),
@@ -225,6 +238,20 @@ def upgrade() -> None:
     op.create_index(op.f('ix_resumes_salary_expectation_max'), 'resumes', ['salary_expectation_max'], unique=False)
     op.create_index(op.f('ix_resumes_salary_expectation_min'), 'resumes', ['salary_expectation_min'], unique=False)
     op.create_index(op.f('ix_resumes_specialization'), 'resumes', ['specialization'], unique=False)
+    op.create_table('sessions',
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('user_agent', sa.Text(), nullable=True),
+    sa.Column('ip_addr', sa.String(length=45), nullable=True),
+    sa.Column('device_name', sa.String(length=128), nullable=True),
+    sa.Column('refresh_token', sa.Text(), nullable=False),
+    sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('last_activity_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
     op.create_table('user_skill_links',
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('skill_id', sa.UUID(), nullable=False),
@@ -446,12 +473,14 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_vacancies_specialization'), table_name='vacancies')
     op.drop_table('vacancies')
     op.drop_table('user_skill_links')
+    op.drop_table('sessions')
     op.drop_index(op.f('ix_resumes_specialization'), table_name='resumes')
     op.drop_index(op.f('ix_resumes_salary_expectation_min'), table_name='resumes')
     op.drop_index(op.f('ix_resumes_salary_expectation_max'), table_name='resumes')
     op.drop_index(op.f('ix_resumes_employment_type'), table_name='resumes')
     op.drop_table('resumes')
     op.drop_table('posts')
+    op.drop_table('oauth_users')
     op.drop_index(op.f('ix_groups_owner_id'), table_name='groups')
     op.drop_table('groups')
     op.drop_table('follows')

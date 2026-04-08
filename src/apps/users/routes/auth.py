@@ -1,6 +1,5 @@
 import asyncio
 from typing import Annotated
-from uuid import uuid4
 from fastapi import Cookie, HTTPException, Header, Query, Response, status
 from fastapi.responses import RedirectResponse
 from starlette.requests import Request
@@ -8,11 +7,12 @@ from pydantic import BaseModel
 from bcrypt import checkpw, gensalt, hashpw
 from apps.shared.schemas import MessageRes
 from apps.users.repositories.oauth_user import OAuthUsersRepository
+from apps.users.repositories.session import SessionsRepository
 from apps.users.repositories.user import UsersRepository
 from apps.users.utils import finalize_session
 from services.mailtrap import Mailtrap, MailtrapError
-from src.apps.users.schemas import AuthProbeRes, EmailAuthReq
-from src.dependencies.proactive_refresh import authDep, create_token
+from src.apps.users.schemas import AuthProbeResponse, EmailAuthSchema, UserUpdateSchema
+from src.dependencies.proactive_refresh import authDep, create_token, strictAuthDep
 from src.apps.users.routes import users_router
 
 from src.utils.settings import get_settings
@@ -23,14 +23,14 @@ from utils.exceptions import ValidationException
 settings = get_settings()
 
 
-@users_router.get("/auth/probe", response_model=AuthProbeRes)
-async def auth_probe(auth: authDep) -> AuthProbeRes:
+@users_router.get("/auth/probe", response_model=AuthProbeResponse)
+async def auth_probe(auth: authDep):
     """"""
-    return AuthProbeRes(is_authenticated=auth is not None)
+    return AuthProbeResponse(is_authenticated=auth is not None)
 
 
 @users_router.get("/auth/google")
-async def google_oauth(req: Request):
+async def google_oauth():
     verifier, challenge = build_pkce_pair()
     url = google_auth_url(challenge)
     res = RedirectResponse(url)
@@ -48,7 +48,7 @@ async def google_oauth_callback(req: Request, code: str = Query()):
 
 
 @users_router.get("/auth/github")
-async def github_oauth(req: Request):
+async def github_oauth():
     verifier, challenge = build_pkce_pair()
     url = github_auth_url(challenge)
     res = RedirectResponse(url)
@@ -71,8 +71,20 @@ async def password_setup(req: Request):
 
 
 @users_router.get(path="/auth/email")
-async def email_auth(req: Request, res: Response, schm: EmailAuthReq, session: DBSession):
-    user = await UsersRepository.find_by_email(schm.email, session)
+async def email_auth(req: Request, res: Response, schema: EmailAuthSchema, session: DBSession):
+    """
+    user exist:
+        yes: authenticated with oauth:
+                yes: [send set-password link, return message response]
+                no: match password:
+                    yes: [finalize_session, return user]
+                    no: return validation error
+        no: first_name or schm.last_name provided:
+            yes: a
+            no: return message response
+    """
+
+    user = await UsersRepository.find_by_email(schema.email, session)
 
     if user:
         if not user.password_hash:
@@ -94,7 +106,7 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthReq, session: D
             providers_text = ", ".join(str(p.value) for p in providers)
             return MessageRes(msg=f"This account was created with {providers_text}. Use that provider to sign in, or use the link we sent to set a password.")
 
-        is_valid = await asyncio.to_thread(checkpw, schm.password.encode(), user.password_hash.encode())
+        is_valid = await asyncio.to_thread(checkpw, schema.password.encode(), user.password_hash.encode())
         if not is_valid:
             raise ValidationException("password is not match.")
 
@@ -102,25 +114,21 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthReq, session: D
         await session.commit()
         return user
 
-    if not schm.first_name or not schm.last_name:
+    if not schema.first_name or not schema.last_name:
         return MessageRes(msg="new_user")
 
-    user_id = uuid4()
+    hash_password_bytes = await asyncio.to_thread(hashpw, schema.password.encode(), gensalt(rounds=8))
+    hash_password = hash_password_bytes.decode()
+    user = await UsersRepository.create(schema.email, hash_password, schema.first_name, schema.last_name, session)
 
-    user = UsersRepository.find_by_email
-
-    token = create_token(user_id, "email_verification")
+    token = create_token(user.id, "email_verification")
     verification_link = f"{settings.frontend_endpoint}/auth/verify?token={token}"
 
     try:
-        await Mailtrap.send_email_verification_link(to_name=f"{schm.first_name} {schm.last_name}", to_email=schm.email, link=verification_link, cfg=settings.mailtrap)
+        await Mailtrap.send_email_verification_link(to_name=f"{schema.first_name} {schema.last_name}", to_email=schema.email, link=verification_link, cfg=settings.mailtrap)
     except MailtrapError as e:
         print(e.error.errors)
         return HTTPException(status_code=500, detail="Could not send email verification link")
-
-    hash_password_bytes = await asyncio.to_thread(hashpw, schm.password.encode(), gensalt(rounds=8))
-    hash_password = hash_password_bytes.decode()
-    user = await UsersRepository.create(schm.email, hash_password, schm.first_name, schm.last_name, session)
 
     user = await finalize_session(user, req, res, session)
     await session.commit()
@@ -128,32 +136,22 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthReq, session: D
 
 
 @users_router.get("/auth/logout")
-async def logout(req: Request):
-    pass
-
-
-@users_router.get("/auth/refresh")
-async def refresh(req: Request):
-    pass
+async def logout(auth: strictAuthDep, session: DBSession):
+    return await SessionsRepository.delete(auth, session)
 
 
 @users_router.get("/")
-async def create_user(req: Request):
-    pass
+async def get_user(auth: strictAuthDep, session: DBSession):
+    return await UsersRepository.get_by_id(auth, session)
 
 
 @users_router.get("/")
-async def get_user(req: Request):
-    pass
+async def update_user(auth: strictAuthDep, schema: UserUpdateSchema, session: DBSession):
+    return await UsersRepository.update_by_id(auth, schema, session)
 
 
 @users_router.get("/")
-async def update_user(req: Request):
-    pass
-
-
-@users_router.get("/")
-async def delete_user(req: Request):
+async def delete_user(auth: strictAuthDep, session: DBSession):
     pass
 
 

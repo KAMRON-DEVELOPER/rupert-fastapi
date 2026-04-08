@@ -1,4 +1,3 @@
-import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
@@ -7,102 +6,20 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from src.apps.shared.enums import FollowPolicy, UserRole, UserStatus
 from src.utils.exceptions import ValidationException
-from src.utils.validators import validate_email, validate_length, validate_password, validate_username, violent_words_regex
 
 
-class AuthProbeRes(BaseModel):
+class AuthProbeResponse(BaseModel):
     is_authenticated: bool
 
 
-class EmailAuthReq(BaseModel):
+class EmailAuthSchema(BaseModel):
     first_name: Optional[str] = Field(default=None, min_length=8, max_length=24, description="First name should be long between 8 and 24")
     last_name: Optional[str] = Field(default=None, min_length=8, max_length=24, description="Last name should be long between 8 and 24")
     email: EmailStr
     password: str = Field(min_length=8, max_length=24, description="Password should be long between 8 and 24")
 
 
-class RegisterSchema(BaseModel):
-    name: str
-    username: str
-    email: str
-    password: str
-
-    @field_validator("name")
-    def validate_name(cls, value: str):
-        validate_length(field=value, min_len=2, max_len=30, field_name="Name")
-        return value
-
-    @field_validator("username")
-    def validate_code(cls, value: str):
-        validate_username(username=value)
-        return value
-
-    @field_validator("email")
-    def validate_email(cls, value: str):
-        validate_email(email=value)
-        return value
-
-    @field_validator("password")
-    def validate_password(cls, value: str):
-        validate_password(password_string=value)
-        return value
-
-
-class VerifySchema(BaseModel):
-    code: str
-
-    @field_validator("code")
-    def validate_code(cls, value: str):
-        if not value.isdigit():
-            raise ValueError("Code must contain only digits.")
-        if len(value) != 4:
-            raise ValueError("Code must be 4 digit long.")
-        return value
-
-
-class LoginSchema(BaseModel):
-    username: str
-    password: str
-
-    @field_validator("username")
-    def validate_code(cls, value: str):
-        validate_username(username=value)
-        return value
-
-    @field_validator("password")
-    def validate_password(cls, value: str):
-        validate_password(password_string=value)
-        return value
-
-
-class RequestForgotPasswordSchema(BaseModel):
-    email: str
-
-    @field_validator("email")
-    def validate_email(cls, value: str):
-        validate_email(email=value)
-        return value
-
-
-class ResetPasswordSchema(BaseModel):
-    code: str
-    new_password: str
-
-    @field_validator("code")
-    def validate_code(cls, value: str):
-        if not value.isdigit():
-            raise ValueError("Code must contain only digits.")
-        if len(value) != 4:
-            raise ValueError("Code must be 4 digit long.")
-        return value
-
-    @field_validator("new_password")
-    def validate_new_password(cls, value: Optional[str]):
-        validate_password(password_string=value)
-        return value
-
-
-class ProfileSchema(BaseModel):
+class UserResponse(BaseModel):
     id: UUID
     created_at: datetime
     updated_at: datetime
@@ -124,20 +41,12 @@ class ProfileSchema(BaseModel):
     followings_count: int
     feeds_count: Optional[int] = 0
 
-    class Config:
-        from_attributes = True
-        json_encoders = {
-            UUID: lambda v: v.hex,
-            datetime: lambda v: int(v.timestamp()) if v is not None else None,
-        }
 
-
-class ProfileUpdateSchema(BaseModel):
-    name: Optional[str] = None
-    username: Optional[str] = None
-    email: Optional[str] = None
+class UserUpdateSchema(BaseModel):
+    email: Optional[EmailStr] = None
     password: Optional[str] = None
-    birthdate: Optional[datetime] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     bio: Optional[str] = None
     country: Optional[str] = None
     city: Optional[str] = None
@@ -145,33 +54,20 @@ class ProfileUpdateSchema(BaseModel):
     remove_avatar: bool = False
     remove_banner: bool = False
 
-    class Config:
-        use_enum_values = True
-        from_attributes = True
-        json_encoders = {
-            UUID: lambda v: v.hex,
-            datetime: lambda v: int(v.timestamp()) if v is not None else None,
-        }
-
-    @field_validator("username")
-    def validate_username(cls, value: Optional[str]):
-        validate_username(username=value)
-        return value
-
     @field_validator("email")
     def validate_email(cls, value: Optional[str]):
-        validate_email(email=value)
         return value
 
     @field_validator("password")
     def validate_password(cls, value: Optional[str]):
-        validate_password(password_string=value)
         return value
 
-    @field_validator("name")
-    def validate_name(cls, value: Optional[str]):
-        if value is not None:
-            validate_length(field=value, min_len=2, max_len=30, field_name="Name")
+    @field_validator("first_name")
+    def validate_first_name(cls, value: Optional[str]):
+        return value
+
+    @field_validator("last_name")
+    def validate_last_name(cls, value: Optional[str]):
         return value
 
     @field_validator("birthdate")
@@ -183,60 +79,14 @@ class ProfileUpdateSchema(BaseModel):
                 raise ValidationException(detail="Birthdate must be between 12 and 100 years ago.")
         return value
 
-    @field_validator("bio")
-    def validate_bio(cls, value: Optional[str]):
-        if value is not None:
-            validate_length(field=value, min_len=0, max_len=200, field_name="bio")
-            if re.search(violent_words_regex, value, re.IGNORECASE):
-                raise ValidationException(detail="Bio contains sensitive or inappropriate content.")
-        return value
 
-
-class ProfileUpdateMediaSchema(BaseModel):
-    avatar_url: Optional[str] = None
-    banner_url: Optional[str] = None
-
-
-class RegistrationTokenSchema(BaseModel):
-    verify_token: str
-    verify_token_expiration_date: str
-
-
-class ForgotPasswordTokenSchema(BaseModel):
-    forgot_password_token: str
-    forgot_password_token_expiration_date: str
-
-
-class TokenSchema(BaseModel):
-    access_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-
-
-class ProfileTokenSchema(BaseModel):
-    user: ProfileSchema
-    tokens: TokenSchema
-
-
-class ResultSchema(BaseModel):
-    ok: bool
-
-
-class ProfileSearchSchema(ProfileSchema):
-    is_following: Optional[bool] = None
-
-
-class UserSearchResponseSchema(BaseModel):
-    users: list[ProfileSearchSchema]
-    end: int
-
-
-class SessionSchema(BaseModel):
+class SessionResponse(BaseModel):
     id: UUID
     user_id: UUID
-    user_agent: Optional[str] = None
-    ip_address: Optional[str] = None
-    device_name: Optional[str] = None
-    refresh_token: Optional[str] = None
+    user_agent: Optional[str]
+    ip_addr: Optional[str]
+    device_name: Optional[str]
+    refresh_token: str
     is_active: bool
     last_activity_at: datetime
     created_at: datetime

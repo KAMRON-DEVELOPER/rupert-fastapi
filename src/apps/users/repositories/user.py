@@ -1,6 +1,8 @@
 from typing import Optional
-from sqlalchemy import select
+from uuid import UUID
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from apps.users.schemas import UserUpdateSchema
 from src.apps.users.models import UserModel
 
 
@@ -17,3 +19,15 @@ class UsersRepository:
         session.add(record)
         await session.flush()
         return record
+
+    @staticmethod
+    async def get_by_id(id: UUID, session: AsyncSession):
+        stmt = select(UserModel).where(UserModel.id == id)
+        result = await session.execute(stmt)
+        return result.scalar_one()
+
+    @staticmethod
+    async def update_by_id(id: UUID, schema: UserUpdateSchema, session: AsyncSession):
+        stmt = update(UserModel).where(UserModel.id == id).values({})
+        result = await session.execute(stmt)
+        return result.scalar_one()
