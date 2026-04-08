@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import TIMESTAMP, Enum, ForeignKey, String, Text, UniqueConstraint
@@ -50,14 +50,14 @@ class PostCommentModel(BaseModel):
 
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     post_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
-    parent_id: Mapped[Optional[UUID]] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("post_comments.id", ondelete="CASCADE"))
+    parent_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("post_comments.id", ondelete="CASCADE"))
     body: Mapped[str] = mapped_column(Text, nullable=False)
 
     # Relationships
-    user: Mapped["UserModel"] = relationship(back_populates="post_comments")
-    post: Mapped["PostModel"] = relationship(back_populates="comments")
-    parent: Mapped[Optional["PostCommentModel"]] = relationship(remote_side="PostCommentModel.id", back_populates="replies")
-    replies: Mapped[list["PostCommentModel"]] = relationship(back_populates="parent", cascade="all, delete-orphan")
+    user: Mapped[UserModel] = relationship(back_populates="post_comments")
+    post: Mapped[PostModel] = relationship(back_populates="comments")
+    parent: Mapped[PostCommentModel | None] = relationship(remote_side="PostCommentModel.id", back_populates="replies")
+    replies: Mapped[list[PostCommentModel]] = relationship(back_populates="parent", cascade="all, delete-orphan")
 
     def __repr__(self):
         return "<PostCommentModel>"
@@ -70,7 +70,7 @@ class PostModel(BaseModel):
     title: Mapped[str] = mapped_column(String(128), nullable=False)
     body: Mapped[dict] = mapped_column(JSONB, nullable=False)
     status: Mapped[PostStatus] = mapped_column(Enum(PostStatus, name="post_status"), default=PostStatus.draft)
-    scheduled_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True))
+    scheduled_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
 
     # Relationships
     author: Mapped["UserModel"] = relationship(back_populates="posts")

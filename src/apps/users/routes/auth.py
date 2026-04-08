@@ -1,22 +1,23 @@
 import asyncio
 from typing import Annotated
-from fastapi import Cookie, HTTPException, Header, Query, Response, status
-from fastapi.responses import RedirectResponse
-from starlette.requests import Request
-from pydantic import BaseModel
+
 from bcrypt import checkpw, gensalt, hashpw
+from fastapi import Cookie, Header, HTTPException, Query, Response, status
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
+from starlette.requests import Request
+
 from apps.shared.schemas import MessageRes
 from apps.users.repositories.oauth_user import OAuthUsersRepository
 from apps.users.repositories.session import SessionsRepository
 from apps.users.repositories.user import UsersRepository
 from apps.users.utils import finalize_session
 from services.mailtrap import Mailtrap, MailtrapError
+from src.apps.users.routes import users_router
 from src.apps.users.schemas import AuthProbeResponse, EmailAuthSchema, UserUpdateSchema
 from src.dependencies.proactive_refresh import authDep, create_token, strictAuthDep
-from src.apps.users.routes import users_router
-
-from src.utils.settings import get_settings
 from src.utils.oauth import build_pkce_pair, exchange_github_code, exchange_google_code, github_auth_url, google_auth_url
+from src.utils.settings import get_settings
 from utils.database import DBSession
 from utils.exceptions import ValidationException
 

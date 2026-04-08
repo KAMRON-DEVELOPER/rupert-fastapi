@@ -1,6 +1,5 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, JsonConfigSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict
@@ -25,14 +24,14 @@ class RedisParams(BaseModel):
     host: str = "localhost"
     port: int = 6379
     db: int = 0
-    username: Optional[str] = None
-    password: Optional[str] = None
+    username: str | None = None
+    password: str | None = None
 
 
 class RedisConfig(BaseModel):
-    url: Optional[str] = "redis://localhost:6379/0?decode_responses=True&protocol=3"
-    params: Optional[RedisParams] = RedisParams()
-    ssl: Optional[RedisSsl] = None
+    url: str | None = "redis://localhost:6379/0?decode_responses=True&protocol=3"
+    params: RedisParams | None = RedisParams()
+    ssl: RedisSsl | None = None
 
 
 class GoogleOauthConfig(BaseModel):
@@ -73,7 +72,7 @@ class S3Config(BaseModel):
 class JwtConfig(BaseModel):
     secret_key: str = ""
     algorithm: str = "HS256"
-    domain: Optional[str] = None
+    domain: str | None = None
     access_token_expire_in_minutes: int = 60
     refresh_token_expire_in_days: int = 90
     email_verification_token_expire_in_hours: int = 24

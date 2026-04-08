@@ -2,10 +2,9 @@ import json
 from datetime import UTC, datetime
 from inspect import isawaitable
 from time import time
-from typing import Optional
 from uuid import UUID, uuid4
 
-from redis.asyncio import Redis, ConnectionPool
+from redis.asyncio import ConnectionPool, Redis
 from redis.asyncio.client import PubSub
 
 from src.apps.chats.schemas import ChatMessageSchema, ChatResponseSchema, ChatSchema, ParticipantSchema
@@ -101,7 +100,7 @@ class ChatCacheManager:
         participant_ids: list[str] = []
         for participant_set in participant_sets:
             participant_set.discard(user_id)
-            pid: Optional[str] = next(iter(participant_set), None)
+            pid: str | None = next(iter(participant_set), None)
             if not pid:
                 continue
             participant_ids.append(pid)
@@ -145,7 +144,7 @@ class ChatCacheManager:
         return ChatResponseSchema(chats=chat_list, end=len(chat_ids) - 1)
 
     async def is_user_chat_owner(self, user_id: str, chat_id: str) -> bool:
-        score: Optional[float] = await self.client.zscore(name=f"users:{user_id}:chats", value=chat_id)
+        score: float | None = await self.client.zscore(name=f"users:{user_id}:chats", value=chat_id)
         logger.warning(f"user_id: {user_id}")
         logger.warning(f"chat_id: {chat_id}")
         logger.warning(f"score: {score}")

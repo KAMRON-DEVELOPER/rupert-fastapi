@@ -1,7 +1,6 @@
 import json
 from io import BytesIO
 from pathlib import Path
-from typing import Optional
 
 import aiohttp
 from miniopy_async.api import Minio
@@ -75,7 +74,7 @@ async def get_object_from_minio(object_name: str) -> bytes:
         raise ValueError("Exception in get_data_from_minio: {e}")
 
 
-async def put_object_to_minio(object_name: str, data: bytes, content_type: str, old_object_name: Optional[str] = None, for_update: bool = False) -> str:
+async def put_object_to_minio(object_name: str, data: bytes, content_type: str, old_object_name: str | None = None, for_update: bool = False) -> str:
     try:
         if for_update and old_object_name:
             await minio_client.remove_object(bucket_name=settings.s3.bucket_name, object_name=old_object_name)
@@ -91,7 +90,7 @@ async def put_object_to_minio(object_name: str, data: bytes, content_type: str, 
         raise ValueError(f"Exception in put_data_to_minio: {e}")
 
 
-async def put_file_to_minio(object_name: str, file_path: Path, content_type: str, old_object_name: Optional[str] = None, for_update=False) -> str:
+async def put_file_to_minio(object_name: str, file_path: Path, content_type: str, old_object_name: str | None = None, for_update=False) -> str:
     try:
         if for_update and old_object_name:
             await minio_client.remove_object(bucket_name=settings.s3.bucket_name, object_name=old_object_name)

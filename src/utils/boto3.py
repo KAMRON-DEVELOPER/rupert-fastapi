@@ -1,7 +1,6 @@
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
 
 import aioboto3
 from botocore.exceptions import ClientError
@@ -85,7 +84,7 @@ async def put_object_to_boto3(
     object_name: str,
     data: bytes,
     content_type: str,
-    old_object_name: Optional[str] = None,
+    old_object_name: str | None = None,
     for_update: bool = False,
 ) -> str:
     async with s3_client() as s3:
@@ -110,7 +109,7 @@ async def put_file_to_boto3(
     object_name: str,
     file_path: Path,
     content_type: str,
-    old_object_name: Optional[str] = None,
+    old_object_name: str | None = None,
     for_update=False,
 ) -> str:
     async with s3_client() as s3:

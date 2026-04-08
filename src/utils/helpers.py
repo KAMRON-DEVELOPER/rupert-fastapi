@@ -3,7 +3,6 @@ import random
 import re
 import string
 from io import BytesIO
-from typing import Optional
 from uuid import UUID
 
 import aiohttp
@@ -96,7 +95,7 @@ async def prepare_image_data(image_data: bytes, max_width: int = 72, max_height:
         raise ValueError(f"🌋 Exception in prepare_image_data: {e}")
 
 
-async def generate_avatar_url(user_id: UUID, image_url: str) -> Optional[str]:
+async def generate_avatar_url(user_id: UUID, image_url: str) -> str | None:
     print(f"🚧 image_url: {image_url}, user_id: {user_id}")
 
     try:

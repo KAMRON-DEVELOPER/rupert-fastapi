@@ -1,9 +1,9 @@
-from fastapi import Response, Request
-from src.apps.users.repositories.session import SessionsRepository
-from dependencies.proactive_refresh import create_token
-from src.apps.models import UserModel
+from fastapi import Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from dependencies.proactive_refresh import create_token
+from src.apps.models import UserModel
+from src.apps.users.repositories.session import SessionsRepository
 from src.utils.settings import get_settings
 
 settings = get_settings()

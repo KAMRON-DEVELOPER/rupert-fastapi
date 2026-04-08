@@ -1,13 +1,13 @@
-from datetime import UTC, datetime, timedelta
 import re
-from typing import Annotated, Literal, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import Cookie, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import Response
-from jwt.exceptions import PyJWTError
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import decode, encode
+from jwt.exceptions import PyJWTError
 from jwt.types import Options
 from pydantic import BaseModel, ValidationError
 
@@ -73,12 +73,12 @@ def decode_token(jwt: str) -> tuple[bool, TokenClaims]:
 
 
 security = HTTPBearer()
-authHeaderDep = Annotated[Optional[HTTPAuthorizationCredentials], Depends(security)]
-cookieDep = Annotated[Optional[str], Cookie()]
+authHeaderDep = Annotated[HTTPAuthorizationCredentials | None, Depends(security)]
+cookieDep = Annotated[str | None, Cookie()]
 
 
 async def proactive_refresh(res: Response, access_token: cookieDep, refresh_token: cookieDep) -> UUID:
-    user_id: Optional[UUID] = None
+    user_id: UUID | None = None
 
     if access_token:
         needs_refresh, claims = decode_token(access_token)
@@ -115,7 +115,7 @@ class ProactiveRefresh:
 
 
 checker = ProactiveRefresh()
-authDep = Annotated[Optional[UUID], Depends(checker)]
+authDep = Annotated[UUID | None, Depends(checker)]
 
 strictChecker = ProactiveRefresh()
 strictAuthDep = Annotated[UUID, Depends(strictChecker)]

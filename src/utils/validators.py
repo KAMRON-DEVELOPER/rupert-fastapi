@@ -6,7 +6,6 @@ import subprocess
 import uuid
 from datetime import datetime
 from io import BytesIO
-from typing import Optional
 
 from fastapi import UploadFile
 from PIL import Image
@@ -30,7 +29,7 @@ allowed_image_extension = {"png", "jpg", "jpeg"}
 allowed_video_extension = {"mp4", "mov"}
 
 
-def validate_username(username: Optional[str] = None) -> None:
+def validate_username(username: str | None = None) -> None:
     if username is not None:
         if not username:
             raise ValidationException(detail="Username cannot be empty.")
@@ -39,7 +38,7 @@ def validate_username(username: Optional[str] = None) -> None:
             raise ValidationException("Username contains restricted or inappropriate content.")
 
 
-def validate_email(email: Optional[str] = None) -> None:
+def validate_email(email: str | None = None) -> None:
     if email is not None:
         if not email:
             raise ValidationException(detail="Email cannot be empty.")
@@ -48,13 +47,13 @@ def validate_email(email: Optional[str] = None) -> None:
             raise ValidationException("Invalid email format.")
 
 
-def validate_phone_number(phone_number: Optional[str] = None):
+def validate_phone_number(phone_number: str | None = None):
     if phone_number is not None:
         if not phone_number:
             raise ValidationException(detail="Phone number cannot be empty.")
 
 
-def validate_password(password_string: Optional[str] = None) -> None:
+def validate_password(password_string: str | None = None) -> None:
     if password_string is not None:
         if not password_string:
             raise ValidationException(detail="Password cannot be empty.")
@@ -127,7 +126,7 @@ def escape_redisearch_special_chars(value: str) -> str:
     return re.sub(special_chars, lambda m: f"\\{m.group(0)}", value)
 
 
-def generate_full_name(given_name: Optional[str] = None, family_name: Optional[str] = None, email: Optional[str] = None) -> str:
+def generate_full_name(given_name: str | None = None, family_name: str | None = None, email: str | None = None) -> str:
     given_name = (given_name or "").strip()
     family_name = (family_name or "").strip()
 

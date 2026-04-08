@@ -1,8 +1,7 @@
+import base64
 import hashlib
 import os
 import secrets
-import base64
-from typing import Optional
 from urllib.parse import urlencode
 
 import httpx
@@ -28,19 +27,19 @@ hd 	            string 	    The hosted domain associated with the user's Google 
 
 class GoogleUserInfo(BaseModel):
     sub: str
-    name: Optional[str] = None
-    given_name: Optional[str] = None
-    family_name: Optional[str] = None
-    picture: Optional[str] = None
-    email: Optional[str] = None
+    name: str | None = None
+    given_name: str | None = None
+    family_name: str | None = None
+    picture: str | None = None
+    email: str | None = None
     email_verified: bool = False
 
 
 class GithubUserInfo(BaseModel):
     id: int
     login: str
-    name: Optional[str] = None
-    email: Optional[str] = None
+    name: str | None = None
+    email: str | None = None
     avatar_url: str
 
 

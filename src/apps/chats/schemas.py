@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -13,8 +12,8 @@ class ParticipantSchema(BaseModel):
     id: UUID
     name: str
     username: str
-    avatar_url: Optional[str] = None
-    last_seen_at: Optional[datetime] = None
+    avatar_url: str | None = None
+    last_seen_at: datetime | None = None
     is_online: bool = False
 
     class Config:
@@ -37,7 +36,7 @@ class ChatMessageSchema(BaseModel):
 class ChatSchema(BaseModel):
     id: UUID
     participant: ParticipantSchema
-    last_message: Optional[ChatMessageSchema] = None
+    last_message: ChatMessageSchema | None = None
     last_activity_at: datetime
 
     class Config:

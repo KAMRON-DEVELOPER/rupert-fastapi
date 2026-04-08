@@ -3,8 +3,9 @@ from logging import Filter, getLogger
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
 from src.apps.companies.routes import companies_router
 from src.apps.users.routes import users_router
 from src.apps.vacancies.routes import vacancies_router

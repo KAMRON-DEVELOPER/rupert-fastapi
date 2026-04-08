@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import Enum, ForeignKey, String, Text, UniqueConstraint
@@ -21,8 +23,8 @@ class CompanyMemberModel(BaseModel):
     company_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"))
     role: Mapped[CompanyMemberRole] = mapped_column(Enum(CompanyMemberRole, name="company_member_role"), default=CompanyMemberRole.member)
 
-    user: Mapped["UserModel"] = relationship(back_populates="company_memberships")
-    company: Mapped["CompanyModel"] = relationship(back_populates="members")
+    user: Mapped[UserModel] = relationship(back_populates="company_memberships")
+    company: Mapped[CompanyModel] = relationship(back_populates="members")
 
     def __repr__(self):
         return "<CompanyMemberModel>"
@@ -32,19 +34,19 @@ class CompanyModel(BaseModel, WithLocation):
     __tablename__ = "companies"
 
     name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True, index=True)
-    tagline: Mapped[Optional[str]] = mapped_column(String(128))
-    description: Mapped[Optional[str]] = mapped_column(Text)
-    logo_url: Mapped[Optional[str]] = mapped_column(Text)
-    website_url: Mapped[Optional[str]] = mapped_column(Text)
+    tagline: Mapped[str | None] = mapped_column(String(128))
+    description: Mapped[str | None] = mapped_column(Text)
+    logo_url: Mapped[str | None] = mapped_column(Text)
+    website_url: Mapped[str | None] = mapped_column(Text)
     type: Mapped[CompanyType] = mapped_column(Enum(CompanyType, name="company_type"), nullable=False)
 
-    contact_email: Mapped[Optional[str]] = mapped_column(String(128))
-    contact_phone: Mapped[Optional[str]] = mapped_column(String(32))
+    contact_email: Mapped[str | None] = mapped_column(String(128))
+    contact_phone: Mapped[str | None] = mapped_column(String(32))
 
     status: Mapped[CompanyStatus] = mapped_column(Enum(CompanyStatus, name="company_status"), default=CompanyStatus.pending, nullable=False)
 
-    members: Mapped[list["CompanyMemberModel"]] = relationship(back_populates="company", cascade="all, delete-orphan", passive_deletes=True)
-    vacancies: Mapped[list["VacancyModel"]] = relationship(back_populates="company", passive_deletes=True)
+    members: Mapped[list[CompanyMemberModel]] = relationship(back_populates="company", cascade="all, delete-orphan", passive_deletes=True)
+    vacancies: Mapped[list[VacancyModel]] = relationship(back_populates="company", passive_deletes=True)
 
     def __repr__(self):
         return f"<CompanyModel {self.name}>"

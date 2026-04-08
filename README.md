@@ -9,11 +9,11 @@ uv add alembic basedpyright ruff black --dev
 ```
 
 ```bash
-alembic init alembic
-alembic revision --autogenerate -m "initial"
-alembic upgrade head
+uv run alembic init alembic
+uv run alembic revision --autogenerate -m "initial"
+uv run alembic upgrade head
 ```
 
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+uv run uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 ```

@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: f354d0cc6f3d
+Revision ID: 45670ea69696
 Revises: 
-Create Date: 2026-04-08 13:43:03.837711
+Create Date: 2026-04-08 16:08:26.012762
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'f354d0cc6f3d'
+revision: str = '45670ea69696'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -41,8 +41,8 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
-    sa.Column('country', sa.String(length=64), nullable=True),
-    sa.Column('city', sa.String(length=64), nullable=True),
+    sa.Column('country', sa.String(length=64), nullable=False),
+    sa.Column('city', sa.String(length=64), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_companies_name'), 'companies', ['name'], unique=True)
@@ -93,18 +93,18 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
-    sa.Column('country', sa.String(length=64), nullable=True),
-    sa.Column('city', sa.String(length=64), nullable=True),
+    sa.Column('country', sa.String(length=64), nullable=False),
+    sa.Column('city', sa.String(length=64), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
     op.create_table('chat_messages',
     sa.Column('chat_id', sa.UUID(), nullable=False),
     sa.Column('sender_id', sa.UUID(), nullable=False),
-    sa.Column('message', sa.Text(), nullable=True),
-    sa.Column('image_urls', sa.ARRAY(sa.String()), nullable=True),
-    sa.Column('video_urls', sa.ARRAY(sa.String()), nullable=True),
-    sa.Column('scheduled_at', sa.TIMESTAMP(timezone=True), nullable=True),
+    sa.Column('message', sa.Text(), nullable=False),
+    sa.Column('image_urls', sa.ARRAY(sa.String()), nullable=False),
+    sa.Column('video_urls', sa.ARRAY(sa.String()), nullable=False),
+    sa.Column('scheduled_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
@@ -228,8 +228,8 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
-    sa.Column('country', sa.String(length=64), nullable=True),
-    sa.Column('city', sa.String(length=64), nullable=True),
+    sa.Column('country', sa.String(length=64), nullable=False),
+    sa.Column('city', sa.String(length=64), nullable=False),
     sa.CheckConstraint('salary_expectation_min <= salary_expectation_max', name='chk_resume_salary_expectation_range'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
@@ -284,8 +284,8 @@ def upgrade() -> None:
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
-    sa.Column('country', sa.String(length=64), nullable=True),
-    sa.Column('city', sa.String(length=64), nullable=True),
+    sa.Column('country', sa.String(length=64), nullable=False),
+    sa.Column('city', sa.String(length=64), nullable=False),
     sa.CheckConstraint('salary_min <= salary_max', name='chk_vacancy_salary_range'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
@@ -350,10 +350,10 @@ def upgrade() -> None:
     op.create_table('group_messages',
     sa.Column('group_id', sa.UUID(), nullable=False),
     sa.Column('sender_id', sa.UUID(), nullable=False),
-    sa.Column('message', sa.Text(), nullable=True),
-    sa.Column('image_urls', sa.ARRAY(sa.String()), nullable=True),
-    sa.Column('video_urls', sa.ARRAY(sa.String()), nullable=True),
-    sa.Column('scheduled_at', sa.TIMESTAMP(timezone=True), nullable=True),
+    sa.Column('message', sa.Text(), nullable=False),
+    sa.Column('image_urls', sa.ARRAY(sa.String()), nullable=False),
+    sa.Column('video_urls', sa.ARRAY(sa.String()), nullable=False),
+    sa.Column('scheduled_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
