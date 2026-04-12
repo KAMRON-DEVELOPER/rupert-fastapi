@@ -55,10 +55,10 @@ class TagModel(BaseModel):
 
     # Relationships
     post_links: Mapped[list[PostTagLink]] = relationship(back_populates="tag", cascade="all, delete-orphan")
-    posts: Mapped[list[PostModel]] = relationship(secondary="post_tag_links", back_populates="tags")
+    posts: Mapped[list[PostModel]] = relationship(secondary="post_tag_links", back_populates="tags", viewonly=True)
 
     feed_links: Mapped[list[FeedTagLink]] = relationship(back_populates="tag", cascade="all, delete-orphan")
-    feeds: Mapped[list[FeedModel]] = relationship(secondary="feed_tag_links", back_populates="tags")
+    feeds: Mapped[list[FeedModel]] = relationship(secondary="feed_tag_links", back_populates="tags", viewonly=True)
 
     def __repr__(self):
         return "<TagModel>"

@@ -46,8 +46,8 @@ class PasswordSetupIn(BaseModel):
 
 
 class EmailAuthIn(BaseModel):
-    first_name: Annotated[str | None, AfterValidator(validate_first_name)]
-    last_name: Annotated[str | None, AfterValidator(validate_last_name)]
+    first_name: Annotated[str | None, AfterValidator(validate_first_name)] = None
+    last_name: Annotated[str | None, AfterValidator(validate_last_name)] = None
     email: EmailStr
     password: Annotated[str, AfterValidator(validate_password)]
 

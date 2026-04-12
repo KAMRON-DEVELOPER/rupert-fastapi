@@ -75,7 +75,7 @@ class PostModel(BaseModel):
     # Relationships
     author: Mapped["UserModel"] = relationship(back_populates="posts")
     tag_links: Mapped[list["PostTagLink"]] = relationship(back_populates="post", cascade="all, delete-orphan")
-    tags: Mapped[list["TagModel"]] = relationship(secondary="post_tag_links", back_populates="posts", overlaps="post_links,tag_links,tag,post")
+    tags: Mapped[list["TagModel"]] = relationship(secondary="post_tag_links", back_populates="posts", viewonly=True)
     engagements: Mapped[list["PostEngagementModel"]] = relationship(back_populates="post", cascade="all, delete-orphan")
     comments: Mapped[list["PostCommentModel"]] = relationship(back_populates="post", cascade="all, delete-orphan", passive_deletes=True)
 

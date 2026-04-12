@@ -1,4 +1,5 @@
 import asyncio
+from pprint import pprint
 from typing import Annotated
 
 from bcrypt import checkpw, gensalt, hashpw
@@ -61,7 +62,8 @@ async def google_oauth_callback(
         await finalize_session(req, res, user, session)
         return RedirectResponse(settings.frontend_endpoint)
     except Exception as e:
-        logger.error("google_oauth_callback", e)
+        logger.error("google_oauth_callback [session.flush, finalize_session]")
+        pprint(e)
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
 
@@ -91,7 +93,8 @@ async def github_oauth_callback(
         await finalize_session(req, res, user, session)
         return RedirectResponse(settings.frontend_endpoint)
     except Exception as e:
-        logger.error("google_oauth_callback", e)
+        logger.error("google_oauth_callback [session.flush, finalize_session]")
+        pprint(e)
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
 
@@ -106,16 +109,18 @@ async def password_setup(token: Annotated[str, Query], schm: PasswordSetupIn, se
     try:
         await session.execute(stmt)
     except Exception as e:
-        logger.error("password_setup", e)
+        logger.error("password_setup session.execute")
+        pprint(e)
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
 
-@users_router.post(path="/auth/email", status_code=status.HTTP_201_CREATED)
+@users_router.post(path="/auth/email")
 async def email_auth(req: Request, res: Response, schm: EmailAuthIn, session: DBSession):
     try:
         user = await UsersRepository.find_by_email(schm.email, session)
     except Exception as e:
-        logger.error("email_auth UsersRepository.find_by_email", e)
+        logger.error("email_auth UsersRepository.find_by_email")
+        pprint(e)
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
     if user:
@@ -128,14 +133,16 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthIn, session: DB
                 await finalize_session(req, res, user, session)
                 await session.commit()
             except Exception as e:
-                logger.error("email_auth finalize_session", e)
+                logger.error("email_auth finalize_session")
+                pprint(e)
                 raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
             return user
 
         try:
             providers = await OAuthUsersRepository.find_providers_by_user_id(user.id, session)
         except Exception as e:
-            logger.error("email_auth OAuthUsersRepository.find_providers_by_user_id", e)
+            logger.error("email_auth OAuthUsersRepository.find_providers_by_user_id")
+            pprint(e)
             raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
         if len(providers) == 0:
@@ -148,7 +155,8 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthIn, session: DB
         try:
             await Mailtrap.send_password_setup_link(to_name=f"{user.first_name} {user.last_name}", to_email=user.email, link=setup_link, cfg=settings.mailtrap)
         except MailtrapError as e:
-            logger.error("MailtrapError", e.error.errors)
+            logger.error("email_auth MailtrapError")
+            pprint(e)
             raise HTTPException(status_code=500, detail="Could not send password setup link")
 
         providers_text = ", ".join(str(p.value) for p in providers)
@@ -163,7 +171,8 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthIn, session: DB
     try:
         user = await UsersRepository.create(schm.email, hash_password, schm.first_name, schm.last_name, session)
     except Exception as e:
-        logger.error("email_auth UsersRepository.create", e)
+        logger.error("email_auth UsersRepository.create")
+        pprint(e)
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
     token = create_token(user.id, "email_verification")
@@ -172,14 +181,16 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthIn, session: DB
     try:
         await Mailtrap.send_email_verification_link(to_name=f"{schm.first_name} {schm.last_name}", to_email=schm.email, link=verification_link, cfg=settings.mailtrap)
     except MailtrapError as e:
-        logger.error("MailtrapError", e.error.errors)
+        logger.error("email_auth MailtrapError")
+        pprint(e)
         raise HTTPException(status_code=500, detail="Could not send email verification link")
 
     try:
         await finalize_session(req, res, user, session)
         await session.commit()
     except Exception as e:
-        logger.error("email_auth finalize_session", e)
+        logger.error("email_auth finalize_session")
+        pprint(e)
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
     return user
 
@@ -191,7 +202,8 @@ async def logout(auth: authDep, session: DBSession):
     try:
         return await SessionsRepository.delete(user_id, refresh_token, session)
     except Exception as e:
-        logger.error("logout", e)
+        logger.error("logout SessionsRepository.delete")
+        pprint(e)
         raise HTTPException(status_code=500, detail="Something went wrong")
 
 
@@ -202,7 +214,8 @@ async def get_user(auth: authDep, session: DBSession):
     try:
         return await UsersRepository.get_by_id(user_id, session)
     except Exception as e:
-        logger.error("get_user", e)
+        logger.error("get_user UsersRepository.get_by_id")
+        pprint(e)
         raise HTTPException(status_code=500, detail="Something went wrong")
 
 
@@ -213,7 +226,8 @@ async def update_user(auth: authDep, schm: UserUpdateIn, session: DBSession):
     try:
         return await UsersRepository.update_by_id(user_id, schm, session)
     except Exception as e:
-        logger.error("update_user", e)
+        logger.error("update_user UsersRepository.update_by_id")
+        pprint(e)
         raise HTTPException(status_code=500, detail="Something went wrong")
 
 
@@ -225,5 +239,6 @@ async def delete_user(auth: authDep, session: DBSession):
         await SessionsRepository.delete(user_id, refresh_token, session)
         await UsersRepository.delete_by_id(user_id, session)
     except Exception as e:
-        logger.error("update_user", e)
+        logger.error("update_user [SessionsRepository.delete, UsersRepository.delete_by_id]")
+        pprint(e)
         raise HTTPException(status_code=500, detail="Something went wrong")

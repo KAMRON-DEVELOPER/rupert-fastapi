@@ -87,7 +87,7 @@ class FeedModel(BaseModel):
     comments: Mapped[list[FeedModel]] = relationship(back_populates="parent", foreign_keys=[parent_id], cascade="all, delete-orphan", passive_deletes=True)
     category: Mapped[FeedCategoryModel | None] = relationship(back_populates="feeds")
     tag_links: Mapped[list[FeedTagLink]] = relationship(back_populates="feed", overlaps="feeds, tags", cascade="all, delete-orphan")
-    tags: Mapped[list[TagModel]] = relationship(secondary="feed_tag_links", back_populates="feeds", overlaps="feed_links,feed,tag")
+    tags: Mapped[list[TagModel]] = relationship(secondary="feed_tag_links", back_populates="feeds", viewonly=True)
     engagements: Mapped[list[FeedEngagementModel]] = relationship(back_populates="feed", cascade="all, delete-orphan")
 
     def __repr__(self):
