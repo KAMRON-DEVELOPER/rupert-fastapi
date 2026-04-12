@@ -1,10 +1,12 @@
 from contextlib import asynccontextmanager
 from logging import Filter, getLogger
 
+from dead_simple_oauth_fastapi import GitHubOAuthClient, GoogleOAuthClient
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from src.apps.companies.routes import companies_router
 from src.apps.users.routes import users_router
@@ -13,10 +15,21 @@ from src.utils.boto3 import initialize_boto3
 from src.utils.database import async_engine, initialize_db
 from src.utils.exceptions import ApiException
 from src.utils.logger import logger
-from src.utils.redis import CacheManager, ChatCacheManager, RedisPubSubManager, create_redis
 from src.utils.settings import get_settings
 
 settings = get_settings()
+
+google = GoogleOAuthClient(
+    client_id=settings.google_oauth.client_id,
+    client_secret=settings.google_oauth.client_secret,
+    redirect_uri=settings.google_oauth.redirect_url,
+)
+
+github = GitHubOAuthClient(
+    client_id=settings.github_oauth.client_id,
+    client_secret=settings.github_oauth.client_secret,
+    redirect_uri=settings.github_oauth.redirect_url,
+)
 
 
 @asynccontextmanager
@@ -32,16 +45,9 @@ async def lifespan(app: FastAPI):
         await initialize_boto3()
     except Exception as e:
         logger.exception(f"initialization exception startup, e: {e}")
-
-    app.state.redis = create_redis()
-    app.state.pubsub_manager = RedisPubSubManager(app.state.redis)
-    app.state.chat_cache_manager = ChatCacheManager(app.state.redis)
-    app.state.cache_manager = CacheManager(app.state.redis)
-
     try:
         yield
     finally:
-        await app.state.redis.aclose()
         await async_engine.dispose()
 
 
@@ -57,6 +63,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 app.include_router(router=users_router, prefix="/api/v1/users", tags=["users"])
 app.include_router(router=companies_router, prefix="/api/v1/companies", tags=["companies"])

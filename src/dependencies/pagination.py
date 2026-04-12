@@ -1,13 +1,21 @@
 from typing import Annotated
 
-from fastapi import Depends, Query
+from fastapi import Query
+from pydantic import BaseModel, model_validator
+from pydantic.fields import Field
 
 
-class PaginationQueryParams:
+class Pagination(BaseModel):
+    offset: int = Field(0, ge=0)
+    limit: int = Field(100, ge=0)
 
-    def __init__(self, offset: int | None = Query(default=0), limit: int | None = Query(default=100)):
-        self.offset = offset
-        self.limit = limit
+    @model_validator(mode="after")
+    def check_offset_less_than_limit(self) -> Pagination:
+        if self.offset > self.limit:
+            raise ValueError("Offset cannot be greater than limit")
+        return self
+
+    model_config = {"extra": "forbid"}
 
 
-paginationDep = Annotated[PaginationQueryParams, Depends()]
+paginationDep = Annotated[Pagination, Query()]

@@ -33,7 +33,7 @@ class CompanyMemberModel(BaseModel):
 class CompanyModel(BaseModel, WithLocation):
     __tablename__ = "companies"
 
-    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
     tagline: Mapped[str | None] = mapped_column(String(128))
     description: Mapped[str | None] = mapped_column(Text)
     logo_url: Mapped[str | None] = mapped_column(Text)

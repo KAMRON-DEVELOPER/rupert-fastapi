@@ -9,6 +9,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "bcrypt>=5.0.0",
     "coredis>=6.3.0",
+    "dead-simple-oauth-fastapi>=0.1.0",
     "fastapi>=0.135.2",
     "httpx>=0.28.1",
     "loguru>=0.7.3",

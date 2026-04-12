@@ -68,13 +68,22 @@ class ResumeSkillLink(BaseModel):
 
 class ResumeModel(BaseModel, WithLocation):
     __tablename__ = "resumes"
-    __table_args__ = (CheckConstraint("salary_expectation_min <= salary_expectation_max", name="chk_resume_salary_expectation_range"),)
+    __table_args__ = (
+        CheckConstraint(
+            "salary_expectation_min <= salary_expectation_max",
+            name="chk_resume_salary_expectation_range",
+        ),
+    )
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title: Mapped[str] = mapped_column(String(128), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text)
 
-    specialization: Mapped[Specialization] = mapped_column(Enum(Specialization, name="specialization"), index=True, nullable=False)
+    specialization: Mapped[Specialization] = mapped_column(
+        Enum(Specialization, name="specialization"),
+        index=True,
+        nullable=False,
+    )
     salary_expectation_min: Mapped[int | None] = mapped_column(Integer, index=True)
     salary_expectation_max: Mapped[int | None] = mapped_column(Integer, index=True)
     salary_currency: Mapped[SalaryCurrency | None] = mapped_column(Enum(SalaryCurrency, name="salary_currency"))
@@ -95,8 +104,16 @@ class UserSkillLink(BaseModel):
     __tablename__ = "user_skill_links"
     __table_args__ = (UniqueConstraint("user_id", "skill_id", name="uq_user_skill"),)
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    skill_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    skill_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("skills.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     proficiency: Mapped[ProficiencyLevel] = mapped_column(Enum(ProficiencyLevel, name="proficiency_level"), nullable=False)
     last_used_at: Mapped[date | None] = mapped_column(Date)
 
@@ -159,7 +176,7 @@ class UserModel(BaseModel, WithLocation):
 
     # Profile
     first_name: Mapped[str] = mapped_column(String(length=64), nullable=False)
-    last_name: Mapped[str] = mapped_column(String(length=64), nullable=False)
+    last_name: Mapped[str | None] = mapped_column(String(length=64), nullable=False)
     headline: Mapped[str | None] = mapped_column(String(120))
     birthdate: Mapped[date | None] = mapped_column(Date)
     bio: Mapped[str | None] = mapped_column(Text)
@@ -177,9 +194,21 @@ class UserModel(BaseModel, WithLocation):
 
     # System
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), default=UserRole.user, nullable=False)
-    status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, name="user_status"), default=UserStatus.active, nullable=False)
-    follow_policy: Mapped[FollowPolicy] = mapped_column(Enum(FollowPolicy, name="follow_policy"), default=FollowPolicy.auto_accept, nullable=False)
-    job_search_status: Mapped[JobSearchStatus] = mapped_column(Enum(JobSearchStatus, name="job_search_status"), default=JobSearchStatus.not_looking, nullable=False)
+    status: Mapped[UserStatus] = mapped_column(
+        Enum(UserStatus, name="user_status"),
+        default=UserStatus.pending_verification,
+        nullable=False,
+    )
+    follow_policy: Mapped[FollowPolicy] = mapped_column(
+        Enum(FollowPolicy, name="follow_policy"),
+        default=FollowPolicy.auto_accept,
+        nullable=False,
+    )
+    job_search_status: Mapped[JobSearchStatus] = mapped_column(
+        Enum(JobSearchStatus, name="job_search_status"),
+        default=JobSearchStatus.not_looking,
+        nullable=False,
+    )
 
     # Relationships
     oauth_users: Mapped[list[OAuthUserModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -190,8 +219,16 @@ class UserModel(BaseModel, WithLocation):
     sessions: Mapped[list[SessionModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
     # Following
-    follower_links: Mapped[list[FollowModel]] = relationship(back_populates="following", foreign_keys="[FollowModel.following_id]", cascade="all, delete-orphan")
-    following_links: Mapped[list[FollowModel]] = relationship(back_populates="follower", foreign_keys="[FollowModel.follower_id]", cascade="all, delete-orphan")
+    follower_links: Mapped[list[FollowModel]] = relationship(
+        back_populates="following",
+        foreign_keys="[FollowModel.following_id]",
+        cascade="all, delete-orphan",
+    )
+    following_links: Mapped[list[FollowModel]] = relationship(
+        back_populates="follower",
+        foreign_keys="[FollowModel.follower_id]",
+        cascade="all, delete-orphan",
+    )
 
     # Jobs
     applications: Mapped[list[ApplicationModel]] = relationship(back_populates="applicant", passive_deletes=True)
@@ -219,10 +256,20 @@ class UserModel(BaseModel, WithLocation):
 
     # Computed
     followers_count: Mapped[int] = column_property(
-        select(func.count(FollowModel.id)).where(FollowModel.following_id == literal_column("users.id")).correlate_except(FollowModel).scalar_subquery()
+        select(func.count(FollowModel.id))
+        .where(
+            FollowModel.following_id == literal_column("users.id"),
+        )
+        .correlate_except(FollowModel)
+        .scalar_subquery()
     )
     followings_count: Mapped[int] = column_property(
-        select(func.count(FollowModel.id)).where(FollowModel.follower_id == literal_column("users.id")).correlate_except(FollowModel).scalar_subquery()
+        select(func.count(FollowModel.id))
+        .where(
+            FollowModel.follower_id == literal_column("users.id"),
+        )
+        .correlate_except(FollowModel)
+        .scalar_subquery()
     )
 
     def __repr__(self):

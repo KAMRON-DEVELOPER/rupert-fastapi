@@ -1,14 +1,11 @@
-import re
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.responses import Response
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import decode, encode
-from jwt.exceptions import PyJWTError
-from jwt.types import Options
+from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from pydantic import BaseModel, ValidationError
 
 from src.utils.settings import get_settings
@@ -16,7 +13,8 @@ from src.utils.settings import get_settings
 settings = get_settings()
 
 
-TokenType = Literal["access", "refresh", "email_verification", "password_setup"]
+CookieTokenType = Literal["access", "refresh"]
+TokenType = Literal[*CookieTokenType, "email_verification", "password_setup"]
 
 
 class TokenClaims(BaseModel):
@@ -26,96 +24,127 @@ class TokenClaims(BaseModel):
     iat: datetime
 
 
+class AuthCookies(BaseModel):
+    access_token: str | None = None
+    refresh_token: str | None = None
+
+    model_config = {"extra": "forbid"}
+
+
 def create_token(user_id: UUID, type: TokenType) -> str:
     iat = datetime.now(UTC)
 
-    minutes = settings.jwt.access_token_expire_in_minutes
-    days = settings.jwt.refresh_token_expire_in_days
-    exp = iat + (timedelta(minutes=minutes) if type == "access" else timedelta(days=days))
+    match type:
+        case "access":
+            exp = iat + timedelta(minutes=settings.jwt.access_token_expire_in_minutes)
+        case "refresh":
+            exp = iat + timedelta(days=settings.jwt.refresh_token_expire_in_days)
+        case "email_verification":
+            exp = iat + timedelta(hours=settings.jwt.email_verification_token_expire_in_hours)
+        case "password_setup":
+            exp = iat + timedelta(minutes=settings.jwt.password_setup_token_expire_in_minutes)
 
-    claims = TokenClaims(sub=user_id, type=type, exp=exp, iat=iat)
+    claims = TokenClaims(sub=user_id, type=type, iat=iat, exp=exp)
     payload = claims.model_dump()
 
     return encode(payload, settings.jwt.secret_key, algorithm=settings.jwt.algorithm)
 
 
-def to_snake_case(name: str) -> str:
-    s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
-    return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
-
-
-def decode_token(jwt: str) -> tuple[bool, TokenClaims]:
+def decode_token(jwt: str, expected_type: TokenType):
     try:
-        obj = decode(jwt, options=Options(verify_signature=False))
+        # We emit new access token if expired, no raise
+        verify_exp = expected_type != "access"
+        obj = decode(
+            jwt,
+            settings.jwt.secret_key,
+            algorithms=[settings.jwt.algorithm],
+            options={"verify_exp": verify_exp},
+        )
 
         claims = TokenClaims.model_validate(obj)
 
-        minutes = settings.jwt.access_token_renewal_threshold_minutes
-        days = settings.jwt.refresh_token_renewal_threshold_days
-        threshold = timedelta(minutes=minutes) if claims.type == "access" else timedelta(days=days)
+        if claims.type != expected_type:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
 
-        if claims.exp - datetime.now(UTC) < threshold:
-            return (True, claims)
-
-        return (False, claims)
-    except Exception as e:
-        if isinstance(e, ValidationError):
-            print(f"Validation error: {e}")
-            raise
-        elif isinstance(e, PyJWTError):
-            exception_class_name = type(e).__name__
-            snake_case_name = to_snake_case(exception_class_name)
-            detail = f"JWT {snake_case_name.replace('_error', '').replace('_signature', ' signature')} error"
-            print(detail)
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
-        else:
-            raise
-
-
-security = HTTPBearer()
-authHeaderDep = Annotated[HTTPAuthorizationCredentials | None, Depends(security)]
-cookieDep = Annotated[str | None, Cookie()]
+        return claims
+    except ValidationError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT token validation error")
+    except ExpiredSignatureError:
+        match expected_type:
+            case "access":
+                detail = "Access token expired"
+            case "refresh":
+                detail = "Session expired"
+            case "email_verification":
+                detail = "Email verification link expired"
+            case "password_setup":
+                detail = "Password setup link expired"
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
+    except PyJWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT error")
 
 
-async def proactive_refresh(res: Response, access_token: cookieDep, refresh_token: cookieDep) -> UUID:
-    user_id: UUID | None = None
+def handle_decode(jwt: str, expected_type: CookieTokenType) -> tuple[bool, TokenClaims, bool]:
+    claims = decode_token(jwt, expected_type=expected_type)
 
-    if access_token:
-        needs_refresh, claims = decode_token(access_token)
-        user_id = claims.sub
-        if needs_refresh:
-            new_access_token = create_token(user_id=claims.sub, type=claims.type)
-            max_age = settings.jwt.access_token_expire_in_minutes * 60
-            res.set_cookie(
-                key="access_token", value=new_access_token, httponly=True, domain=settings.jwt.domain, path="/", secure=settings.debug is False, samesite="lax", max_age=max_age
-            )
+    if expected_type == "access":
+        threshold = timedelta(minutes=settings.jwt.access_token_renewal_threshold_minutes)
+    else:
+        threshold = timedelta(days=settings.jwt.refresh_token_renewal_threshold_days)
 
-    if refresh_token:
-        needs_refresh, claims = decode_token(refresh_token)
-        user_id = claims.sub
-        if needs_refresh:
-            new_refresh_token = create_token(user_id=claims.sub, type=claims.type)
-            max_age = settings.jwt.refresh_token_expire_in_days * 86400
-            res.set_cookie(
-                key="refresh_token", value=new_refresh_token, httponly=True, domain=settings.jwt.domain, path="/", secure=settings.debug is False, samesite="lax", max_age=max_age
-            )
+    now = datetime.now(UTC)
+    exp = claims.exp
+    needs_refresh = (exp - now) < threshold
+    expired = exp < now
 
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+    return (needs_refresh, claims, expired)
 
-    return user_id
+
+def set_auth_cookie(res: Response, key: str, value: str, max_age: int):
+    res.set_cookie(key=key, value=value, max_age=max_age, domain=settings.jwt.domain, path="/", secure=not settings.debug, httponly=True, samesite="lax")
+
+
+def clear_auth_cookies(res: Response):
+    res.delete_cookie(key="access_token", domain=settings.jwt.domain, path="/")
+    res.delete_cookie(key="refresh_token", domain=settings.jwt.domain, path="/")
 
 
 class ProactiveRefresh:
-    def __init__(self, optional: bool = False):
-        self.optional = optional
+    def __init__(self, required: bool = False):
+        self.required = required
 
-    def __call__(self, q: str = ""):
-        pass
+    def __call__(self, res: Response, auth_cookies: Annotated[AuthCookies, Cookie()]):
+        access_token = auth_cookies.access_token
+        refresh_token = auth_cookies.refresh_token
+
+        if access_token:
+            access_needs_refresh, access_claims, expired = handle_decode(access_token, "access")
+            if not expired:
+                if access_needs_refresh:
+                    new_access_token = create_token(user_id=access_claims.sub, type="access")
+                    set_auth_cookie(res, key="access_token", value=new_access_token, max_age=settings.jwt.access_token_expire_in_minutes * 60)
+                return access_claims.sub, access_token, refresh_token
+
+        if refresh_token:
+            refresh_needs_refresh, refresh_claims, _ = handle_decode(refresh_token, "refresh")
+
+            new_access_token = create_token(user_id=refresh_claims.sub, type="access")
+            set_auth_cookie(res, key="access_token", value=new_access_token, max_age=settings.jwt.access_token_expire_in_minutes * 60)
+
+            if refresh_needs_refresh:
+                new_refresh_token = create_token(user_id=refresh_claims.sub, type="refresh")
+                set_auth_cookie(res, key="refresh_token", value=new_refresh_token, max_age=settings.jwt.refresh_token_expire_in_days * 86400)
+
+            return refresh_claims.sub, access_token, refresh_token
+
+        if self.required:
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
+        return None
 
 
-checker = ProactiveRefresh()
-authDep = Annotated[UUID | None, Depends(checker)]
+auth_probe_checker = ProactiveRefresh()
+authProbeDep = Annotated[tuple[UUID, str, str] | None, Depends(auth_probe_checker)]
 
-strictChecker = ProactiveRefresh()
-strictAuthDep = Annotated[UUID, Depends(strictChecker)]
+auth_checker = ProactiveRefresh(required=True)
+authDep = Annotated[tuple[UUID, str, str], Depends(auth_checker)]

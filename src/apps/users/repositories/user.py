@@ -1,9 +1,9 @@
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.users.schemas import UserUpdateSchema
+from apps.users.schemas import UserUpdateIn
 from src.apps.users.models import UserModel
 
 
@@ -28,7 +28,13 @@ class UsersRepository:
         return result.scalar_one()
 
     @staticmethod
-    async def update_by_id(id: UUID, schema: UserUpdateSchema, session: AsyncSession):
-        stmt = update(UserModel).where(UserModel.id == id).values({})
+    async def update_by_id(id: UUID, schema: UserUpdateIn, session: AsyncSession):
+        # TODO we need perform some validations
+        stmt = update(UserModel).where(UserModel.id == id).values().returning(UserModel)
         result = await session.execute(stmt)
         return result.scalar_one()
+
+    @staticmethod
+    async def delete_by_id(id: UUID, session: AsyncSession):
+        stmt = delete(UserModel).where(UserModel.id == id)
+        await session.execute(stmt)
