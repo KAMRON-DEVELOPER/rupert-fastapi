@@ -111,7 +111,11 @@ async def password_setup(token: Annotated[str, Query], schm: PasswordSetupIn, se
 
 @users_router.post(path="/auth/email", status_code=status.HTTP_201_CREATED)
 async def email_auth(req: Request, res: Response, schm: EmailAuthIn, session: DBSession):
-    user = await UsersRepository.find_by_email(schm.email, session)
+    try:
+        user = await UsersRepository.find_by_email(schm.email, session)
+    except Exception as e:
+        logger.error("email_auth UsersRepository.find_by_email", e)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
     if user:
         if user.password_hash:
@@ -119,12 +123,20 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthIn, session: DB
             if not is_valid:
                 raise ValidationException("password is not match.")
 
-            await finalize_session(req, res, user, session)
-            await session.commit()
+            try:
+                await finalize_session(req, res, user, session)
+                await session.commit()
+            except Exception as e:
+                logger.error("email_auth finalize_session", e)
+                raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
             return user
 
-        # No password
-        providers = await OAuthUsersRepository.find_providers_by_user_id(user.id, session)
+        try:
+            providers = await OAuthUsersRepository.find_providers_by_user_id(user.id, session)
+        except Exception as e:
+            logger.error("email_auth OAuthUsersRepository.find_providers_by_user_id", e)
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
+
         if len(providers) == 0:
             print(f"user has no password and no linked oauth provider, {user.id}")
             raise HTTPException(status_code=500, detail="This account is missing a login method. Please contact support.")
@@ -146,7 +158,12 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthIn, session: DB
 
     hash_password_bytes = await asyncio.to_thread(hashpw, schm.password.encode(), gensalt(rounds=8))
     hash_password = hash_password_bytes.decode()
-    user = await UsersRepository.create(schm.email, hash_password, schm.first_name, schm.last_name, session)
+
+    try:
+        user = await UsersRepository.create(schm.email, hash_password, schm.first_name, schm.last_name, session)
+    except Exception as e:
+        logger.error("email_auth UsersRepository.create", e)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
     token = create_token(user.id, "email_verification")
     verification_link = f"{settings.frontend_endpoint}/auth/verify?token={token}"
@@ -157,8 +174,12 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthIn, session: DB
         logger.error("MailtrapError", e.error.errors)
         raise HTTPException(status_code=500, detail="Could not send email verification link")
 
-    await finalize_session(req, res, user, session)
-    await session.commit()
+    try:
+        await finalize_session(req, res, user, session)
+        await session.commit()
+    except Exception as e:
+        logger.error("email_auth finalize_session", e)
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
     return user
 
 
