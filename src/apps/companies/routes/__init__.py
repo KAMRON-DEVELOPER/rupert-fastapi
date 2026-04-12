@@ -1,7 +1,4 @@
-from fastapi import APIRouter
-
 from . import company
+from .router import companies_router
 
-__all__ = ["company"]
-
-companies_router = APIRouter()
+__all__ = ["companies_router", "company"]

@@ -6,8 +6,8 @@ import aioboto3
 from botocore.exceptions import ClientError
 from types_aiobotocore_s3.type_defs import ObjectIdentifierTypeDef
 
-from src.utils.logger import logger
-from src.utils.settings import get_settings
+from src.core.logger import logger
+from src.core.settings import get_settings
 
 settings = get_settings()
 

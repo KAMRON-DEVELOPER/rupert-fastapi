@@ -8,8 +8,8 @@ from uuid import UUID
 import aiohttp
 from PIL import Image
 
-from src.utils.logger import logger
-from src.utils.minio import put_object_to_minio
+from src.core.logger import logger
+from src.core.minio import put_object_to_minio
 
 
 def generate_username_from_base_name(base_name: str) -> str:

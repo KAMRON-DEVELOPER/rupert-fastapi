@@ -8,7 +8,7 @@ from jwt import decode, encode
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
 from pydantic import BaseModel, ValidationError
 
-from src.utils.settings import get_settings
+from src.core.settings import get_settings
 
 settings = get_settings()
 

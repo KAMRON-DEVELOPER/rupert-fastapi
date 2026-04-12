@@ -1,4 +1,4 @@
-from . import vacancies_router
+from .router import vacancies_router
 
 
 @vacancies_router.get("/vacancies")

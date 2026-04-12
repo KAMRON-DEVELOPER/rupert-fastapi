@@ -1,4 +1,4 @@
-from . import companies_router
+from .router import companies_router
 
 
 @companies_router.get("/companies")

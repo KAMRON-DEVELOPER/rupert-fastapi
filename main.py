@@ -11,11 +11,11 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from src.apps.companies.routes import companies_router
 from src.apps.users.routes import users_router
 from src.apps.vacancies.routes import vacancies_router
-from src.utils.boto3 import initialize_boto3
-from src.utils.database import async_engine, initialize_db
-from src.utils.exceptions import ApiException
-from src.utils.logger import logger
-from src.utils.settings import get_settings
+from src.core.boto3 import initialize_boto3
+from src.core.database import async_engine, initialize_db
+from src.core.exceptions import ApiException
+from src.core.logger import logger
+from src.core.settings import get_settings
 
 settings = get_settings()
 

@@ -18,13 +18,13 @@ from services.mailtrap import Mailtrap, MailtrapError
 from src.apps.shared.enums import UserStatus
 from src.apps.users.models import UserModel
 from src.apps.users.schemas import AuthProbeOut, EmailAuthIn, PasswordSetupIn, UserUpdateIn
+from src.core.database import DBSession
+from src.core.exceptions import ValidationException
+from src.core.logger import logger
+from src.core.settings import get_settings
 from src.dependencies.proactive_refresh import authDep, authProbeDep, create_token, decode_token
-from src.utils.logger import logger
-from src.utils.settings import get_settings
-from utils.database import DBSession
-from utils.exceptions import ValidationException
 
-from . import users_router
+from .router import users_router
 
 settings = get_settings()
 

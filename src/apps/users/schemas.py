@@ -6,7 +6,7 @@ from pydantic import AfterValidator, BaseModel, EmailStr, Field, ValidationInfo,
 
 from src.apps.shared.enums import EmploymentType, FollowPolicy, JobSearchStatus, ProficiencyLevel, Provider, SalaryCurrency, Specialization, UserRole, UserStatus, WorkFormat
 from src.apps.shared.schemas import BaseOut, ORMSchema, SkillOut
-from src.utils.exceptions import ValidationException
+from src.core.exceptions import ValidationException
 
 
 def validate_first_name(v: str | None) -> str | None:

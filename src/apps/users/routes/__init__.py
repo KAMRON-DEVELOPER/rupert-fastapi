@@ -1,7 +1,4 @@
-from fastapi import APIRouter
-
 from . import auth
+from .router import users_router
 
-__all__ = ["auth"]
-
-users_router = APIRouter()
+__all__ = ["users_router", "auth"]

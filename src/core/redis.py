@@ -8,8 +8,8 @@ from redis.asyncio import ConnectionPool, Redis
 from redis.asyncio.client import PubSub
 
 from src.apps.chats.schemas import ChatMessageSchema, ChatResponseSchema, ChatSchema, ParticipantSchema
-from src.utils.logger import logger
-from src.utils.settings import get_settings
+from src.core.logger import logger
+from src.core.settings import get_settings
 
 settings = get_settings()
 

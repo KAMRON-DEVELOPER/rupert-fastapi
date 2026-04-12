@@ -8,8 +8,8 @@ from miniopy_async.datatypes import Object
 from miniopy_async.error import MinioException, S3Error
 from miniopy_async.helpers import ObjectWriteResult
 
-from src.utils.logger import logger
-from src.utils.settings import get_settings
+from src.core.logger import logger
+from src.core.settings import get_settings
 
 settings = get_settings()
 

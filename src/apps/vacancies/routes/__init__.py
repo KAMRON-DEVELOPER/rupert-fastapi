@@ -1,7 +1,4 @@
-from fastapi import APIRouter
-
 from . import vacancy
+from .router import vacancies_router
 
-__all__ = ["vacancy"]
-
-vacancies_router = APIRouter()
+__all__ = ["vacancies_router", "vacancy"]

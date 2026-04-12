@@ -11,7 +11,7 @@ from fastapi import UploadFile
 from PIL import Image
 from PIL.ImageFile import ImageFile
 
-from src.utils.exceptions import ValidationException
+from src.core.exceptions import ValidationException
 
 email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
 violent_words = [

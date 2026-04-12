@@ -1,8 +1,8 @@
 from aiohttp import ClientSession
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.utils.logger import logger
-from src.utils.settings import MailtrapConfig
+from src.core.logger import logger
+from src.core.settings import MailtrapConfig
 
 
 class Mailbox(BaseModel):
