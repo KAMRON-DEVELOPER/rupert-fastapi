@@ -8,16 +8,16 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import update
 from starlette.requests import Request
 
-from apps.shared.schemas import MessageResponse
-from apps.users.repositories.oauth_user import OAuthUsersRepository
-from apps.users.repositories.session import SessionsRepository
-from apps.users.repositories.user import UsersRepository
-from apps.users.utils import finalize_session
 from main import github, google
 from services.mailtrap import Mailtrap, MailtrapError
 from src.apps.shared.enums import UserStatus
+from src.apps.shared.schemas import MessageResponse
 from src.apps.users.models import UserModel
+from src.apps.users.repositories.oauth_user import OAuthUsersRepository
+from src.apps.users.repositories.session import SessionsRepository
+from src.apps.users.repositories.user import UsersRepository
 from src.apps.users.schemas import AuthProbeOut, EmailAuthIn, PasswordSetupIn, UserUpdateIn
+from src.apps.users.utils import finalize_session
 from src.core.database import DBSession
 from src.core.exceptions import ValidationException
 from src.core.logger import logger
