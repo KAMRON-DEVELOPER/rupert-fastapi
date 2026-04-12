@@ -1,4 +1,4 @@
-from src.apps.vacancies.routes import vacancies_router
+from . import vacancies_router
 
 
 @vacancies_router.get("/vacancies")

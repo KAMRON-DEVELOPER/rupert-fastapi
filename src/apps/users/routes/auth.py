@@ -17,13 +17,14 @@ from main import github, google
 from services.mailtrap import Mailtrap, MailtrapError
 from src.apps.shared.enums import UserStatus
 from src.apps.users.models import UserModel
-from src.apps.users.routes import users_router
 from src.apps.users.schemas import AuthProbeOut, EmailAuthIn, PasswordSetupIn, UserUpdateIn
 from src.dependencies.proactive_refresh import authDep, authProbeDep, create_token, decode_token
 from src.utils.logger import logger
 from src.utils.settings import get_settings
 from utils.database import DBSession
 from utils.exceptions import ValidationException
+
+from . import users_router
 
 settings = get_settings()
 

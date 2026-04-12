@@ -1,4 +1,4 @@
-from src.apps.companies.routes import companies_router
+from . import companies_router
 
 
 @companies_router.get("/companies")
