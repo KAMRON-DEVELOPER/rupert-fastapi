@@ -1,7 +1,6 @@
 from contextlib import asynccontextmanager
 from logging import Filter, getLogger
 
-from dead_simple_oauth_fastapi import GitHubOAuthClient, GoogleOAuthClient
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,18 +17,6 @@ from src.core.logger import logger
 from src.core.settings import get_settings
 
 settings = get_settings()
-
-google = GoogleOAuthClient(
-    client_id=settings.google_oauth.client_id,
-    client_secret=settings.google_oauth.client_secret,
-    redirect_uri=settings.google_oauth.redirect_url,
-)
-
-github = GitHubOAuthClient(
-    client_id=settings.github_oauth.client_id,
-    client_secret=settings.github_oauth.client_secret,
-    redirect_uri=settings.github_oauth.redirect_url,
-)
 
 
 @asynccontextmanager
