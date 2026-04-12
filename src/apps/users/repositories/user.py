@@ -3,8 +3,8 @@ from uuid import UUID
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.users.schemas import UserUpdateIn
 from src.apps.users.models import UserModel
+from src.apps.users.schemas import UserUpdateIn
 
 
 class UsersRepository:

@@ -1,10 +1,10 @@
 from fastapi import Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from dependencies.proactive_refresh import create_token, set_auth_cookie
 from src.apps.models import UserModel
 from src.apps.users.repositories.session import SessionsRepository
 from src.core.settings import get_settings
+from src.dependencies.proactive_refresh import create_token, set_auth_cookie
 
 settings = get_settings()
 
