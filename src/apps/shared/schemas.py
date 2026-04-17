@@ -2,7 +2,8 @@ from datetime import datetime
 from typing import Annotated, Generic, TypeVar
 from uuid import UUID
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict, Field
+from pydantic.alias_generators import to_camel
 
 
 # ---------------------------------------------------------------------------
@@ -12,10 +13,16 @@ class ORMSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class BaseOut(ORMSchema):
+class CameCaseOut(ORMSchema):
+    model_config = ConfigDict(from_attributes=True, alias_generator=AliasGenerator(serialization_alias=to_camel))
+
+
+class BaseOut(CameCaseOut):
     id: UUID
     created_at: datetime
     updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ---------------------------------------------------------------------------
