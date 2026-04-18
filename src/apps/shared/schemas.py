@@ -13,11 +13,11 @@ class ORMSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class CameCaseOut(ORMSchema):
+class CamelCaseOut(ORMSchema):
     model_config = ConfigDict(from_attributes=True, alias_generator=AliasGenerator(serialization_alias=to_camel))
 
 
-class BaseOut(CameCaseOut):
+class BaseOut(CamelCaseOut):
     id: UUID
     created_at: datetime
     updated_at: datetime

@@ -1,0 +1,26 @@
+from pprint import pprint
+
+from fastapi import APIRouter, HTTPException, status
+
+from src.apps.companies.repositories.company import CompaniesRepository
+from src.apps.stats.schemas import Stats
+from src.apps.users.repositories.user import UsersRepository
+from src.apps.vacancies.repositories.vacancy import VacanciesRepository
+from src.core.database import DBSession
+from src.core.logger import logger
+
+stats_router = APIRouter()
+
+
+@stats_router.get("/")
+async def stats(session: DBSession):
+    try:
+        users = await UsersRepository.get_stats(session)
+        vacancies = await VacanciesRepository.get_stats(session)
+        companies = await CompaniesRepository.get_stats(session)
+    except Exception as e:
+        logger.error("stats")
+        pprint(e)
+        raise HTTPException(status_code=status.HTTP)
+
+    return Stats(users=users, vacancies=vacancies, companies=companies)

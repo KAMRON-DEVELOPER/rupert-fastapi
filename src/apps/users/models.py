@@ -209,6 +209,7 @@ class UserModel(BaseModel, WithLocation):
         default=JobSearchStatus.not_looking,
         nullable=False,
     )
+    last_active_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), index=True)
 
     # Relationships
     oauth_users: Mapped[list[OAuthUserModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -217,6 +218,7 @@ class UserModel(BaseModel, WithLocation):
     skills: Mapped[list[SkillModel]] = relationship(secondary="user_skill_links", back_populates="users", viewonly=True)
     work_experiences: Mapped[list[WorkExperienceModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
     sessions: Mapped[list[SessionModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    activities: Mapped[list[ActivityModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
     # Following
     follower_links: Mapped[list[FollowModel]] = relationship(
@@ -279,12 +281,12 @@ class UserModel(BaseModel, WithLocation):
 class SessionModel(BaseModel):
     __tablename__ = "sessions"
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     user_agent: Mapped[str | None] = mapped_column(Text)
     ip_addr: Mapped[str | None] = mapped_column(String(45))
     device_name: Mapped[str | None] = mapped_column(String(128))
-    refresh_token: Mapped[str] = mapped_column(Text, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    refresh_token: Mapped[str] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_activity_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now())
 
     # Relationships
@@ -292,3 +294,15 @@ class SessionModel(BaseModel):
 
     def __repr__(self):
         return f"<SessionModel id={self.id}>"
+
+
+class ActivityModel(BaseModel):
+    __tablename__ = "activities"
+    __table_args__ = (UniqueConstraint("user_id", "activity_date", name="uq_user_activity_date"),)
+
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    activity_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    last_activity_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now())
+
+    # Relationships
+    user: Mapped[UserModel] = relationship(back_populates="activities")

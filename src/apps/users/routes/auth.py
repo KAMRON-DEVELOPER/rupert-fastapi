@@ -1,26 +1,22 @@
 import asyncio
 from pprint import pprint
 from typing import Annotated
+from urllib.parse import urljoin
 
 from bcrypt import checkpw, gensalt, hashpw
-from dead_simple_oauth_fastapi import GithubUser, GoogleUser
-from fastapi import Depends, HTTPException, Query, Response, status
+from fastapi import HTTPException, Query, Response, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import update
 from starlette.requests import Request
 
-from src.apps.shared.enums import UserStatus
 from src.apps.shared.schemas import MessageResponse
-from src.apps.users.models import UserModel
 from src.apps.users.repositories.oauth_user import OAuthUsersRepository
 from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
-from src.apps.users.schemas import AuthProbeOut, EmailAuthIn, PasswordSetupIn, UserUpdateIn
+from src.apps.users.schemas import AuthProbeOut, EmailAuthIn
 from src.apps.users.utils import finalize_session
 from src.core.database import DBSession
 from src.core.exceptions import ValidationException
 from src.core.logger import logger
-from src.core.oauth import github, google
 from src.core.settings import get_settings
 from src.dependencies.proactive_refresh import authDep, authProbeDep, create_token, decode_token
 from src.services.mailtrap import Mailtrap, MailtrapError
@@ -34,84 +30,6 @@ settings = get_settings()
 async def auth_probe(auth: authProbeDep):
     """Helpfull handler to check user session validity"""
     return AuthProbeOut(is_authenticated=auth is not None)
-
-
-@users_router.get("/auth/google")
-async def google_oauth(req: Request):
-    return await google.redirect(req)
-
-
-@users_router.get("/auth/google/callback")
-async def google_oauth_callback(
-    req: Request,
-    res: Response,
-    oauth_user: Annotated[GoogleUser, Depends(google.callback_dependency())],
-    session: DBSession,
-):
-    try:
-        user = UserModel(
-            email=oauth_user.email,
-            email_verified=oauth_user.email_verified,
-            first_name=oauth_user.given_name,
-            last_name=oauth_user.family_name,
-            status=UserStatus.active,
-        )
-        session.add(user)
-        await session.flush()
-
-        await finalize_session(req, res, user, session)
-        return RedirectResponse(settings.frontend_endpoint)
-    except Exception as e:
-        logger.error("google_oauth_callback [session.flush, finalize_session]")
-        pprint(e)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
-
-
-@users_router.get("/auth/github")
-async def github_oauth(request: Request):
-    return await github.redirect(request)
-
-
-@users_router.get("/auth/github/callback")
-async def github_oauth_callback(
-    req: Request,
-    res: Response,
-    oauth_user: Annotated[GithubUser, Depends(github.callback_dependency())],
-    session: DBSession,
-):
-    try:
-        user = UserModel(
-            email=oauth_user.email,
-            email_verified=True,
-            first_name=oauth_user.name,
-            last_name=None,
-            status=UserStatus.active,
-        )
-        session.add(user)
-        await session.flush()
-
-        await finalize_session(req, res, user, session)
-        return RedirectResponse(settings.frontend_endpoint)
-    except Exception as e:
-        logger.error("google_oauth_callback [session.flush, finalize_session]")
-        pprint(e)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
-
-
-@users_router.post("/auth/password-setup")
-async def password_setup(token: Annotated[str, Query], schm: PasswordSetupIn, session: DBSession):
-    decoded = decode_token(token, "password_setup")
-
-    hash_password_bytes = await asyncio.to_thread(hashpw, schm.password.encode(), gensalt(rounds=8))
-    hash_password = hash_password_bytes.decode()
-
-    stmt = update(UserModel).where(UserModel.id == decoded.sub).values(hash_password=hash_password)
-    try:
-        await session.execute(stmt)
-    except Exception as e:
-        logger.error("password_setup session.execute")
-        pprint(e)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
 
 @users_router.post(path="/auth/email")
@@ -195,6 +113,30 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthIn, session: DB
     return user
 
 
+@users_router.post("/auth/verify")
+async def verify(token: Annotated[str, Query()], auth: authProbeDep, session: DBSession):
+    claims = decode_token(token, "email_verification")
+
+    if auth:
+        if auth[0] != claims.sub:
+            content = MessageResponse(msg="You are not the same person!").model_dump_json()
+            return Response(status_code=status.HTTP_400_BAD_REQUEST, content=content)
+
+    try:
+        await UsersRepository.set_email_verified(claims.sub, session)
+    except Exception as e:
+        logger.error("logout SessionsRepository.delete")
+        pprint(e)
+        raise HTTPException(status_code=500, detail="Something went wrong")
+
+    if auth:
+        return MessageResponse(msg="Your email verified successfully")
+    else:
+        base = settings.frontend_endpoint.rstrip("/")
+        url = urljoin(base, "auth")
+        return RedirectResponse(url)
+
+
 @users_router.post("/auth/logout")
 async def logout(auth: authDep, session: DBSession):
     user_id, _, refresh_token = auth
@@ -203,42 +145,5 @@ async def logout(auth: authDep, session: DBSession):
         return await SessionsRepository.delete(user_id, refresh_token, session)
     except Exception as e:
         logger.error("logout SessionsRepository.delete")
-        pprint(e)
-        raise HTTPException(status_code=500, detail="Something went wrong")
-
-
-@users_router.get("/")
-async def get_user(auth: authDep, session: DBSession):
-    user_id, _, _ = auth
-
-    try:
-        return await UsersRepository.get_by_id(user_id, session)
-    except Exception as e:
-        logger.error("get_user UsersRepository.get_by_id")
-        pprint(e)
-        raise HTTPException(status_code=500, detail="Something went wrong")
-
-
-@users_router.patch("/")
-async def update_user(auth: authDep, schm: UserUpdateIn, session: DBSession):
-    user_id, _, _ = auth
-
-    try:
-        return await UsersRepository.update_by_id(user_id, schm, session)
-    except Exception as e:
-        logger.error("update_user UsersRepository.update_by_id")
-        pprint(e)
-        raise HTTPException(status_code=500, detail="Something went wrong")
-
-
-@users_router.delete("/")
-async def delete_user(auth: authDep, session: DBSession):
-    user_id, _, refresh_token = auth
-
-    try:
-        await SessionsRepository.delete(user_id, refresh_token, session)
-        await UsersRepository.delete_by_id(user_id, session)
-    except Exception as e:
-        logger.error("update_user [SessionsRepository.delete, UsersRepository.delete_by_id]")
         pprint(e)
         raise HTTPException(status_code=500, detail="Something went wrong")

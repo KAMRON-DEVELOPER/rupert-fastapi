@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.apps.models import UserModel
 from src.apps.users.repositories.session import SessionsRepository
 from src.core.settings import get_settings
-from src.dependencies.proactive_refresh import create_token, set_auth_cookie
+from src.dependencies.proactive_refresh import create_token, set_cookie
 
 settings = get_settings()
 
@@ -16,8 +16,8 @@ async def finalize_session(req: Request, res: Response, user: UserModel, session
     new_access_token = create_token(user_id=user.id, type="access")
     new_refresh_token = create_token(user_id=user.id, type="refresh")
 
-    set_auth_cookie(res, key="access_token", value=new_access_token, max_age=settings.jwt.access_token_expire_in_minutes * 60)
-    set_auth_cookie(res, key="refresh_token", value=new_refresh_token, max_age=settings.jwt.refresh_token_expire_in_days * 86400)
+    set_cookie(res, key="access_token", value=new_access_token, max_age=settings.jwt.access_token_expire_in_minutes * 60)
+    set_cookie(res, key="refresh_token", value=new_refresh_token, max_age=settings.jwt.refresh_token_expire_in_days * 86400)
 
     await SessionsRepository.create(
         user_id=user.id,

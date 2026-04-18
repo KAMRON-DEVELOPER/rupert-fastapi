@@ -12,6 +12,10 @@ from src.core.logger import logger
 from src.core.minio import put_object_to_minio
 
 
+def percentage(count: int, total: int) -> float:
+    return round(count * 100 / total, 2) if total else 0.0
+
+
 def generate_username_from_base_name(base_name: str) -> str:
     return re.sub(pattern=r"[^a-zA-Z0-9_]", repl="", string=base_name.lower().replace(" ", "_"))
 

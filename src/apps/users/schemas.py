@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import AfterValidator, BaseModel, EmailStr, Field, ValidationInfo, computed_field, field_validator
 
 from src.apps.shared.enums import EmploymentType, FollowPolicy, JobSearchStatus, ProficiencyLevel, Provider, SalaryCurrency, Specialization, UserRole, UserStatus, WorkFormat
-from src.apps.shared.schemas import BaseOut, CameCaseOut, ORMSchema, SkillOut
+from src.apps.shared.schemas import BaseOut, CamelCaseOut, ORMSchema, SkillOut
 from src.core.exceptions import ValidationException
 
 
@@ -30,7 +30,7 @@ def validate_password(v: str | None) -> str | None:
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
-class AuthProbeOut(CameCaseOut):
+class AuthProbeOut(CamelCaseOut):
     is_authenticated: bool
 
 
@@ -191,7 +191,7 @@ class WorkExperienceOut(BaseOut):
 
     @computed_field
     @property
-    def is_current(self) -> float:
+    def is_current(self) -> bool:
         return self.ended_at is None
 
 
