@@ -1,11 +1,12 @@
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.shared.enums import JobSearchStatus
-from src.apps.stats.schemas import JobSearchStatusBucket, SpecializationBucket, UsersStats
-from src.apps.users.models import UserModel
+from src.apps.stats.schemas import DailyActiveUsersBucket, JobSearchStatusBucket, SpecializationBucket, UsersStats
+from src.apps.users.models import ActivityModel, UserModel
 from src.apps.users.schemas import UserUpdateIn
 from src.core.helpers import percentage
 
@@ -48,6 +49,10 @@ class UsersRepository:
 
     @staticmethod
     async def get_stats(session: AsyncSession):
+        now = datetime.now(UTC)
+        today = now.date()
+        start_date = today - timedelta(days=29)
+
         looking_statuses = (JobSearchStatus.actively_looking, JobSearchStatus.open_to_offers, JobSearchStatus.interviewing)
 
         totals_stmt = select(
@@ -58,6 +63,32 @@ class UsersRepository:
         row = (await session.execute(totals_stmt)).one()
         total, looking_for_job_count = row
         looking_for_job_percentage = percentage(looking_for_job_count, total)
+
+        # dau_chart_rows: Sequence[Tuple[date, int]]
+        dau_chart_rows = (
+            (
+                await session.execute(
+                    select(
+                        ActivityModel.activity_date,
+                        func.count(ActivityModel.user_id).label("count"),
+                    )
+                    .where(ActivityModel.activity_date >= start_date)
+                    .group_by(ActivityModel.activity_date)
+                    .order_by(ActivityModel.activity_date)
+                )
+            )
+            .tuples()
+            .all()
+        )
+        dau_counts_by_date = {activity_date: count for activity_date, count in dau_chart_rows}
+        dau_chart = [
+            DailyActiveUsersBucket(
+                count=dau_counts_by_date.get(day, 0),
+                date=day,
+            )
+            for offset in range(30)
+            for day in [start_date + timedelta(days=offset)]
+        ]
 
         by_status_stmt = (
             select(
@@ -102,6 +133,7 @@ class UsersRepository:
             total=total,
             looking_for_job_count=looking_for_job_count,
             looking_for_job_percentage=looking_for_job_percentage,
+            dau_chart=dau_chart,
             by_job_search_status=by_job_search_status,
             by_specialization=by_specialization,
         )

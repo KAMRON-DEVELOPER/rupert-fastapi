@@ -209,7 +209,6 @@ class UserModel(BaseModel, WithLocation):
         default=JobSearchStatus.not_looking,
         nullable=False,
     )
-    last_active_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), index=True)
 
     # Relationships
     oauth_users: Mapped[list[OAuthUserModel]] = relationship(back_populates="user", cascade="all, delete-orphan")

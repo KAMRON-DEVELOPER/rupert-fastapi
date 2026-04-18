@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from src.apps.companies.routes import companies_router
+from src.apps.stats.routes import stats_router
 from src.apps.users.routes import users_router
 from src.apps.vacancies.routes import vacancies_router
 from src.core.boto3 import initialize_boto3
@@ -52,6 +53,7 @@ app.add_middleware(
 )
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
+app.include_router(router=stats_router, prefix="/api/v1/stats", tags=["stats"])
 app.include_router(router=users_router, prefix="/api/v1/users", tags=["users"])
 app.include_router(router=companies_router, prefix="/api/v1/companies", tags=["companies"])
 app.include_router(router=vacancies_router, prefix="/api/v1/vacancies", tags=["vacancies"])

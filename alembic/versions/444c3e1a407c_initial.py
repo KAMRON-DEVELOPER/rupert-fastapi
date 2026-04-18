@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: 45670ea69696
+Revision ID: 444c3e1a407c
 Revises: 
-Create Date: 2026-04-08 16:08:26.012762
+Create Date: 2026-04-18 12:48:00.170896
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '45670ea69696'
+revision: str = '444c3e1a407c'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -29,7 +29,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('companies',
-    sa.Column('name', sa.String(length=120), nullable=False),
+    sa.Column('name', sa.String(length=128), nullable=False),
     sa.Column('tagline', sa.String(length=128), nullable=True),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('logo_url', sa.Text(), nullable=True),
@@ -98,6 +98,19 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
+    op.create_table('activities',
+    sa.Column('user_id', sa.UUID(), nullable=False),
+    sa.Column('activity_date', sa.Date(), nullable=False),
+    sa.Column('last_activity_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.Column('id', sa.UUID(), nullable=False),
+    sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id', 'activity_date', name='uq_user_activity_date')
+    )
+    op.create_index(op.f('ix_activities_activity_date'), 'activities', ['activity_date'], unique=False)
+    op.create_index(op.f('ix_activities_user_id'), 'activities', ['user_id'], unique=False)
     op.create_table('chat_messages',
     sa.Column('chat_id', sa.UUID(), nullable=False),
     sa.Column('sender_id', sa.UUID(), nullable=False),
@@ -493,6 +506,9 @@ def downgrade() -> None:
     op.drop_table('chat_participants')
     op.drop_index(op.f('ix_chat_messages_chat_id'), table_name='chat_messages')
     op.drop_table('chat_messages')
+    op.drop_index(op.f('ix_activities_user_id'), table_name='activities')
+    op.drop_index(op.f('ix_activities_activity_date'), table_name='activities')
+    op.drop_table('activities')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_table('users')
     op.drop_table('tags')

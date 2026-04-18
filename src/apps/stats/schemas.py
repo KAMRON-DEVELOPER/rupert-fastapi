@@ -1,3 +1,5 @@
+from datetime import date
+
 from src.apps.shared.enums import CompanyType, JobSearchStatus, Specialization, VacancyStatus
 from src.apps.shared.schemas import CamelCaseOut
 
@@ -23,10 +25,18 @@ class CompanyTypeBucket(BucketBase):
     key: CompanyType
 
 
+class DailyActiveUsersBucket(CamelCaseOut):
+    count: int
+    date: date
+
+
 class UsersStats(CamelCaseOut):
     total: int
+
     looking_for_job_count: int
     looking_for_job_percentage: float
+
+    dau_chart: list[DailyActiveUsersBucket]
 
     by_job_search_status: list[JobSearchStatusBucket]
     by_specialization: list[SpecializationBucket]
@@ -34,13 +44,16 @@ class UsersStats(CamelCaseOut):
 
 class VacanciesStats(CamelCaseOut):
     total: int
+
     open: int
+
     by_status: list[VacancyStatusBucket]
     by_specialization: list[SpecializationBucket]
 
 
 class CompaniesStats(CamelCaseOut):
     total: int
+
     by_type: list[CompanyTypeBucket]
 
 
