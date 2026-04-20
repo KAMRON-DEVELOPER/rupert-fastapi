@@ -17,17 +17,11 @@ from src.core.database import DBSession
 from src.core.logger import logger
 from src.core.oauth import github, google
 from src.core.settings import get_settings
-from src.dependencies.proactive_refresh import authProbeDep, decode_token
+from src.dependencies.proactive_refresh import decode_token
 
 from .router import users_router
 
 settings = get_settings()
-
-
-@users_router.get("/auth/probe", response_model=AuthProbeOut)
-async def auth_probe(auth: authProbeDep):
-    """Helpfull handler to check user session validity"""
-    return AuthProbeOut(is_authenticated=auth is not None)
 
 
 @users_router.get("/auth/google")

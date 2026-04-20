@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Generic, TypeVar
 from uuid import UUID
 
-from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
 
@@ -28,6 +28,19 @@ class BaseOut(CamelCaseOut):
 # ---------------------------------------------------------------------------
 # Pagination
 # ---------------------------------------------------------------------------
+class Pagination(BaseModel):
+    offset: int = Field(0, ge=0)
+    limit: int = Field(100, ge=0)
+
+    @model_validator(mode="after")
+    def check_offset_less_than_limit(self) -> Pagination:
+        if self.offset > self.limit:
+            raise ValueError("Offset cannot be greater than limit")
+        return self
+
+    model_config = {"extra": "forbid"}
+
+
 T = TypeVar("T")
 
 

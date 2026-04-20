@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from fastapi import Query
 from pydantic import AnyUrl, BaseModel, Field, field_validator
 
 from src.apps.companies.schemas.company import CompanyCardOut
@@ -86,8 +87,22 @@ class VacancyUpdateIn(BaseModel):
     status: VacancyStatus | None = None
 
 
-class VacancyCardOut(BaseModel):
-    company_name: str
+class VacancyFilters(BaseModel):
+    company_id: UUID | None = None
+    title: str | None = None
+    submission_type: SubmissionType | None = None
+    specialization: Specialization | None = None
+    salary_min: int | None = None
+    salary_max: int | None = None
+    salary_currency: SalaryCurrency | None = None
+    years_of_experience_min: float | None = None
+    work_format: WorkFormat | None = None
+    employment_type: EmploymentType | None = None
+    skill_ids: list[UUID] | None = Query(None)
+
+
+class VacancyCardOut(BaseOut):
+    company: CompanyCardOut
 
     title: str
 
@@ -118,6 +133,12 @@ class ApplicationIn(BaseModel):
     vacancy_id: UUID
     resume_id: UUID | None = None
     cover_letter: str | None = None
+
+
+class ApplicationFilters(BaseModel):
+    vacancy_id: UUID | None = None
+    applicant_id: UUID | None = None
+    status: ApplicationStatus | None = None
 
 
 class ApplicationStatusUpdateIn(BaseModel):

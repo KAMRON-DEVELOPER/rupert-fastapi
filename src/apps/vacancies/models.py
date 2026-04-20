@@ -59,6 +59,10 @@ class VacancyModel(BaseModel, WithLocation):
 
     status: Mapped[VacancyStatus] = mapped_column(Enum(VacancyStatus, name="vacancy_status"), default=VacancyStatus.draft, nullable=False)
 
+    # Non-mapped attributes
+    is_saved: bool = False
+    has_applied: bool = False
+
     # Relationships
     company: Mapped[CompanyModel] = relationship(back_populates="vacancies")
     skill_links: Mapped[list[VacancySkillLink]] = relationship(back_populates="vacancy", cascade="all, delete-orphan")
