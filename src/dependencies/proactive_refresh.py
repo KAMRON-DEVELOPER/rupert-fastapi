@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.users.models import ActivityModel
 from src.core.database import DBSession
+from src.core.logger import logger
 from src.core.settings import get_settings
 
 settings = get_settings()
@@ -77,8 +78,8 @@ def decode_token(jwt: str, expected_type: TokenType):
             case "password_setup":
                 detail = "Password setup link expired"
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
-    except PyJWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT error")
+    except PyJWTError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"JWT error: e{e}")
 
 
 def handle_decode(jwt: str, expected_type: CookieTokenType) -> tuple[bool, TokenClaims, bool]:
@@ -111,7 +112,7 @@ class Cookies(BaseModel):
     refresh_token: str | None = None
     dau: str | None = None
 
-    model_config = {"extra": "forbid"}
+    model_config = {"extra": "ignore"}
 
 
 async def upsert_daily_activity(user_id: UUID, activity_date: date, last_activity_at: datetime, session: AsyncSession):
@@ -129,6 +130,13 @@ class ProactiveRefresh:
         refresh_token = auth_cookies.refresh_token
         dau = auth_cookies.dau
         user_id = None
+
+        clear_auth_cookies(res)
+
+        logger.debug(f"access_token: {access_token}")
+        logger.debug(f"refresh_token: {refresh_token}")
+        logger.debug(f"dau: {dau}")
+        logger.debug(f"user_id: {user_id}")
 
         if access_token:
             access_needs_refresh, access_claims, expired = handle_decode(access_token, "access")
