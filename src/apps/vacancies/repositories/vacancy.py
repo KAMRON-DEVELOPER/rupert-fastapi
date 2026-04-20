@@ -1,3 +1,4 @@
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy import exists, func, select
@@ -5,10 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.apps.shared.enums import ApplicationStatus, VacancyStatus
-from src.apps.shared.schemas import Pagination
+from src.apps.shared.schemas import PaginatedOut, Pagination
 from src.apps.stats.schemas import SpecializationBucket, VacanciesStats, VacancyStatusBucket
 from src.apps.vacancies.models import ApplicationModel, SavedVacancyModel, VacancyModel, VacancySkillLink
-from src.apps.vacancies.schemas import ApplicationFilters, VacancyFilters
+from src.apps.vacancies.schemas import ApplicationFilters, ApplicationOut, VacancyCardOut, VacancyFilters
 from src.core.helpers import percentage
 
 
@@ -19,16 +20,8 @@ class VacanciesRepository:
         user_id: UUID | None = None,
         pagination: Pagination | None = None,
         filters: VacancyFilters | None = None,
-    ) -> list[VacancyModel]:
-        stmt = select(VacancyModel).options(selectinload(VacancyModel.company)).order_by(VacancyModel.created_at.desc())
-
-        if pagination:
-            stmt.offset(pagination.offset).limit(pagination.limit)
-
-        if user_id:
-            is_saved_subquery = exists().where(SavedVacancyModel.vacancy_id == VacancyModel.id, SavedVacancyModel.user_id == user_id)
-            has_applied_subquery = exists().where(ApplicationModel.vacancy_id == VacancyModel.id, ApplicationModel.applicant_id == user_id)
-            stmt = stmt.add_columns(is_saved_subquery.label("is_saved"), has_applied_subquery.label("has_applied"))
+    ) -> PaginatedOut[VacancyCardOut]:
+        stmt = select(VacancyModel).options(selectinload(VacancyModel.company))
 
         if filters:
             if filters.company_id:
@@ -54,6 +47,21 @@ class VacanciesRepository:
             if filters.skill_ids:
                 stmt = stmt.join(VacancyModel.skill_links).where(VacancySkillLink.skill_id.in_(filters.skill_ids))
 
+        # Count total before pagination
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = await session.scalar(count_stmt) or 0
+
+        # Apply ordering and pagination
+        stmt = stmt.order_by(VacancyModel.created_at.desc())
+
+        if pagination:
+            stmt = stmt.offset(pagination.offset).limit(pagination.limit)
+
+        if user_id:
+            is_saved_subquery = exists().where(SavedVacancyModel.vacancy_id == VacancyModel.id, SavedVacancyModel.user_id == user_id)
+            has_applied_subquery = exists().where(ApplicationModel.vacancy_id == VacancyModel.id, ApplicationModel.applicant_id == user_id)
+            stmt = stmt.add_columns(is_saved_subquery.label("is_saved"), has_applied_subquery.label("has_applied"))
+
         if user_id:
             res = await session.execute(stmt)
             vacancies = []
@@ -62,29 +70,20 @@ class VacanciesRepository:
                 vacancy.is_saved = row[1]
                 vacancy.has_applied = row[2]
                 vacancies.append(vacancy)
-            return vacancies
+                data = cast(list[VacancyCardOut], vacancies)
+                return PaginatedOut(data=data, total=total)
 
         res = await session.scalars(stmt)
-        return list(res.unique().all())
+        data = cast(list[VacancyCardOut], list(res.unique().all()))
+        return PaginatedOut(data=data, total=total)
 
     @staticmethod
     async def get_applications(
         session: AsyncSession,
         pagination: Pagination | None = None,
         filters: ApplicationFilters | None = None,
-    ) -> list[ApplicationModel]:
-        stmt = (
-            select(ApplicationModel)
-            .options(
-                selectinload(ApplicationModel.vacancy).selectinload(VacancyModel.company),
-                selectinload(ApplicationModel.resume),
-                selectinload(ApplicationModel.applicant),
-            )
-            .order_by(ApplicationModel.created_at.desc())
-        )
-
-        if pagination:
-            stmt.offset(pagination.offset).limit(pagination.limit)
+    ) -> PaginatedOut[ApplicationOut]:
+        stmt = select(ApplicationModel)
 
         if filters:
             if filters.vacancy_id:
@@ -94,8 +93,23 @@ class VacanciesRepository:
             if filters.status:
                 stmt = stmt.where(ApplicationModel.status == filters.status)
 
+        # Count total before pagination
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = await session.scalar(count_stmt) or 0
+
+        # Apply loading options and ordering
+        stmt = stmt.options(
+            selectinload(ApplicationModel.vacancy).selectinload(VacancyModel.company),
+            selectinload(ApplicationModel.resume),
+            selectinload(ApplicationModel.applicant),
+        ).order_by(ApplicationModel.created_at.desc())
+
+        if pagination:
+            stmt = stmt.offset(pagination.offset).limit(pagination.limit)
+
         res = await session.scalars(stmt)
-        return list(res.all())
+        data = cast(list[ApplicationOut], list(res.all()))
+        return PaginatedOut(data=data, total=total)
 
     @staticmethod
     async def get_by_id(session: AsyncSession, vacancy_id: UUID) -> VacancyModel | None:
