@@ -87,7 +87,7 @@ class VacancyUpdateIn(BaseModel):
 
 
 class VacancyCardOut(BaseModel):
-    company: CompanyCardOut
+    company_name: str
 
     title: str
 
@@ -109,33 +109,6 @@ class VacancyCardOut(BaseModel):
 
     is_saved: bool = False
     has_applied: bool = False
-
-
-"""
-class ApplicationModel(BaseModel):
-    applicant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    vacancy_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("vacancies.id", ondelete="CASCADE"), nullable=False)
-    resume_id: Mapped[UUID | None] = mapped_column(ForeignKey("resumes.id", ondelete="SET NULL"))
-
-    cover_letter: Mapped[str | None] = mapped_column(Text)
-    status: Mapped[ApplicationStatus] = mapped_column(Enum(ApplicationStatus, name="application_status"), default=ApplicationStatus.pending)
-
-    recruiter_note: Mapped[str | None] = mapped_column(Text)
-
-    # Relationships
-    applicant: Mapped[UserModel] = relationship(back_populates="applications")
-    resume: Mapped[ResumeModel | None] = relationship(back_populates="applications")
-    vacancy: Mapped[VacancyModel] = relationship(back_populates="applications")
-
-
-class SavedVacancyModel(BaseModel):
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    vacancy_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("vacancies.id", ondelete="CASCADE"), nullable=False)
-
-    # Relationships
-    user: Mapped[UserModel] = relationship(back_populates="saved_vacancies")
-    vacancy: Mapped[VacancyModel] = relationship(back_populates="saved_vacancies")
-"""
 
 
 # ---------------------------------------------------------------------------

@@ -4,10 +4,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.apps.shared.enums import VacancyStatus
 from src.apps.stats.schemas import SpecializationBucket, VacanciesStats, VacancyStatusBucket
 from src.apps.vacancies.models import VacancyModel
+from src.apps.vacancies.schemas import VacancyCardOut
 from src.core.helpers import percentage
 
 
 class VacanciesRepository:
+    @staticmethod
+    async def get_many(offset: int, limit: int, session: AsyncSession) -> list[VacancyCardOut]:
+        stmt = select(VacancyModel.company, VacancyModel.title).offset(offset).limit(limit)
+        res = (await session.scalars(stmt)).all()
+
+        return VacancyCardOut()
+
     @staticmethod
     async def get_stats(session: AsyncSession):
         totals_stmt = select(
