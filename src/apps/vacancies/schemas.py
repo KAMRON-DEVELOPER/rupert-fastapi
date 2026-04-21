@@ -88,9 +88,9 @@ class VacancyFilters(BaseModel):
     work_format: WorkFormat | None = None
     employment_type: EmploymentType | None = None
     status: VacancyStatus | None = None
-    skill_ids: list[UUID] | None = Query(None)
     country: str | None = None
     city: str | None = None
+    skill_ids: list[UUID] | None = Query(None)
 
 
 class VacancyCardOut(BaseOut):
