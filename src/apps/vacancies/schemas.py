@@ -32,26 +32,20 @@ class VacancySkillLinkOut(ORMSchema):
 class VacancyIn(BaseModel):
     title: str = Field(max_length=128)
     description: str
-
     external_apply_url: AnyUrl | None = None
     submission_type: SubmissionType
-
     specialization: Specialization
     salary_min: int | None = Field(default=None, ge=0)
     salary_max: int | None = Field(default=None, ge=0)
     salary_currency: SalaryCurrency | None = None
     payment_frequency: PaymentFrequency | None = None
-
     years_of_experience_min: float | None = Field(default=None, ge=0)
     work_format: WorkFormat = WorkFormat.onsite
     work_hours_per_week: int | None = Field(default=None, ge=1, le=168)
     employment_type: EmploymentType = EmploymentType.full_time
-
     country: str = Field(max_length=64)
     city: str = Field(max_length=64)
-
     status: VacancyStatus = VacancyStatus.draft
-
     skills: list[VacancySkillLinkIn] = Field(default_factory=list)
 
     @field_validator("salary_max")
@@ -66,24 +60,19 @@ class VacancyIn(BaseModel):
 class VacancyUpdateIn(BaseModel):
     title: str | None = Field(default=None, max_length=128)
     description: str | None = None
-
     external_apply_url: AnyUrl | None = None
     submission_type: SubmissionType | None = None
-
     specialization: Specialization | None = None
     salary_min: int | None = None
     salary_max: int | None = None
     salary_currency: SalaryCurrency | None = None
     payment_frequency: PaymentFrequency | None = None
-
     years_of_experience_min: float | None = None
     work_format: WorkFormat | None = None
     work_hours_per_week: int | None = None
     employment_type: EmploymentType | None = None
-
     country: str | None = Field(default=None, max_length=64)
     city: str | None = Field(default=None, max_length=64)
-
     status: VacancyStatus | None = None
 
 
@@ -98,32 +87,36 @@ class VacancyFilters(BaseModel):
     years_of_experience_min: float | None = None
     work_format: WorkFormat | None = None
     employment_type: EmploymentType | None = None
+    status: VacancyStatus | None = None
     skill_ids: list[UUID] | None = Query(None)
+    country: str | None = None
+    city: str | None = None
 
 
 class VacancyCardOut(BaseOut):
     company: CompanyCardOut
-
     title: str
-
+    submission_type: SubmissionType
     specialization: Specialization
     salary_min: int | None
     salary_max: int | None
     salary_currency: SalaryCurrency | None
-    payment_frequency: PaymentFrequency | None
-
-    country: str
-    city: str
-
-    status: VacancyStatus
-
     years_of_experience_min: float | None = None
     work_format: WorkFormat
     employment_type: EmploymentType
-    work_hours_per_week: int | None = None
+    status: VacancyStatus
+    country: str
+    city: str
+    is_saved: bool | None = None
+    has_applied: bool | None = None
 
-    is_saved: bool = False
-    has_applied: bool = False
+
+class VacancyOut(VacancyCardOut):
+    description: str
+    external_apply_url: AnyUrl | None
+    work_hours_per_week: int | None = None
+    payment_frequency: PaymentFrequency | None
+    skill_links: list[VacancySkillLinkOut]
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +144,6 @@ class ApplicationOut(BaseOut):
     applicant_id: UUID
     status: ApplicationStatus
     cover_letter: str | None
-
     vacancy: VacancyCardOut
     resume: ResumeCardOut | None
 

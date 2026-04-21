@@ -39,14 +39,15 @@ class CompanyModel(BaseModel, WithLocation):
     logo_url: Mapped[str | None] = mapped_column(Text)
     website_url: Mapped[str | None] = mapped_column(Text)
     type: Mapped[CompanyType] = mapped_column(Enum(CompanyType, name="company_type"), nullable=False)
-
     contact_email: Mapped[str | None] = mapped_column(String(128))
     contact_phone: Mapped[str | None] = mapped_column(String(32))
-
     status: Mapped[CompanyStatus] = mapped_column(Enum(CompanyStatus, name="company_status"), default=CompanyStatus.pending, nullable=False)
 
     members: Mapped[list[CompanyMemberModel]] = relationship(back_populates="company", cascade="all, delete-orphan", passive_deletes=True)
     vacancies: Mapped[list[VacancyModel]] = relationship(back_populates="company", passive_deletes=True)
+
+    open_vacancies_count: int | None = None
+    member_count: int | None = None
 
     def __repr__(self):
         return f"<CompanyModel {self.name}>"

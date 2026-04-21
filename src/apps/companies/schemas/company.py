@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from fastapi import Query
 from pydantic import AnyUrl, BaseModel, EmailStr, Field
 
 from src.apps.shared.enums import CompanyMemberRole, CompanyStatus, CompanyType
@@ -37,14 +38,25 @@ class CompanyUpdateIn(BaseModel):
     contact_phone: str | None = Field(default=None, max_length=32)
 
 
+class CompanyFilters(BaseModel):
+    name: str | None = None
+    type: CompanyType | None = None
+    status: CompanyStatus | None = None
+    country: str | None = None
+    city: str | None = None
+    has_open_vacancies: bool | None = None
+    skill_ids: list[UUID] | None = Query(None)
+
+
 class CompanyCardOut(BaseOut):
     name: str
     tagline: str | None
     logo_url: AnyUrl | None
     type: CompanyType
+    status: CompanyStatus
     country: str
     city: str
-    status: CompanyStatus
+    open_vacancies_count: int | None = None
 
 
 class CompanyOut(CompanyCardOut):
@@ -52,9 +64,7 @@ class CompanyOut(CompanyCardOut):
     website_url: AnyUrl | None
     contact_email: str | None
     contact_phone: str | None
-
     member_count: int | None = None
-    open_vacancy_count: int | None = None
 
 
 # ---------------------------------------------------------------------------

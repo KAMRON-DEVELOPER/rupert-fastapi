@@ -9,7 +9,7 @@ from src.apps.shared.enums import ApplicationStatus, VacancyStatus
 from src.apps.shared.schemas import PaginatedOut, Pagination
 from src.apps.stats.schemas import SpecializationBucket, VacanciesStats, VacancyStatusBucket
 from src.apps.vacancies.models import ApplicationModel, SavedVacancyModel, VacancyModel, VacancySkillLink
-from src.apps.vacancies.schemas import ApplicationFilters, ApplicationOut, VacancyCardOut, VacancyFilters
+from src.apps.vacancies.schemas import ApplicationFilters, ApplicationOut, VacancyCardOut, VacancyFilters, VacancyOut
 from src.core.helpers import percentage
 
 
@@ -32,50 +32,159 @@ class VacanciesRepository:
                 stmt = stmt.where(VacancyModel.submission_type == filters.submission_type)
             if filters.specialization:
                 stmt = stmt.where(VacancyModel.specialization == filters.specialization)
-            if filters.salary_min is not None:
+            if filters.salary_min:
+                stmt = stmt.where(VacancyModel.salary_max.is_not(None))
                 stmt = stmt.where(VacancyModel.salary_max >= filters.salary_min)
-            if filters.salary_max is not None:
+            if filters.salary_max:
+                stmt = stmt.where(VacancyModel.salary_min.is_not(None))
                 stmt = stmt.where(VacancyModel.salary_min <= filters.salary_max)
             if filters.salary_currency:
                 stmt = stmt.where(VacancyModel.salary_currency == filters.salary_currency)
-            if filters.years_of_experience_min is not None:
+            if filters.years_of_experience_min:
+                stmt = stmt.where(VacancyModel.years_of_experience_min.is_not(None))
                 stmt = stmt.where(VacancyModel.years_of_experience_min >= filters.years_of_experience_min)
             if filters.work_format:
                 stmt = stmt.where(VacancyModel.work_format == filters.work_format)
             if filters.employment_type:
                 stmt = stmt.where(VacancyModel.employment_type == filters.employment_type)
+            if filters.status:
+                stmt = stmt.where(VacancyModel.status == filters.status)
             if filters.skill_ids:
-                stmt = stmt.join(VacancyModel.skill_links).where(VacancySkillLink.skill_id.in_(filters.skill_ids))
+                # JOIN creates duplicate rows when a vacancy matches multiple skills,
+                # so .distinct() is required here — both for correctness and for the count.
+                stmt = (
+                    stmt.join(VacancyModel.skill_links)
+                    .where(
+                        VacancySkillLink.skill_id.in_(filters.skill_ids),
+                    )
+                    .distinct(VacancyModel.id)
+                )
+            if filters.country:
+                stmt = stmt.where(VacancyModel.country == filters.country)
+            if filters.city:
+                stmt = stmt.where(VacancyModel.city == filters.city)
 
-        # Count total before pagination
-        count_stmt = select(func.count()).select_from(stmt.subquery())
+        # Count total BEFORE pagination (filters already applied above)
+        # Sorting rows is computationally expensive for the database.
+        # If you just want to know how many rows exist, sorting them first is a massive waste of time.
+        count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
         total = await session.scalar(count_stmt) or 0
 
-        # Apply ordering and pagination
         stmt = stmt.order_by(VacancyModel.created_at.desc())
 
         if pagination:
             stmt = stmt.offset(pagination.offset).limit(pagination.limit)
 
         if user_id:
-            is_saved_subquery = exists().where(SavedVacancyModel.vacancy_id == VacancyModel.id, SavedVacancyModel.user_id == user_id)
-            has_applied_subquery = exists().where(ApplicationModel.vacancy_id == VacancyModel.id, ApplicationModel.applicant_id == user_id)
-            stmt = stmt.add_columns(is_saved_subquery.label("is_saved"), has_applied_subquery.label("has_applied"))
+            is_saved_subquery = exists().where(
+                SavedVacancyModel.vacancy_id == VacancyModel.id,
+                SavedVacancyModel.user_id == user_id,
+            )
+            has_applied_subquery = exists().where(
+                ApplicationModel.vacancy_id == VacancyModel.id,
+                ApplicationModel.applicant_id == user_id,
+            )
+            stmt = stmt.add_columns(
+                is_saved_subquery.label("is_saved"),
+                has_applied_subquery.label("has_applied"),
+            )
 
-        if user_id:
             res = await session.execute(stmt)
-            vacancies = []
-            for row in res.unique().all():
-                vacancy = row[0]
-                vacancy.is_saved = row[1]
-                vacancy.has_applied = row[2]
+            vacancies: list[VacancyModel] = []
+
+            for vacancy, is_saved, has_applied in res.unique().all():
+                vacancy.is_saved = is_saved
+                vacancy.has_applied = has_applied
                 vacancies.append(vacancy)
-                data = cast(list[VacancyCardOut], vacancies)
-                return PaginatedOut(data=data, total=total)
+
+            data = cast(list[VacancyCardOut], vacancies)
+            return PaginatedOut(data=data, total=total)
 
         res = await session.scalars(stmt)
         data = cast(list[VacancyCardOut], list(res.unique().all()))
         return PaginatedOut(data=data, total=total)
+
+    @staticmethod
+    async def get_by_id(session: AsyncSession, vacancy_id: UUID, user_id: UUID | None = None) -> VacancyOut:
+        stmt = (
+            select(VacancyModel)
+            .options(
+                selectinload(VacancyModel.company),
+                selectinload(VacancyModel.skill_links).selectinload(VacancySkillLink.skill),
+            )
+            .where(VacancyModel.id == vacancy_id)
+        )
+
+        load_options = [
+            selectinload(VacancyModel.company),
+            selectinload(VacancyModel.skill_links).selectinload(VacancySkillLink.skill),
+        ]
+
+        if user_id:
+            # Correlated subqueries for the specific vacancy — these are cheap single-row lookups.
+            is_saved_subquery = exists().where(
+                SavedVacancyModel.vacancy_id == vacancy_id,
+                SavedVacancyModel.user_id == user_id,
+            )
+            has_applied_subquery = exists().where(
+                ApplicationModel.vacancy_id == vacancy_id,
+                ApplicationModel.applicant_id == user_id,
+            )
+
+            stmt = (
+                select(
+                    VacancyModel,
+                    is_saved_subquery.label("is_saved"),
+                    has_applied_subquery.label("has_applied"),
+                )
+                .options(*load_options)
+                .where(VacancyModel.id == vacancy_id)
+            )
+            # row: Row[Tuple[VacancyModel, bool, bool]]
+            row = (await session.execute(stmt)).one()
+            vacancy, is_saved, has_applied = row.tuple()
+            vacancy.is_saved = is_saved
+            vacancy.has_applied = has_applied
+            return cast(VacancyOut, vacancy)
+
+        stmt = select(VacancyModel).options(*load_options).where(VacancyModel.id == vacancy_id)
+        vacancy = (await session.execute(stmt)).one().tuple()[0]
+        return cast(VacancyOut, vacancy)
+
+    @staticmethod
+    async def create(session: AsyncSession, company_id: UUID, data: dict) -> VacancyModel:
+        skills_data = data.pop("skills", [])
+        vacancy = VacancyModel(company_id=company_id, **data)
+        session.add(vacancy)
+        await session.flush()
+
+        for skill_item in skills_data:
+            link = VacancySkillLink(vacancy_id=vacancy.id, **skill_item)
+            session.add(link)
+
+        await session.commit()
+        await session.refresh(vacancy)
+        return vacancy
+
+    @staticmethod
+    async def update(session: AsyncSession, vacancy_id: UUID, data: dict) -> VacancyOut | None:
+        vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
+
+        for key, value in data.items():
+            if value is not None:
+                setattr(vacancy, key, value)
+
+        await session.commit()
+        await session.refresh(vacancy)
+        return vacancy
+
+    @staticmethod
+    async def delete(session: AsyncSession, vacancy_id: UUID) -> bool:
+        vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
+
+        await session.delete(vacancy)
+        await session.commit()
+        return True
 
     @staticmethod
     async def get_applications(
@@ -112,58 +221,7 @@ class VacanciesRepository:
         return PaginatedOut(data=data, total=total)
 
     @staticmethod
-    async def get_by_id(session: AsyncSession, vacancy_id: UUID) -> VacancyModel | None:
-        stmt = (
-            select(VacancyModel)
-            .options(
-                selectinload(VacancyModel.company),
-                selectinload(VacancyModel.skill_links).selectinload(VacancySkillLink.skill),
-            )
-            .where(VacancyModel.id == vacancy_id)
-        )
-        return await session.scalar(stmt)
-
-    @staticmethod
-    async def create(session: AsyncSession, company_id: UUID, data: dict) -> VacancyModel:
-        skills_data = data.pop("skills", [])
-        vacancy = VacancyModel(company_id=company_id, **data)
-        session.add(vacancy)
-        await session.flush()
-
-        for skill_item in skills_data:
-            link = VacancySkillLink(vacancy_id=vacancy.id, **skill_item)
-            session.add(link)
-
-        await session.commit()
-        await session.refresh(vacancy)
-        return vacancy
-
-    @staticmethod
-    async def update(session: AsyncSession, vacancy_id: UUID, data: dict) -> VacancyModel | None:
-        vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
-        if not vacancy:
-            return None
-
-        for key, value in data.items():
-            if value is not None:
-                setattr(vacancy, key, value)
-
-        await session.commit()
-        await session.refresh(vacancy)
-        return vacancy
-
-    @staticmethod
-    async def delete(session: AsyncSession, vacancy_id: UUID) -> bool:
-        vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
-        if not vacancy:
-            return False
-
-        await session.delete(vacancy)
-        await session.commit()
-        return True
-
-    @staticmethod
-    async def get_application_by_id(session: AsyncSession, application_id: UUID) -> ApplicationModel | None:
+    async def get_application_by_id(session: AsyncSession, application_id: UUID) -> ApplicationModel:
         stmt = (
             select(ApplicationModel)
             .options(
@@ -173,7 +231,7 @@ class VacanciesRepository:
             )
             .where(ApplicationModel.id == application_id)
         )
-        return await session.scalar(stmt)
+        return (await session.execute(stmt)).scalar_one()
 
     @staticmethod
     async def apply_to_vacancy(session: AsyncSession, applicant_id: UUID, data: dict) -> ApplicationModel:
