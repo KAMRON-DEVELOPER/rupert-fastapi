@@ -9,7 +9,8 @@ from src.apps.shared.enums import ApplicationStatus, VacancyStatus
 from src.apps.shared.schemas import PaginatedOut, Pagination
 from src.apps.stats.schemas import SpecializationBucket, VacanciesStats, VacancyStatusBucket
 from src.apps.vacancies.models import ApplicationModel, SavedVacancyModel, VacancyModel, VacancySkillLink
-from src.apps.vacancies.schemas import ApplicationFilters, ApplicationOut, VacancyCardOut, VacancyFilters, VacancyOut
+from src.apps.vacancies.schemas.application import ApplicationFilters, ApplicationOut
+from src.apps.vacancies.schemas.vacancy import VacancyCardOut, VacancyFilters, VacancyOut
 from src.core.helpers import percentage
 
 
@@ -105,14 +106,14 @@ class VacanciesRepository:
         return PaginatedOut(data=data, total=total)
 
     @staticmethod
-    async def get_by_id(session: AsyncSession, vacancy_id: UUID, user_id: UUID | None = None) -> VacancyOut:
+    async def get_by_id(session: AsyncSession, id: UUID, user_id: UUID | None = None) -> VacancyOut:
         stmt = (
             select(VacancyModel)
             .options(
                 selectinload(VacancyModel.company),
                 selectinload(VacancyModel.skill_links).selectinload(VacancySkillLink.skill),
             )
-            .where(VacancyModel.id == vacancy_id)
+            .where(VacancyModel.id == id)
         )
 
         load_options = [
@@ -123,11 +124,11 @@ class VacanciesRepository:
         if user_id:
             # Correlated subqueries for the specific vacancy — these are cheap single-row lookups.
             is_saved_subquery = exists().where(
-                SavedVacancyModel.vacancy_id == vacancy_id,
+                SavedVacancyModel.vacancy_id == id,
                 SavedVacancyModel.user_id == user_id,
             )
             has_applied_subquery = exists().where(
-                ApplicationModel.vacancy_id == vacancy_id,
+                ApplicationModel.vacancy_id == id,
                 ApplicationModel.applicant_id == user_id,
             )
 
@@ -138,7 +139,7 @@ class VacanciesRepository:
                     has_applied_subquery.label("has_applied"),
                 )
                 .options(*load_options)
-                .where(VacancyModel.id == vacancy_id)
+                .where(VacancyModel.id == id)
             )
             # row: Row[Tuple[VacancyModel, bool, bool]]
             row = (await session.execute(stmt)).one()
@@ -147,7 +148,7 @@ class VacanciesRepository:
             vacancy.has_applied = has_applied
             return cast(VacancyOut, vacancy)
 
-        stmt = select(VacancyModel).options(*load_options).where(VacancyModel.id == vacancy_id)
+        stmt = select(VacancyModel).options(*load_options).where(VacancyModel.id == id)
         vacancy = (await session.execute(stmt)).one().tuple()[0]
         return cast(VacancyOut, vacancy)
 
@@ -221,7 +222,7 @@ class VacanciesRepository:
         return PaginatedOut(data=data, total=total)
 
     @staticmethod
-    async def get_application_by_id(session: AsyncSession, application_id: UUID) -> ApplicationModel:
+    async def get_application_by_id(session: AsyncSession, id: UUID) -> ApplicationModel:
         stmt = (
             select(ApplicationModel)
             .options(
@@ -229,7 +230,7 @@ class VacanciesRepository:
                 selectinload(ApplicationModel.resume),
                 selectinload(ApplicationModel.applicant),
             )
-            .where(ApplicationModel.id == application_id)
+            .where(ApplicationModel.id == id)
         )
         return (await session.execute(stmt)).scalar_one()
 
