@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException, Path, status
 from src.apps.shared.schemas import PaginatedOut, Pagination
 from src.apps.vacancies.repositories.vacancy import VacanciesRepository
 from src.apps.vacancies.schemas.application import ApplicationFilters, ApplicationOut
-from src.apps.vacancies.schemas.vacancy import VacancyCardOut, VacancyFilters
+from src.apps.vacancies.schemas.vacancy import VacancyCardOut, VacancyFilters, VacancyOut
 from src.core.database import DBSession
 from src.core.logger import logger
 from src.dependencies.proactive_refresh import authProbeDep
@@ -26,7 +26,7 @@ async def list_vacancies(pagination: Annotated[Pagination, Depends()], filters: 
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
 
-@vacancies_router.get("/{id}", response_model=PaginatedOut[VacancyCardOut])
+@vacancies_router.get("/{id}", response_model=VacancyOut)
 async def get_vacancy(id: Annotated[UUID, Path()], auth: authProbeDep, session: DBSession):
     user_id = auth[0] if auth else None
     try:
@@ -47,7 +47,7 @@ async def list_applications(pagination: Annotated[Pagination, Depends()], filter
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
 
-@vacancies_router.get("/applications/{id}", response_model=PaginatedOut[ApplicationOut])
+@vacancies_router.get("/applications/{id}", response_model=ApplicationOut)
 async def get_application(id: Annotated[UUID, Path()], session: DBSession):
     try:
         return await VacanciesRepository.get_application_by_id(session=session, id=id)
