@@ -4,7 +4,7 @@ from fastapi import HTTPException
 
 from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
-from src.apps.users.schemas import UserUpdateIn
+from src.apps.users.schemas import UserOut, UserUpdateIn
 from src.core.database import DBSession
 from src.core.logger import logger
 from src.core.settings import get_settings
@@ -15,12 +15,17 @@ from .router import users_router
 settings = get_settings()
 
 
-@users_router.get("/")
+@users_router.get("/", response_model=UserOut)
 async def get_user(auth: authDep, session: DBSession):
     user_id, _, _ = auth
 
     try:
-        return await UsersRepository.get_by_id(user_id, session)
+        user = await UsersRepository.get_by_id(user_id, session)
+        logger.debug(f"user.email_verified: {user.email_verified}")
+        logger.debug(f"user.skills: {user.skills}")
+        logger.debug(f"user.resumes: {user.resumes}")
+        logger.debug(f"user.work_experiences: {user.work_experiences}")
+        return user
     except Exception as e:
         logger.error("get_user UsersRepository.get_by_id")
         pprint(e)

@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.apps.shared.enums import JobSearchStatus
 from src.apps.stats.schemas import DailyActiveUsersBucket, JobSearchStatusBucket, SpecializationBucket, UsersStats
@@ -27,7 +28,15 @@ class UsersRepository:
 
     @staticmethod
     async def get_by_id(id: UUID, session: AsyncSession):
-        stmt = select(UserModel).where(UserModel.id == id)
+        stmt = (
+            select(UserModel)
+            .options(
+                selectinload(UserModel.resumes),
+                selectinload(UserModel.skills),
+                selectinload(UserModel.work_experiences),
+            )
+            .where(UserModel.id == id)
+        )
         result = await session.execute(stmt)
         return result.scalar_one()
 
