@@ -4,9 +4,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import ARRAY, TIMESTAMP
+from sqlalchemy import ARRAY, TIMESTAMP, ForeignKey, String, Text, func
 from sqlalchemy import UUID as PG_UUID
-from sqlalchemy import ForeignKey, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
@@ -34,6 +33,13 @@ class WithLocation(Base):
 
     country: Mapped[str] = mapped_column(String(64))
     city: Mapped[str] = mapped_column(String(64))
+
+
+class WithNullableLocation(Base):
+    __abstract__ = True
+
+    country: Mapped[str | None] = mapped_column(String(64))
+    city: Mapped[str | None] = mapped_column(String(64))
 
 
 class MessageBaseModel(BaseModel):

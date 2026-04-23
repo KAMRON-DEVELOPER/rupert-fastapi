@@ -21,7 +21,7 @@ from src.apps.shared.enums import (
     UserStatus,
     WorkFormat,
 )
-from src.apps.shared.models import Base, BaseModel, WithLocation
+from src.apps.shared.models import Base, BaseModel, WithLocation, WithNullableLocation
 
 if TYPE_CHECKING:
     from src.apps.chats.models import ChatMessageModel, ChatModel, ChatParticipantModel
@@ -166,7 +166,7 @@ class OAuthUserModel(Base):
         return "<OAuthUserModel>"
 
 
-class UserModel(BaseModel, WithLocation):
+class UserModel(BaseModel, WithNullableLocation):
     __tablename__ = "users"
 
     # Auth & Identity

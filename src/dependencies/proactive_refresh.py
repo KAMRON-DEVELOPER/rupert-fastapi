@@ -6,7 +6,7 @@ from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.responses import Response
 from jwt import decode, encode
 from jwt.exceptions import ExpiredSignatureError, PyJWTError
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, field_serializer
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +19,8 @@ settings = get_settings()
 
 
 CookieTokenType = Literal["access", "refresh"]
-TokenType = Literal[*CookieTokenType, "email_verification", "password_setup"]
+ExtraTokenType = Literal["email_verification", "password_setup"]
+TokenType = CookieTokenType | ExtraTokenType
 
 
 class TokenClaims(BaseModel):
@@ -27,6 +28,10 @@ class TokenClaims(BaseModel):
     type: TokenType
     exp: datetime
     iat: datetime
+
+    @field_serializer("sub")
+    def serialize_sub(self, sub: UUID, _info):
+        return sub.hex
 
 
 def create_token(user_id: UUID, type: TokenType) -> str:
@@ -44,29 +49,19 @@ def create_token(user_id: UUID, type: TokenType) -> str:
 
     claims = TokenClaims(sub=user_id, type=type, iat=iat, exp=exp)
     payload = claims.model_dump()
-
-    return encode(payload, settings.jwt.secret_key, algorithm=settings.jwt.algorithm)
+    try:
+        return encode(payload, settings.jwt.secret_key, algorithm=settings.jwt.algorithm)
+    except Exception as e:
+        logger.error(f"Failed to encode token: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to encode token")
 
 
 def decode_token(jwt: str, expected_type: TokenType):
+    # We emit new access token if expired, no raise
+    verify_exp = expected_type != "access"
+
     try:
-        # We emit new access token if expired, no raise
-        verify_exp = expected_type != "access"
-        obj = decode(
-            jwt,
-            settings.jwt.secret_key,
-            algorithms=[settings.jwt.algorithm],
-            options={"verify_exp": verify_exp},
-        )
-
-        claims = TokenClaims.model_validate(obj)
-
-        if claims.type != expected_type:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
-
-        return claims
-    except ValidationError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT token validation error")
+        obj = decode(jwt, settings.jwt.secret_key, algorithms=[settings.jwt.algorithm], options={"verify_exp": verify_exp})
     except ExpiredSignatureError:
         match expected_type:
             case "access":
@@ -79,7 +74,17 @@ def decode_token(jwt: str, expected_type: TokenType):
                 detail = "Password setup link expired"
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=detail)
     except PyJWTError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"JWT error: e{e}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"JWT error: {e}")
+
+    try:
+        claims = TokenClaims.model_validate(obj)
+    except ValidationError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token validation error")
+
+    if claims.type != expected_type:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+
+    return claims
 
 
 def handle_decode(jwt: str, expected_type: CookieTokenType) -> tuple[bool, TokenClaims, bool]:
@@ -130,13 +135,6 @@ class ProactiveRefresh:
         refresh_token = auth_cookies.refresh_token
         dau = auth_cookies.dau
         user_id = None
-
-        clear_auth_cookies(res)
-
-        logger.debug(f"access_token: {access_token}")
-        logger.debug(f"refresh_token: {refresh_token}")
-        logger.debug(f"dau: {dau}")
-        logger.debug(f"user_id: {user_id}")
 
         if access_token:
             access_needs_refresh, access_claims, expired = handle_decode(access_token, "access")

@@ -58,11 +58,11 @@ class Mailtrap:
 
                 if status == 200:
                     response = SuccessResponse(**data)
-                    logger.debug("Mailtrap success: %s", response)
+                    logger.debug(f"Mailtrap success: {response}")
                     return
 
                 response = ErrorResponse(**data)
-                logger.error("Mailtrap error: %s", response)
+                logger.error(f"Mailtrap error: {response}")
                 raise MailtrapError(response)
 
     @classmethod

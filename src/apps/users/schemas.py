@@ -2,7 +2,8 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Annotated
 from uuid import UUID
 
-from pydantic import AfterValidator, BaseModel, EmailStr, Field, ValidationInfo, computed_field, field_validator
+from pydantic import AfterValidator, AliasGenerator, BaseModel, ConfigDict, EmailStr, Field, ValidationInfo, computed_field, field_validator
+from pydantic.alias_generators import to_camel
 
 from src.apps.shared.enums import EmploymentType, FollowPolicy, JobSearchStatus, ProficiencyLevel, Provider, SalaryCurrency, Specialization, UserRole, UserStatus, WorkFormat
 from src.apps.shared.schemas import BaseOut, CamelCaseOut, ORMSchema, SkillOut
@@ -46,10 +47,12 @@ class PasswordSetupIn(BaseModel):
 
 
 class EmailAuthIn(BaseModel):
-    first_name: Annotated[str | None, AfterValidator(validate_first_name)] = None
-    last_name: Annotated[str | None, AfterValidator(validate_last_name)] = None
     email: EmailStr
     password: Annotated[str, AfterValidator(validate_password)]
+    first_name: Annotated[str | None, AfterValidator(validate_first_name)] = None
+    last_name: Annotated[str | None, AfterValidator(validate_last_name)] = None
+
+    model_config = ConfigDict(alias_generator=AliasGenerator(validation_alias=to_camel))
 
 
 # ---------------------------------------------------------------------------
