@@ -1,7 +1,8 @@
 from uuid import UUID
 
 from fastapi import Query
-from pydantic import AnyUrl, BaseModel, EmailStr, Field
+from pydantic import AliasGenerator, AnyUrl, BaseModel, ConfigDict, EmailStr, Field
+from pydantic.alias_generators import to_camel
 
 from src.apps.shared.enums import CompanyMemberRole, CompanyStatus, CompanyType
 from src.apps.shared.schemas import BaseOut
@@ -46,6 +47,8 @@ class CompanyFilters(BaseModel):
     city: str | None = None
     has_open_vacancies: bool | None = None
     skill_ids: list[UUID] | None = Query(None)
+
+    model_config = ConfigDict(alias_generator=AliasGenerator(validation_alias=to_camel))
 
 
 class CompanyCardOut(BaseOut):

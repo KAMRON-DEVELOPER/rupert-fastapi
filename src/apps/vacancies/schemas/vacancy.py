@@ -1,7 +1,8 @@
 from uuid import UUID
 
 from fastapi import Query
-from pydantic import AnyUrl, BaseModel, Field, field_validator
+from pydantic import AliasGenerator, AnyUrl, BaseModel, ConfigDict, Field, field_validator
+from pydantic.alias_generators import to_camel
 
 from src.apps.companies.schemas.company import CompanyCardOut
 from src.apps.shared.enums import EmploymentType, PaymentFrequency, ProficiencyLevel, SalaryCurrency, Specialization, SubmissionType, VacancyStatus, WorkFormat
@@ -90,6 +91,8 @@ class VacancyFilters(BaseModel):
     country: str | None = None
     city: str | None = None
     skill_ids: list[UUID] | None = Query(None)
+
+    model_config = ConfigDict(alias_generator=AliasGenerator(validation_alias=to_camel))
 
 
 class VacancyCardOut(BaseOut):
