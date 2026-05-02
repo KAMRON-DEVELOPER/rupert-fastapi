@@ -1,8 +1,8 @@
 """initial
 
-Revision ID: 444c3e1a407c
+Revision ID: 17bbe34e7a45
 Revises: 
-Create Date: 2026-04-18 12:48:00.170896
+Create Date: 2026-04-24 15:57:52.790377
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '444c3e1a407c'
+revision: str = '17bbe34e7a45'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -38,11 +38,11 @@ def upgrade() -> None:
     sa.Column('contact_email', sa.String(length=128), nullable=True),
     sa.Column('contact_phone', sa.String(length=32), nullable=True),
     sa.Column('status', sa.Enum('pending', 'approved', 'rejected', 'suspended', name='company_status'), nullable=False),
+    sa.Column('country', sa.String(length=64), nullable=False),
+    sa.Column('city', sa.String(length=64), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
-    sa.Column('country', sa.String(length=64), nullable=False),
-    sa.Column('city', sa.String(length=64), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_companies_name'), 'companies', ['name'], unique=True)
@@ -75,7 +75,7 @@ def upgrade() -> None:
     sa.Column('email_verified', sa.Boolean(), nullable=False),
     sa.Column('password_hash', sa.String(length=255), nullable=True),
     sa.Column('first_name', sa.String(length=64), nullable=False),
-    sa.Column('last_name', sa.String(length=64), nullable=False),
+    sa.Column('last_name', sa.String(length=64), nullable=True),
     sa.Column('headline', sa.String(length=120), nullable=True),
     sa.Column('birthdate', sa.Date(), nullable=True),
     sa.Column('bio', sa.Text(), nullable=True),
@@ -84,17 +84,16 @@ def upgrade() -> None:
     sa.Column('specialization', sa.Enum('frontend', 'backend', 'fullstack', 'ios', 'android', 'cross_platform_mobile', 'desktop', 'embedded', 'systems', 'firmware', 'devops', 'platform', 'sre', 'cloud', 'data_engineering', 'data_science', 'machine_learning', 'ai_engineering', 'data_analytics', 'security', 'application_security', 'blockchain', 'game', 'qa', 'ui_ux', 'developer_relations', 'technical_writing', name='specialization'), nullable=True),
     sa.Column('phone_number', sa.String(length=32), nullable=True),
     sa.Column('github_url', sa.Text(), nullable=True),
-    sa.Column('linkedin_url', sa.Text(), nullable=True),
-    sa.Column('portfolio_url', sa.Text(), nullable=True),
+    sa.Column('telegram_username', sa.String(length=32), nullable=True),
     sa.Column('role', sa.Enum('user', 'admin', name='user_role'), nullable=False),
     sa.Column('status', sa.Enum('active', 'suspended', 'pending_verification', 'deleted', name='user_status'), nullable=False),
     sa.Column('follow_policy', sa.Enum('auto_accept', 'require_approval', name='follow_policy'), nullable=False),
     sa.Column('job_search_status', sa.Enum('actively_looking', 'open_to_offers', 'interviewing', 'not_looking', name='job_search_status'), nullable=False),
+    sa.Column('country', sa.String(length=64), nullable=True),
+    sa.Column('city', sa.String(length=64), nullable=True),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
-    sa.Column('country', sa.String(length=64), nullable=False),
-    sa.Column('city', sa.String(length=64), nullable=False),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
@@ -204,16 +203,17 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_groups_owner_id'), 'groups', ['owner_id'], unique=False)
     op.create_table('oauth_users',
-    sa.Column('id', sa.String(length=255), nullable=False),
+    sa.Column('provider_id', sa.String(length=255), nullable=False),
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('provider', sa.Enum('google', 'github', name='provider'), nullable=False),
     sa.Column('username', sa.String(length=128), nullable=True),
     sa.Column('email', sa.String(length=128), nullable=True),
     sa.Column('picture', sa.Text(), nullable=True),
+    sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id'),
+    sa.PrimaryKeyConstraint('provider_id', 'id'),
     sa.UniqueConstraint('user_id', 'provider', name='uq_oauth_user_provider')
     )
     op.create_table('posts',
@@ -238,11 +238,11 @@ def upgrade() -> None:
     sa.Column('salary_currency', sa.Enum('UZS', 'KZT', 'KGS', 'TJS', 'TMT', 'USD', 'EUR', 'TRY', name='salary_currency'), nullable=True),
     sa.Column('work_format', sa.Enum('onsite', 'remote', 'hybrid', name='work_format'), nullable=True),
     sa.Column('employment_type', sa.Enum('full_time', 'part_time', 'contract', 'internship', name='employment_type'), nullable=True),
+    sa.Column('country', sa.String(length=64), nullable=False),
+    sa.Column('city', sa.String(length=64), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
-    sa.Column('country', sa.String(length=64), nullable=False),
-    sa.Column('city', sa.String(length=64), nullable=False),
     sa.CheckConstraint('salary_expectation_min <= salary_expectation_max', name='chk_resume_salary_expectation_range'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
@@ -294,11 +294,11 @@ def upgrade() -> None:
     sa.Column('work_hours_per_week', sa.SmallInteger(), nullable=True),
     sa.Column('employment_type', sa.Enum('full_time', 'part_time', 'contract', 'internship', name='employment_type'), nullable=False),
     sa.Column('status', sa.Enum('draft', 'open', 'archived', 'closed', name='vacancy_status'), nullable=False),
+    sa.Column('country', sa.String(length=64), nullable=False),
+    sa.Column('city', sa.String(length=64), nullable=False),
     sa.Column('id', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.TIMESTAMP(timezone=True), nullable=False),
     sa.Column('updated_at', sa.TIMESTAMP(timezone=True), nullable=False),
-    sa.Column('country', sa.String(length=64), nullable=False),
-    sa.Column('city', sa.String(length=64), nullable=False),
     sa.CheckConstraint('salary_min <= salary_max', name='chk_vacancy_salary_range'),
     sa.ForeignKeyConstraint(['company_id'], ['companies.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')

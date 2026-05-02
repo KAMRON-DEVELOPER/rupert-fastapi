@@ -8,16 +8,16 @@ from sqlalchemy import TIMESTAMP, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.apps.shared.models import BaseModel, MessageBaseModel
+from src.apps.shared.models import BaseMessageModel, BaseModel
 
 if TYPE_CHECKING:
     from src.apps.users.models import UserModel
 
 
-class ChatMessageModel(MessageBaseModel):
+class ChatMessageModel(BaseMessageModel):
     __tablename__ = "chat_messages"
 
-    chat_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="chats.id", ondelete="CASCADE"), index=True, nullable=False)
+    chat_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="chats.id", ondelete="CASCADE"), index=True)
 
     # Relationships
     chat: Mapped[ChatModel] = relationship(back_populates="messages", passive_deletes=True)

@@ -4,7 +4,7 @@ from fastapi import HTTPException
 
 from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
-from src.apps.users.schemas import UserOut, UserUpdateIn
+from src.apps.users.schemas.user import UserDetail, UserUpdateRequest
 from src.core.database import DBSession
 from src.core.logger import logger
 from src.core.settings import get_settings
@@ -15,7 +15,7 @@ from .router import users_router
 settings = get_settings()
 
 
-@users_router.get("/", response_model=UserOut)
+@users_router.get("/", response_model=UserDetail)
 async def get_user(auth: authDep, session: DBSession):
     user_id, _, _ = auth
 
@@ -33,7 +33,7 @@ async def get_user(auth: authDep, session: DBSession):
 
 
 @users_router.patch("/")
-async def update_user(auth: authDep, schm: UserUpdateIn, session: DBSession):
+async def update_user(auth: authDep, schm: UserUpdateRequest, session: DBSession):
     user_id, _, _ = auth
 
     try:

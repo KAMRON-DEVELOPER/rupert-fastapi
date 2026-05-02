@@ -3,15 +3,14 @@ from typing import Annotated
 from urllib.parse import urljoin
 
 from bcrypt import checkpw, gensalt, hashpw
-from fastapi import HTTPException, Query, Response, status
+from fastapi import HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
-from starlette.requests import Request
 
 from src.apps.shared.schemas import MessageResponse
 from src.apps.users.repositories.oauth_user import OAuthUsersRepository
 from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
-from src.apps.users.schemas import AuthProbeOut, EmailAuthIn
+from src.apps.users.schemas.auth import AuthProbeResponse, EmailAuthRequest
 from src.apps.users.utils import finalize_session
 from src.core.database import DBSession
 from src.core.exceptions import ValidationException
@@ -25,14 +24,14 @@ from .router import users_router
 settings = get_settings()
 
 
-@users_router.get("/auth/probe", response_model=AuthProbeOut)
+@users_router.get("/auth/probe", response_model=AuthProbeResponse)
 async def auth_probe(auth: authProbeDep):
-    """Helpfull handler to check user session validity"""
-    return AuthProbeOut(is_authenticated=auth is not None)
+    """Helpful handler to check user session validity"""
+    return AuthProbeResponse(is_authenticated=auth is not None)
 
 
 @users_router.post(path="/auth/email")
-async def email_auth(req: Request, res: Response, schm: EmailAuthIn, session: DBSession):
+async def email_auth(req: Request, res: Response, schm: EmailAuthRequest, session: DBSession):
     try:
         user = await UsersRepository.find_by_email(schm.email, session)
     except Exception as e:
@@ -73,10 +72,10 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthIn, session: DB
             raise HTTPException(status_code=500, detail="Could not send password setup link")
 
         providers_text = ", ".join(str(p.value) for p in providers)
-        return MessageResponse(msg=f"This account was created with {providers_text}. Use that provider to sign in, or use the link we sent to set a password.")
+        return MessageResponse(message=f"This account was created with {providers_text}. Use that provider to sign in, or use the link we sent to set a password.")
 
     if not schm.first_name or not schm.last_name:
-        return MessageResponse(msg="new_user")
+        return MessageResponse(message="new_user")
 
     hash_password_bytes = await asyncio.to_thread(hashpw, schm.password.encode(), gensalt(rounds=8))
     hash_password = hash_password_bytes.decode()
@@ -110,7 +109,7 @@ async def verify(token: Annotated[str, Query()], auth: authProbeDep, session: DB
 
     if auth:
         if auth[0] != claims.sub:
-            content = MessageResponse(msg="You are not the same person!").model_dump_json()
+            content = MessageResponse(message="You are not the same person!").model_dump_json()
             return Response(status_code=status.HTTP_400_BAD_REQUEST, content=content)
 
     try:
@@ -120,7 +119,7 @@ async def verify(token: Annotated[str, Query()], auth: authProbeDep, session: DB
         raise HTTPException(status_code=500, detail="Something went wrong")
 
     if auth:
-        return MessageResponse(msg="Your email verified successfully")
+        return MessageResponse(message="Your email verified successfully")
     else:
         base = settings.frontend_endpoint.rstrip("/")
         url = urljoin(base, "auth")

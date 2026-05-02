@@ -5,10 +5,10 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.apps.shared.enums import JobSearchStatus
+from src.apps.shared.schemas.enums import JobSearchStatus
 from src.apps.stats.schemas import DailyActiveUsersBucket, JobSearchStatusBucket, SpecializationBucket, UsersStats
 from src.apps.users.models import ActivityModel, UserModel
-from src.apps.users.schemas import UserUpdateIn
+from src.apps.users.schemas.user import UserUpdateRequest
 from src.core.helpers import percentage
 
 
@@ -41,7 +41,7 @@ class UsersRepository:
         return result.scalar_one()
 
     @staticmethod
-    async def update_by_id(id: UUID, schm: UserUpdateIn, session: AsyncSession):
+    async def update_by_id(id: UUID, schm: UserUpdateRequest, session: AsyncSession):
         stmt = update(UserModel).where(UserModel.id == id).values(schm.model_dump(exclude_unset=True)).returning(UserModel)
         result = await session.execute(stmt)
         return result.scalar_one()

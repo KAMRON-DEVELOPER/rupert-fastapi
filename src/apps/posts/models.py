@@ -7,8 +7,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.apps.shared.enums import PostEngagementType, PostStatus
 from src.apps.shared.models import BaseModel
+from src.apps.shared.schemas.enums import PostEngagementType, PostStatus
 
 if TYPE_CHECKING:
     from src.apps.shared.models import TagModel
@@ -33,9 +33,9 @@ class PostEngagementModel(BaseModel):
     __tablename__ = "post_engagements"
     __table_args__ = (UniqueConstraint("user_id", "post_id", name="uq_user_post_engagement"),)
 
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    post_id: Mapped[UUID] = mapped_column(ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
-    type: Mapped[PostEngagementType] = mapped_column(Enum(PostEngagementType, name="post_engagement_type"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    post_id: Mapped[UUID] = mapped_column(ForeignKey("posts.id", ondelete="CASCADE"))
+    type: Mapped[PostEngagementType] = mapped_column(Enum(PostEngagementType, name="post_engagement_type"))
 
     # Relationships
     user: Mapped["UserModel"] = relationship(back_populates="post_engagements", passive_deletes=True)
@@ -48,10 +48,10 @@ class PostEngagementModel(BaseModel):
 class PostCommentModel(BaseModel):
     __tablename__ = "post_comments"
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    post_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    post_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"))
     parent_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("post_comments.id", ondelete="CASCADE"))
-    body: Mapped[str] = mapped_column(Text, nullable=False)
+    body: Mapped[str] = mapped_column(Text)
 
     # Relationships
     user: Mapped[UserModel] = relationship(back_populates="post_comments")
@@ -66,9 +66,9 @@ class PostCommentModel(BaseModel):
 class PostModel(BaseModel):
     __tablename__ = "posts"
 
-    author_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    title: Mapped[str] = mapped_column(String(128), nullable=False)
-    body: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    author_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(128))
+    body: Mapped[dict] = mapped_column(JSONB)
     status: Mapped[PostStatus] = mapped_column(Enum(PostStatus, name="post_status"), default=PostStatus.draft)
     scheduled_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
 

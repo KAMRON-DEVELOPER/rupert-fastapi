@@ -5,12 +5,12 @@ from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.apps.shared.enums import ApplicationStatus, VacancyStatus
-from src.apps.shared.schemas import PaginatedOut, Pagination
+from apps.vacancies.schemas.application import ApplicationDetail, applicationListDep
+from src.apps.shared.schemas import PaginatedResponse, paginationDep
+from src.apps.shared.schemas.enums import ApplicationStatus, VacancyStatus
 from src.apps.stats.schemas import SpecializationBucket, VacanciesStats, VacancyStatusBucket
 from src.apps.vacancies.models import ApplicationModel, SavedVacancyModel, VacancyModel, VacancySkillLink
-from src.apps.vacancies.schemas.application import ApplicationFilters, ApplicationOut
-from src.apps.vacancies.schemas.vacancy import VacancyCardOut, VacancyFilters, VacancyOut
+from src.apps.vacancies.schemas.vacancy import VacancyDetail, VacancySummary, vacancyListDep
 from src.core.helpers import percentage
 
 
@@ -18,10 +18,10 @@ class VacanciesRepository:
     @staticmethod
     async def get_many(
         session: AsyncSession,
+        pagination: paginationDep,
+        filters: vacancyListDep,
         user_id: UUID | None = None,
-        pagination: Pagination | None = None,
-        filters: VacancyFilters | None = None,
-    ) -> PaginatedOut[VacancyCardOut]:
+    ) -> PaginatedResponse[VacancySummary]:
         stmt = select(VacancyModel).options(selectinload(VacancyModel.company))
 
         if filters:
@@ -98,15 +98,15 @@ class VacanciesRepository:
                 vacancy.has_applied = has_applied
                 vacancies.append(vacancy)
 
-            data = cast(list[VacancyCardOut], vacancies)
-            return PaginatedOut(data=data, total=total)
+            data = cast(list[VacancySummary], vacancies)
+            return PaginatedResponse(data=data, total=total)
 
         res = await session.scalars(stmt)
-        data = cast(list[VacancyCardOut], list(res.unique().all()))
-        return PaginatedOut(data=data, total=total)
+        data = cast(list[VacancySummary], list(res.unique().all()))
+        return PaginatedResponse(data=data, total=total)
 
     @staticmethod
-    async def get_by_id(session: AsyncSession, id: UUID, user_id: UUID | None = None) -> VacancyOut:
+    async def get_by_id(session: AsyncSession, id: UUID, user_id: UUID | None = None) -> VacancyDetail:
         stmt = (
             select(VacancyModel)
             .options(
@@ -146,11 +146,11 @@ class VacanciesRepository:
             vacancy, is_saved, has_applied = row.tuple()
             vacancy.is_saved = is_saved
             vacancy.has_applied = has_applied
-            return cast(VacancyOut, vacancy)
+            return cast(VacancyDetail, vacancy)
 
         stmt = select(VacancyModel).options(*load_options).where(VacancyModel.id == id)
         vacancy = (await session.execute(stmt)).one().tuple()[0]
-        return cast(VacancyOut, vacancy)
+        return cast(VacancyDetail, vacancy)
 
     @staticmethod
     async def create(session: AsyncSession, company_id: UUID, data: dict) -> VacancyModel:
@@ -168,7 +168,7 @@ class VacanciesRepository:
         return vacancy
 
     @staticmethod
-    async def update(session: AsyncSession, vacancy_id: UUID, data: dict) -> VacancyOut | None:
+    async def update(session: AsyncSession, vacancy_id: UUID, data: dict) -> VacancyDetail | None:
         vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
 
         for key, value in data.items():
@@ -190,9 +190,9 @@ class VacanciesRepository:
     @staticmethod
     async def get_applications(
         session: AsyncSession,
-        pagination: Pagination | None = None,
-        filters: ApplicationFilters | None = None,
-    ) -> PaginatedOut[ApplicationOut]:
+        pagination: paginationDep,
+        filters: applicationListDep,
+    ) -> PaginatedResponse[ApplicationDetail]:
         stmt = select(ApplicationModel)
 
         if filters:
@@ -218,8 +218,8 @@ class VacanciesRepository:
             stmt = stmt.offset(pagination.offset).limit(pagination.limit)
 
         res = await session.scalars(stmt)
-        data = cast(list[ApplicationOut], list(res.all()))
-        return PaginatedOut(data=data, total=total)
+        data = cast(list[ApplicationDetail], list(res.all()))
+        return PaginatedResponse(data=data, total=total)
 
     @staticmethod
     async def get_application_by_id(session: AsyncSession, id: UUID) -> ApplicationModel:

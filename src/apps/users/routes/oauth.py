@@ -4,14 +4,13 @@ from typing import Annotated
 
 from bcrypt import gensalt, hashpw
 from dead_simple_oauth_fastapi import GithubUser, GoogleUser
-from fastapi import Depends, HTTPException, Query, Response, status
+from fastapi import Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import update
-from starlette.requests import Request
 
-from src.apps.shared.enums import UserStatus
+from src.apps.shared.schemas.enums import UserStatus
 from src.apps.users.models import UserModel
-from src.apps.users.schemas import AuthProbeOut, PasswordSetupIn
+from src.apps.users.schemas.auth import PasswordSetupRequest
 from src.apps.users.utils import finalize_session
 from src.core.database import DBSession
 from src.core.logger import logger
@@ -87,7 +86,7 @@ async def github_oauth_callback(
 
 
 @users_router.post("/auth/password-setup")
-async def password_setup(token: Annotated[str, Query], schm: PasswordSetupIn, session: DBSession):
+async def password_setup(token: Annotated[str, Query], schm: PasswordSetupRequest, session: DBSession):
     decoded = decode_token(token, "password_setup")
 
     hash_password_bytes = await asyncio.to_thread(hashpw, schm.password.encode(), gensalt(rounds=8))

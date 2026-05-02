@@ -1,42 +1,44 @@
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel
+from fastapi import Depends
 
-from src.apps.shared.enums import ApplicationStatus
-from src.apps.shared.schemas import BaseOut
-from src.apps.users.schemas import ResumeCardOut, UserCardOut
-from src.apps.vacancies.schemas.vacancy import VacancyCardOut
+from src.apps.shared.schemas import RequestSchema, ResponseSchema
+from src.apps.shared.schemas.enums import ApplicationStatus
+from src.apps.users.schemas.resume import ResumeSummary
+from src.apps.users.schemas.user import UserSummary
+from src.apps.vacancies.schemas.vacancy import VacancySummary
 
 
-# ---------------------------------------------------------------------------
-# Application
-# ---------------------------------------------------------------------------
-class ApplicationIn(BaseModel):
+class ApplicationRequest(RequestSchema):
     vacancy_id: UUID
     resume_id: UUID | None = None
     cover_letter: str | None = None
 
 
-class ApplicationFilters(BaseModel):
+class ApplicationListParams(RequestSchema):
     vacancy_id: UUID | None = None
     applicant_id: UUID | None = None
     status: ApplicationStatus | None = None
 
 
-class ApplicationStatusUpdateIn(BaseModel):
+applicationListDep = Annotated[ApplicationListParams, Depends()]
+
+
+class ApplicationStatusUpdateRequest(RequestSchema):
     status: ApplicationStatus
     recruiter_note: str | None = None
 
 
-class ApplicationOut(BaseOut):
+class ApplicationSummary(ResponseSchema):
     vacancy_id: UUID
     applicant_id: UUID
     status: ApplicationStatus
     cover_letter: str | None
-    vacancy: VacancyCardOut
-    resume: ResumeCardOut | None
+    vacancy: VacancySummary
+    resume: ResumeSummary | None
 
 
-class ApplicationDetailOut(ApplicationOut):
-    applicant: UserCardOut
+class ApplicationDetail(ApplicationSummary):
+    applicant: UserSummary
     recruiter_note: str | None

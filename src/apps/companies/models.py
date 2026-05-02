@@ -7,8 +7,8 @@ from sqlalchemy import Enum, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.apps.shared.enums import CompanyMemberRole, CompanyStatus, CompanyType
-from src.apps.shared.models import BaseModel, WithLocation
+from src.apps.shared.models import BaseLocationModel, BaseModel
+from src.apps.shared.schemas.enums import CompanyMemberRole, CompanyStatus, CompanyType
 
 if TYPE_CHECKING:
     from src.apps.users.models import UserModel
@@ -30,18 +30,18 @@ class CompanyMemberModel(BaseModel):
         return "<CompanyMemberModel>"
 
 
-class CompanyModel(BaseModel, WithLocation):
+class CompanyModel(BaseLocationModel):
     __tablename__ = "companies"
 
-    name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     tagline: Mapped[str | None] = mapped_column(String(128))
     description: Mapped[str | None] = mapped_column(Text)
     logo_url: Mapped[str | None] = mapped_column(Text)
     website_url: Mapped[str | None] = mapped_column(Text)
-    type: Mapped[CompanyType] = mapped_column(Enum(CompanyType, name="company_type"), nullable=False)
+    type: Mapped[CompanyType] = mapped_column(Enum(CompanyType, name="company_type"))
     contact_email: Mapped[str | None] = mapped_column(String(128))
     contact_phone: Mapped[str | None] = mapped_column(String(32))
-    status: Mapped[CompanyStatus] = mapped_column(Enum(CompanyStatus, name="company_status"), default=CompanyStatus.pending, nullable=False)
+    status: Mapped[CompanyStatus] = mapped_column(Enum(CompanyStatus, name="company_status"), default=CompanyStatus.pending)
 
     members: Mapped[list[CompanyMemberModel]] = relationship(back_populates="company", cascade="all, delete-orphan", passive_deletes=True)
     vacancies: Mapped[list[VacancyModel]] = relationship(back_populates="company", passive_deletes=True)

@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from scalar_fastapi import get_scalar_api_reference
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from src.apps.companies.routes import companies_router
@@ -62,6 +63,11 @@ app.include_router(router=vacancies_router, prefix="/api/v1/vacancies", tags=["v
 @app.get(path="/", tags=["root"])
 async def root() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/docs/scalar", include_in_schema=False)
+async def scalar_html():
+    return get_scalar_api_reference(openapi_url=app.openapi_url, scalar_proxy_url="https://proxy.scalar.com")
 
 
 @app.exception_handler(ApiException)

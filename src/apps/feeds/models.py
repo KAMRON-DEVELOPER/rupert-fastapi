@@ -8,8 +8,8 @@ from sqlalchemy import TIMESTAMP, Enum, Float, ForeignKey, String, UniqueConstra
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
-from src.apps.shared.enums import CommentPolicy, FeedEngagementType, FeedVisibility
 from src.apps.shared.models import BaseModel
+from src.apps.shared.schemas.enums import CommentPolicy, FeedEngagementType, FeedVisibility
 from src.apps.users.models import UserModel
 
 if TYPE_CHECKING:
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class FeedCategoryModel(BaseModel):
     __tablename__ = "feed_categories"
 
-    name: Mapped[str] = mapped_column(String(24), index=True, nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(24), index=True, unique=True)
 
     # Relationships
     feeds: Mapped[list[FeedModel]] = relationship(back_populates="category")
@@ -46,9 +46,9 @@ class FeedEngagementModel(BaseModel):
     __tablename__ = "feed_engagements"
     __table_args__ = (UniqueConstraint("user_id", "feed_id", "type", name="uq_user_feed_engagement"),)
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
-    feed_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("feeds.id", ondelete="CASCADE"), index=True, nullable=False)
-    type: Mapped[FeedEngagementType] = mapped_column(Enum(FeedEngagementType, name="feed_engagement_type"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    feed_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("feeds.id", ondelete="CASCADE"), index=True)
+    type: Mapped[FeedEngagementType] = mapped_column(Enum(FeedEngagementType, name="feed_engagement_type"))
 
     # Relationships
     user: Mapped[UserModel] = relationship(back_populates="feed_engagements", passive_deletes=True)
@@ -61,7 +61,7 @@ class FeedEngagementModel(BaseModel):
 class FeedModel(BaseModel):
     __tablename__ = "feeds"
 
-    author_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    author_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
     author_first_name: Mapped[str] = column_property(select(UserModel.first_name).where(UserModel.id == author_id).correlate_except(UserModel).scalar_subquery())
     author_last_name: Mapped[str] = column_property(select(UserModel.last_name).where(UserModel.id == author_id).correlate_except(UserModel).scalar_subquery())
 

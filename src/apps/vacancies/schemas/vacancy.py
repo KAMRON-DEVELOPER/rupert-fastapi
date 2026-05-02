@@ -1,35 +1,16 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import Query
-from pydantic import AliasGenerator, AnyUrl, BaseModel, ConfigDict, Field, field_validator
-from pydantic.alias_generators import to_camel
+from fastapi import Depends, Query
+from pydantic import AnyUrl, Field, field_validator
 
-from src.apps.companies.schemas.company import CompanyCardOut
-from src.apps.shared.enums import EmploymentType, PaymentFrequency, ProficiencyLevel, SalaryCurrency, Specialization, SubmissionType, VacancyStatus, WorkFormat
-from src.apps.shared.schemas import BaseOut, ORMSchema, SkillOut
-
-
-# ---------------------------------------------------------------------------
-# VacancySkillLink
-# ---------------------------------------------------------------------------
-class VacancySkillLinkIn(BaseModel):
-    skill_id: UUID
-    proficiency: ProficiencyLevel
-    years_of_experience_min: float | None = None
-    is_required: bool = True
+from src.apps.companies.schemas.company import CompanySummary
+from src.apps.shared.schemas import BaseModelResponse, LocationRequest, RequestSchema
+from src.apps.shared.schemas.enums import EmploymentType, PaymentFrequency, SalaryCurrency, Specialization, SubmissionType, VacancyStatus, WorkFormat
+from src.apps.vacancies.schemas.skill_links import VacancySkillLinkRequest, VacancySkillLinkResponse
 
 
-class VacancySkillLinkOut(ORMSchema):
-    skill: SkillOut
-    proficiency: ProficiencyLevel
-    years_of_experience_min: float | None
-    is_required: bool
-
-
-# ---------------------------------------------------------------------------
-# Vacancy
-# ---------------------------------------------------------------------------
-class VacancyIn(BaseModel):
+class VacancyCreateRequest(LocationRequest):
     title: str = Field(max_length=128)
     description: str
     external_apply_url: AnyUrl | None = None
@@ -43,10 +24,8 @@ class VacancyIn(BaseModel):
     work_format: WorkFormat = WorkFormat.onsite
     work_hours_per_week: int | None = Field(default=None, ge=1, le=168)
     employment_type: EmploymentType = EmploymentType.full_time
-    country: str = Field(max_length=64)
-    city: str = Field(max_length=64)
     status: VacancyStatus = VacancyStatus.draft
-    skills: list[VacancySkillLinkIn] = Field(default_factory=list)
+    skills: list[VacancySkillLinkRequest] = Field(default_factory=list)
 
     @field_validator("salary_max")
     @classmethod
@@ -57,7 +36,7 @@ class VacancyIn(BaseModel):
         return v
 
 
-class VacancyUpdateIn(BaseModel):
+class VacancyUpdateRequest(RequestSchema):
     title: str | None = Field(default=None, max_length=128)
     description: str | None = None
     external_apply_url: AnyUrl | None = None
@@ -74,9 +53,10 @@ class VacancyUpdateIn(BaseModel):
     country: str | None = Field(default=None, max_length=64)
     city: str | None = Field(default=None, max_length=64)
     status: VacancyStatus | None = None
+    skills: list[VacancySkillLinkRequest] | None
 
 
-class VacancyFilters(BaseModel):
+class VacancyListParams(RequestSchema):
     company_id: UUID | None = None
     title: str | None = None
     submission_type: SubmissionType | None = None
@@ -92,11 +72,12 @@ class VacancyFilters(BaseModel):
     city: str | None = None
     skill_ids: list[UUID] | None = Query(None)
 
-    model_config = ConfigDict(alias_generator=AliasGenerator(validation_alias=to_camel))
+
+vacancyListDep = Annotated[VacancyListParams, Depends()]
 
 
-class VacancyCardOut(BaseOut):
-    company: CompanyCardOut
+class VacancySummary(BaseModelResponse):
+    company: CompanySummary
     title: str
     submission_type: SubmissionType
     specialization: Specialization
@@ -113,9 +94,9 @@ class VacancyCardOut(BaseOut):
     has_applied: bool | None = None
 
 
-class VacancyOut(VacancyCardOut):
+class VacancyDetail(VacancySummary):
     description: str
     external_apply_url: AnyUrl | None
     work_hours_per_week: int | None = None
     payment_frequency: PaymentFrequency | None
-    skill_links: list[VacancySkillLinkOut]
+    skill_links: list[VacancySkillLinkResponse]

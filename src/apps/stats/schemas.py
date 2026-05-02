@@ -1,10 +1,10 @@
 from datetime import date
 
-from src.apps.shared.enums import CompanyType, JobSearchStatus, Specialization, VacancyStatus
-from src.apps.shared.schemas import CamelCaseOut
+from src.apps.shared.schemas import ResponseSchema
+from src.apps.shared.schemas.enums import CompanyType, JobSearchStatus, Specialization, VacancyStatus
 
 
-class BucketBase(CamelCaseOut):
+class BucketBase(ResponseSchema):
     count: int
     percentage: float
 
@@ -25,12 +25,12 @@ class CompanyTypeBucket(BucketBase):
     key: CompanyType
 
 
-class DailyActiveUsersBucket(CamelCaseOut):
+class DailyActiveUsersBucket(ResponseSchema):
     count: int
     date: date
 
 
-class UsersStats(CamelCaseOut):
+class UsersStats(ResponseSchema):
     total: int
 
     looking_for_job_count: int
@@ -42,7 +42,7 @@ class UsersStats(CamelCaseOut):
     by_specialization: list[SpecializationBucket]
 
 
-class VacanciesStats(CamelCaseOut):
+class VacanciesStats(ResponseSchema):
     total: int
 
     open: int
@@ -51,13 +51,13 @@ class VacanciesStats(CamelCaseOut):
     by_specialization: list[SpecializationBucket]
 
 
-class CompaniesStats(CamelCaseOut):
+class CompaniesStats(ResponseSchema):
     total: int
 
     by_type: list[CompanyTypeBucket]
 
 
-class Stats(CamelCaseOut):
+class Stats(ResponseSchema):
     users: UsersStats
     vacancies: VacanciesStats
     companies: CompaniesStats

@@ -8,8 +8,18 @@ from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey, Integer, Nume
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.apps.shared.enums import ApplicationStatus, EmploymentType, PaymentFrequency, ProficiencyLevel, SalaryCurrency, Specialization, SubmissionType, VacancyStatus, WorkFormat
-from src.apps.shared.models import BaseModel, WithLocation
+from src.apps.shared.models import BaseLocationModel, BaseModel
+from src.apps.shared.schemas.enums import (
+    ApplicationStatus,
+    EmploymentType,
+    PaymentFrequency,
+    ProficiencyLevel,
+    SalaryCurrency,
+    Specialization,
+    SubmissionType,
+    VacancyStatus,
+    WorkFormat,
+)
 
 if TYPE_CHECKING:
     from src.apps.companies.models import CompanyModel
@@ -34,7 +44,7 @@ class VacancySkillLink(BaseModel):
         return "<VacancySkillLink>"
 
 
-class VacancyModel(BaseModel, WithLocation):
+class VacancyModel(BaseLocationModel):
     __tablename__ = "vacancies"
     __table_args__ = (CheckConstraint("salary_min <= salary_max", name="chk_vacancy_salary_range"),)
     company_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False)
@@ -73,10 +83,8 @@ class ApplicationModel(BaseModel):
     applicant_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     vacancy_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("vacancies.id", ondelete="CASCADE"), nullable=False)
     resume_id: Mapped[UUID | None] = mapped_column(ForeignKey("resumes.id", ondelete="SET NULL"))
-
     cover_letter: Mapped[str | None] = mapped_column(Text)
     status: Mapped[ApplicationStatus] = mapped_column(Enum(ApplicationStatus, name="application_status"), default=ApplicationStatus.pending)
-
     recruiter_note: Mapped[str | None] = mapped_column(Text)
 
     # Relationships

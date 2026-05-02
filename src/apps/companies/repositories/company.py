@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.apps.companies.models import CompanyMemberModel, CompanyModel
-from src.apps.companies.schemas.company import CompanyCardOut, CompanyFilters, CompanyOut
-from src.apps.shared.schemas import PaginatedOut, Pagination
+from src.apps.companies.schemas.company import CompanyDetail, CompanySummary, companyListDep
+from src.apps.shared.schemas import PaginatedResponse, paginationDep
 from src.apps.stats.schemas import CompaniesStats, CompanyTypeBucket
 from src.apps.vacancies.models import VacancyModel
 from src.core.helpers import percentage
@@ -17,9 +17,9 @@ class CompaniesRepository:
     @staticmethod
     async def get_many(
         session: AsyncSession,
-        pagination: Pagination | None = None,
-        filters: CompanyFilters | None = None,
-    ) -> PaginatedOut[CompanyCardOut]:
+        pagination: paginationDep,
+        filters: companyListDep,
+    ) -> PaginatedResponse[CompanySummary]:
         # Correlated scalar subquery: counts open vacancies for each company
         # in the outer query. SQLAlchemy auto-correlates this because CompanyModel.id
         # is referenced from the outer SELECT.
@@ -67,11 +67,11 @@ class CompaniesRepository:
             company.open_vacancies_count = open_count
             companies.append(company)
 
-        data = cast(list[CompanyCardOut], companies)
-        return PaginatedOut(data=data, total=total)
+        data = cast(list[CompanySummary], companies)
+        return PaginatedResponse(data=data, total=total)
 
     @staticmethod
-    async def get_by_id(session: AsyncSession, company_id: UUID) -> CompanyOut:
+    async def get_by_id(session: AsyncSession, company_id: UUID) -> CompanyDetail:
         open_vacancies_count = (
             select(func.count(VacancyModel.id))
             .where(
@@ -107,7 +107,7 @@ class CompaniesRepository:
         company, open_count, member_count_value = res
         company.open_vacancies_count = open_count
         company.member_count = member_count_value
-        return cast(CompanyOut, company)
+        return cast(CompanyDetail, company)
 
     @staticmethod
     async def get_stats(session: AsyncSession):

@@ -8,7 +8,8 @@ from sqlalchemy import TIMESTAMP, Boolean, CheckConstraint, Date, Enum, ForeignK
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
-from src.apps.shared.enums import (
+from src.apps.shared.models import BaseLocationModel, BaseModel, BaseNullableLocationModel
+from src.apps.shared.schemas.enums import (
     EmploymentType,
     FollowPolicy,
     FollowStatus,
@@ -21,7 +22,6 @@ from src.apps.shared.enums import (
     UserStatus,
     WorkFormat,
 )
-from src.apps.shared.models import Base, BaseModel, WithLocation, WithNullableLocation
 
 if TYPE_CHECKING:
     from src.apps.chats.models import ChatMessageModel, ChatModel, ChatParticipantModel
@@ -55,7 +55,7 @@ class ResumeSkillLink(BaseModel):
 
     resume_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="CASCADE"))
     skill_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"))
-    proficiency: Mapped[ProficiencyLevel] = mapped_column(Enum(ProficiencyLevel, name="proficiency_level"), nullable=False)
+    proficiency: Mapped[ProficiencyLevel] = mapped_column(Enum(ProficiencyLevel, name="proficiency_level"))
     last_used_at: Mapped[date | None] = mapped_column(Date)
 
     # Relationships
@@ -66,7 +66,7 @@ class ResumeSkillLink(BaseModel):
         return "<ResumeSkillLink>"
 
 
-class ResumeModel(BaseModel, WithLocation):
+class ResumeModel(BaseLocationModel):
     __tablename__ = "resumes"
     __table_args__ = (
         CheckConstraint(
@@ -75,15 +75,10 @@ class ResumeModel(BaseModel, WithLocation):
         ),
     )
 
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    title: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(128))
     summary: Mapped[str | None] = mapped_column(Text)
-
-    specialization: Mapped[Specialization] = mapped_column(
-        Enum(Specialization, name="specialization"),
-        index=True,
-        nullable=False,
-    )
+    specialization: Mapped[Specialization] = mapped_column(Enum(Specialization, name="specialization"), index=True)
     salary_expectation_min: Mapped[int | None] = mapped_column(Integer, index=True)
     salary_expectation_max: Mapped[int | None] = mapped_column(Integer, index=True)
     salary_currency: Mapped[SalaryCurrency | None] = mapped_column(Enum(SalaryCurrency, name="salary_currency"))
@@ -104,17 +99,9 @@ class UserSkillLink(BaseModel):
     __tablename__ = "user_skill_links"
     __table_args__ = (UniqueConstraint("user_id", "skill_id", name="uq_user_skill"),)
 
-    user_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    skill_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("skills.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    proficiency: Mapped[ProficiencyLevel] = mapped_column(Enum(ProficiencyLevel, name="proficiency_level"), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    skill_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"))
+    proficiency: Mapped[ProficiencyLevel] = mapped_column(Enum(ProficiencyLevel, name="proficiency_level"))
     last_used_at: Mapped[date | None] = mapped_column(Date)
 
     # Relationships
@@ -129,12 +116,12 @@ class WorkExperienceModel(BaseModel):
     __tablename__ = "work_experiences"
     __table_args__ = (CheckConstraint("ended_at IS NULL OR started_at <= ended_at", name="chk_work_experience_date_range"),)
 
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    company_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    company_name: Mapped[str] = mapped_column(String(128))
     location: Mapped[str | None] = mapped_column(String(128))
-    position: Mapped[str] = mapped_column(String(128), nullable=False)
+    position: Mapped[str] = mapped_column(String(128))
     description: Mapped[str | None] = mapped_column(Text)
-    started_at: Mapped[date] = mapped_column(Date, nullable=False)
+    started_at: Mapped[date] = mapped_column(Date)
     ended_at: Mapped[date | None] = mapped_column(Date)
 
     # Relationships
@@ -144,20 +131,16 @@ class WorkExperienceModel(BaseModel):
         return "<WorkExperienceModel>"
 
 
-class OAuthUserModel(Base):
+class OAuthUserModel(BaseModel):
     __tablename__ = "oauth_users"
     __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_oauth_user_provider"),)
 
-    id: Mapped[str] = mapped_column(String(length=255), primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-
-    provider: Mapped[Provider] = mapped_column(Enum(Provider, name="provider"), nullable=False)
-    username: Mapped[str | None] = mapped_column(String(length=128))
-    email: Mapped[str | None] = mapped_column(String(length=128))
+    provider_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    provider: Mapped[Provider] = mapped_column(Enum(Provider, name="provider"))
+    username: Mapped[str | None] = mapped_column(String(128))
+    email: Mapped[str | None] = mapped_column(String(128))
     picture: Mapped[str | None] = mapped_column(Text)
-
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now(), onupdate=func.now())
 
     # Relationships
     user: Mapped[UserModel] = relationship(back_populates="oauth_users")
@@ -166,49 +149,27 @@ class OAuthUserModel(Base):
         return "<OAuthUserModel>"
 
 
-class UserModel(BaseModel, WithNullableLocation):
+class UserModel(BaseNullableLocationModel):
     __tablename__ = "users"
 
-    # Auth & Identity
-    email: Mapped[str] = mapped_column(String(length=128), nullable=False, index=True, unique=True)
+    email: Mapped[str] = mapped_column(String(128), index=True, unique=True)
     email_verified: Mapped[bool] = mapped_column(default=False)
-    password_hash: Mapped[str | None] = mapped_column(String(length=255))
-
-    # Profile
-    first_name: Mapped[str] = mapped_column(String(length=64), nullable=False)
-    last_name: Mapped[str | None] = mapped_column(String(length=64), nullable=False)
+    password_hash: Mapped[str | None] = mapped_column(String(255))
+    first_name: Mapped[str] = mapped_column(String(64))
+    last_name: Mapped[str | None] = mapped_column(String(64))
     headline: Mapped[str | None] = mapped_column(String(120))
     birthdate: Mapped[date | None] = mapped_column(Date)
     bio: Mapped[str | None] = mapped_column(Text)
     avatar_url: Mapped[str | None] = mapped_column(Text)
     banner_url: Mapped[str | None] = mapped_column(Text)
-
-    # Specialization
     specialization: Mapped[Specialization | None] = mapped_column(Enum(Specialization, index=True, name="specialization"))
-
-    # Contact
     phone_number: Mapped[str | None] = mapped_column(String(32))
     github_url: Mapped[str | None] = mapped_column(Text)
-    linkedin_url: Mapped[str | None] = mapped_column(Text)
-    portfolio_url: Mapped[str | None] = mapped_column(Text)
-
-    # System
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), default=UserRole.user, nullable=False)
-    status: Mapped[UserStatus] = mapped_column(
-        Enum(UserStatus, name="user_status"),
-        default=UserStatus.pending_verification,
-        nullable=False,
-    )
-    follow_policy: Mapped[FollowPolicy] = mapped_column(
-        Enum(FollowPolicy, name="follow_policy"),
-        default=FollowPolicy.auto_accept,
-        nullable=False,
-    )
-    job_search_status: Mapped[JobSearchStatus] = mapped_column(
-        Enum(JobSearchStatus, name="job_search_status"),
-        default=JobSearchStatus.not_looking,
-        nullable=False,
-    )
+    telegram_username: Mapped[str | None] = mapped_column(String(32))
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), default=UserRole.user)
+    status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, name="user_status"), default=UserStatus.pending_verification)
+    follow_policy: Mapped[FollowPolicy] = mapped_column(Enum(FollowPolicy, name="follow_policy"), default=FollowPolicy.auto_accept)
+    job_search_status: Mapped[JobSearchStatus] = mapped_column(Enum(JobSearchStatus, name="job_search_status"), default=JobSearchStatus.not_looking)
 
     # Relationships
     oauth_users: Mapped[list[OAuthUserModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
@@ -300,7 +261,7 @@ class ActivityModel(BaseModel):
     __table_args__ = (UniqueConstraint("user_id", "activity_date", name="uq_user_activity_date"),)
 
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    activity_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    activity_date: Mapped[date] = mapped_column(Date, index=True)
     last_activity_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now())
 
     # Relationships

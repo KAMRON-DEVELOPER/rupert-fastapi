@@ -8,17 +8,17 @@ from sqlalchemy import TIMESTAMP, Enum, ForeignKey, String, Text, UniqueConstrai
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
-from src.apps.shared.enums import GroupMemberRole, GroupType
-from src.apps.shared.models import BaseModel, MessageBaseModel
+from src.apps.shared.models import BaseMessageModel, BaseModel
+from src.apps.shared.schemas.enums import GroupMemberRole, GroupType
 
 if TYPE_CHECKING:
     from src.apps.users.models import UserModel
 
 
-class GroupMessageModel(MessageBaseModel):
+class GroupMessageModel(BaseMessageModel):
     __tablename__ = "group_messages"
 
-    group_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="groups.id", ondelete="CASCADE"), index=True, nullable=False)
+    group_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="groups.id", ondelete="CASCADE"), index=True)
 
     # Relationships
     group: Mapped[GroupModel] = relationship(back_populates="group_messages", passive_deletes=True)
@@ -31,7 +31,6 @@ class GroupParticipantModel(BaseModel):
 
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE"), primary_key=True)
     group_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="groups.id", ondelete="CASCADE"), primary_key=True)
-
     background_url: Mapped[str | None] = mapped_column(Text)
     role: Mapped[GroupMemberRole] = mapped_column(Enum(GroupMemberRole, name="group_member_role"), default=GroupMemberRole.regular)
 
@@ -47,10 +46,9 @@ class GroupModel(BaseModel):
     __tablename__ = "groups"
     __table_args__ = (UniqueConstraint("name", name="uq_group_name"),)
 
-    name: Mapped[str] = mapped_column(String(length=24), nullable=False)
+    name: Mapped[str] = mapped_column(String(length=24))
     description: Mapped[str | None] = mapped_column(Text)
-    owner_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE"), index=True, nullable=False)
-
+    owner_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE"), index=True)
     avatar_url: Mapped[str | None] = mapped_column(Text)
     background_url: Mapped[str | None] = mapped_column(Text)
     group_type: Mapped[GroupType] = mapped_column(Enum(GroupType, name="group_type"), default=GroupType.public)

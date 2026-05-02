@@ -4,7 +4,7 @@ from typing import Annotated, AsyncGenerator
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-from src.apps.models import Base
+from src.apps.__init__ import Base
 from src.core.logger import logger
 from src.core.settings import get_settings
 
