@@ -3,6 +3,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import aioboto3
+from aiobotocore.config import AioConfig
+from botocore.client import Config
 from botocore.exceptions import ClientError
 from types_aiobotocore_s3.type_defs import ObjectIdentifierTypeDef
 
@@ -21,6 +23,7 @@ async def s3_client():
         endpoint_url=f"{'http' if settings.debug else 'https'}://{settings.s3.endpoint}",
         aws_access_key_id=settings.s3.access_key_id,
         aws_secret_access_key=settings.s3.secret_key,
+        config=AioConfig(signature_version="s3v4"),
         region_name=settings.s3.region,
         verify=False if settings.debug else True,
     ) as client:
