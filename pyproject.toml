@@ -1,3 +1,5 @@
+#:schema https://json.schemastore.org/pyproject.json
+
 [project]
 name = "rupert-rupert"
 version = "0.1.0"
@@ -47,6 +49,7 @@ exclude = [".venv", "deploy"]
 typeCheckingMode = "standard"
 venvPath = "."
 venv = ".venv"
+include = ["src", "tests", "main.py"]
 
 [tool.isort]
 profile = "black"
