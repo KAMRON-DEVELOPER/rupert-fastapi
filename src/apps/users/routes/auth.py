@@ -60,19 +60,28 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthRequest, sessio
 
         if len(providers) == 0:
             print(f"user has no password and no linked oauth provider, {user.id}")
-            raise HTTPException(status_code=500, detail="This account is missing a login method. Please contact support.")
+            raise HTTPException(
+                status_code=500, detail="This account is missing a login method. Please contact support."
+            )
 
         token = create_token(user.id, "password_setup")
         setup_link = f"{settings.frontend_endpoint}/auth/set-password?token={token}"
 
         try:
-            await Mailtrap.send_password_setup_link(to_name=f"{user.first_name} {user.last_name}", to_email=user.email, link=setup_link, cfg=settings.mailtrap)
+            await Mailtrap.send_password_setup_link(
+                to_name=f"{user.first_name} {user.last_name}",
+                to_email=user.email,
+                link=setup_link,
+                cfg=settings.mailtrap,
+            )
         except MailtrapError as e:
             logger.error(f"email_auth MailtrapError: {e}")
             raise HTTPException(status_code=500, detail="Could not send password setup link")
 
         providers_text = ", ".join(str(p.value) for p in providers)
-        return MessageResponse(message=f"This account was created with {providers_text}. Use that provider to sign in, or use the link we sent to set a password.")
+        return MessageResponse(
+            message=f"This account was created with {providers_text}. Use that provider to sign in, or use the link we sent to set a password."
+        )
 
     if not schm.first_name or not schm.last_name:
         return MessageResponse(message="new_user")
@@ -91,7 +100,12 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthRequest, sessio
 
     try:
         await finalize_session(req, res, user, session)
-        await Mailtrap.send_email_verification_link(to_name=f"{schm.first_name} {schm.last_name}", to_email=schm.email, link=verification_link, cfg=settings.mailtrap)
+        await Mailtrap.send_email_verification_link(
+            to_name=f"{schm.first_name} {schm.last_name}",
+            to_email=schm.email,
+            link=verification_link,
+            cfg=settings.mailtrap,
+        )
         await session.commit()
     except MailtrapError as e:
         logger.error(f"email_auth MailtrapError: {e}")

@@ -4,7 +4,21 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import TIMESTAMP, Boolean, CheckConstraint, Date, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func, literal_column, select
+from sqlalchemy import (
+    TIMESTAMP,
+    Boolean,
+    CheckConstraint,
+    Date,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    literal_column,
+    select,
+)
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
@@ -39,7 +53,9 @@ class FollowModel(BaseModel):
 
     follower_id: Mapped[UUID] = mapped_column(ForeignKey(column="users.id", ondelete="CASCADE"))
     following_id: Mapped[UUID] = mapped_column(ForeignKey(column="users.id", ondelete="CASCADE"))
-    status: Mapped[FollowStatus] = mapped_column(Enum(FollowStatus, name="follow_status"), default=FollowStatus.accepted)
+    status: Mapped[FollowStatus] = mapped_column(
+        Enum(FollowStatus, name="follow_status"), default=FollowStatus.accepted
+    )
 
     # Relationships
     follower: Mapped[UserModel] = relationship(back_populates="following_links", foreign_keys=[follower_id])
@@ -83,12 +99,16 @@ class ResumeModel(BaseLocationModel):
     salary_expectation_max: Mapped[int | None] = mapped_column(Integer, index=True)
     salary_currency: Mapped[SalaryCurrency | None] = mapped_column(Enum(SalaryCurrency, name="salary_currency"))
     work_format: Mapped[WorkFormat | None] = mapped_column(Enum(WorkFormat, name="work_format"))
-    employment_type: Mapped[EmploymentType | None] = mapped_column(Enum(EmploymentType, name="employment_type"), index=True)
+    employment_type: Mapped[EmploymentType | None] = mapped_column(
+        Enum(EmploymentType, name="employment_type"), index=True
+    )
 
     # Relationships
     user: Mapped[UserModel] = relationship(back_populates="resumes")
     skill_links: Mapped[list[ResumeSkillLink]] = relationship(back_populates="resume", cascade="all, delete-orphan")
-    skills: Mapped[list[SkillModel]] = relationship(secondary="resume_skill_links", back_populates="resumes", viewonly=True)
+    skills: Mapped[list[SkillModel]] = relationship(
+        secondary="resume_skill_links", back_populates="resumes", viewonly=True
+    )
     applications: Mapped[list[ApplicationModel]] = relationship(back_populates="resume")
 
     def __repr__(self):
@@ -114,7 +134,9 @@ class UserSkillLink(BaseModel):
 
 class WorkExperienceModel(BaseModel):
     __tablename__ = "work_experiences"
-    __table_args__ = (CheckConstraint("ended_at IS NULL OR started_at <= ended_at", name="chk_work_experience_date_range"),)
+    __table_args__ = (
+        CheckConstraint("ended_at IS NULL OR started_at <= ended_at", name="chk_work_experience_date_range"),
+    )
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     company_name: Mapped[str] = mapped_column(String(128))
@@ -162,21 +184,31 @@ class UserModel(BaseNullableLocationModel):
     bio: Mapped[str | None] = mapped_column(Text)
     avatar_url: Mapped[str | None] = mapped_column(Text)
     banner_url: Mapped[str | None] = mapped_column(Text)
-    specialization: Mapped[Specialization | None] = mapped_column(Enum(Specialization, index=True, name="specialization"))
+    specialization: Mapped[Specialization | None] = mapped_column(
+        Enum(Specialization, index=True, name="specialization")
+    )
     phone_number: Mapped[str | None] = mapped_column(String(32))
     github_url: Mapped[str | None] = mapped_column(Text)
     telegram_username: Mapped[str | None] = mapped_column(String(32))
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), default=UserRole.user)
-    status: Mapped[UserStatus] = mapped_column(Enum(UserStatus, name="user_status"), default=UserStatus.pending_verification)
-    follow_policy: Mapped[FollowPolicy] = mapped_column(Enum(FollowPolicy, name="follow_policy"), default=FollowPolicy.auto_accept)
-    job_search_status: Mapped[JobSearchStatus] = mapped_column(Enum(JobSearchStatus, name="job_search_status"), default=JobSearchStatus.not_looking)
+    status: Mapped[UserStatus] = mapped_column(
+        Enum(UserStatus, name="user_status"), default=UserStatus.pending_verification
+    )
+    follow_policy: Mapped[FollowPolicy] = mapped_column(
+        Enum(FollowPolicy, name="follow_policy"), default=FollowPolicy.auto_accept
+    )
+    job_search_status: Mapped[JobSearchStatus] = mapped_column(
+        Enum(JobSearchStatus, name="job_search_status"), default=JobSearchStatus.not_looking
+    )
 
     # Relationships
     oauth_users: Mapped[list[OAuthUserModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
     resumes: Mapped[list[ResumeModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
     skill_links: Mapped[list[UserSkillLink]] = relationship(back_populates="user", cascade="all, delete-orphan")
     skills: Mapped[list[SkillModel]] = relationship(secondary="user_skill_links", back_populates="users", viewonly=True)
-    work_experiences: Mapped[list[WorkExperienceModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    work_experiences: Mapped[list[WorkExperienceModel]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
     sessions: Mapped[list[SessionModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
     activities: Mapped[list[ActivityModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
@@ -207,7 +239,9 @@ class UserModel(BaseNullableLocationModel):
     post_comments: Mapped[list[PostCommentModel]] = relationship(back_populates="user", passive_deletes=True)
 
     # Groups
-    groups: Mapped[list[GroupModel]] = relationship(secondary="group_participants", back_populates="users", viewonly=True)
+    groups: Mapped[list[GroupModel]] = relationship(
+        secondary="group_participants", back_populates="users", viewonly=True
+    )
     group_messages: Mapped[list[GroupMessageModel]] = relationship(back_populates="sender")
     group_participants: Mapped[list[GroupParticipantModel]] = relationship(back_populates="user", passive_deletes=True)
 

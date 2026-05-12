@@ -6,7 +6,15 @@ from pydantic import AnyUrl, Field, field_validator
 
 from src.apps.companies.schemas.company import CompanySummary
 from src.apps.shared.schemas import BaseModelResponse, LocationRequest, RequestSchema
-from src.apps.shared.schemas.enums import EmploymentType, PaymentFrequency, SalaryCurrency, Specialization, SubmissionType, VacancyStatus, WorkFormat
+from src.apps.shared.schemas.enums import (
+    EmploymentType,
+    PaymentFrequency,
+    SalaryCurrency,
+    Specialization,
+    SubmissionType,
+    VacancyStatus,
+    WorkFormat,
+)
 from src.apps.vacancies.schemas.skill_links import VacancySkillLinkRequest, VacancySkillLinkResponse
 
 

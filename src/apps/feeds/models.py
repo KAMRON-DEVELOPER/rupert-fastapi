@@ -31,8 +31,12 @@ class FeedCategoryModel(BaseModel):
 class FeedTagLink(BaseModel):
     __tablename__ = "feed_tag_links"
 
-    feed_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="feeds.id", ondelete="CASCADE"), primary_key=True)
-    tag_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="tags.id", ondelete="CASCADE"), primary_key=True)
+    feed_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey(column="feeds.id", ondelete="CASCADE"), primary_key=True
+    )
+    tag_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey(column="tags.id", ondelete="CASCADE"), primary_key=True
+    )
 
     # Relationships
     feed: Mapped[FeedModel] = relationship(back_populates="tag_links", overlaps="feeds, tags")
@@ -61,13 +65,25 @@ class FeedEngagementModel(BaseModel):
 class FeedModel(BaseModel):
     __tablename__ = "feeds"
 
-    author_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    author_first_name: Mapped[str] = column_property(select(UserModel.first_name).where(UserModel.id == author_id).correlate_except(UserModel).scalar_subquery())
-    author_last_name: Mapped[str] = column_property(select(UserModel.last_name).where(UserModel.id == author_id).correlate_except(UserModel).scalar_subquery())
+    author_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    author_first_name: Mapped[str] = column_property(
+        select(UserModel.first_name).where(UserModel.id == author_id).correlate_except(UserModel).scalar_subquery()
+    )
+    author_last_name: Mapped[str] = column_property(
+        select(UserModel.last_name).where(UserModel.id == author_id).correlate_except(UserModel).scalar_subquery()
+    )
 
-    parent_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("feeds.id", ondelete="CASCADE"), index=True)
-    quote_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("feeds.id", ondelete="CASCADE"), index=True)
-    category_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("feed_categories.id", ondelete="CASCADE"), index=True)
+    parent_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("feeds.id", ondelete="CASCADE"), index=True
+    )
+    quote_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("feeds.id", ondelete="CASCADE"), index=True
+    )
+    category_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("feed_categories.id", ondelete="CASCADE"), index=True
+    )
 
     body: Mapped[str] = mapped_column(String(200))
     video_url: Mapped[str | None] = mapped_column(String(255))
@@ -75,18 +91,32 @@ class FeedModel(BaseModel):
     image_url: Mapped[str | None] = mapped_column(String(255))
     image_aspect_ratio: Mapped[float | None] = mapped_column(Float(precision=4))
 
-    feed_visibility: Mapped[FeedVisibility] = mapped_column(Enum(FeedVisibility, name="feed_visibility"), default=FeedVisibility.public)
-    comment_policy: Mapped[CommentPolicy] = mapped_column(Enum(CommentPolicy, name="comment_policy"), default=CommentPolicy.everyone)
+    feed_visibility: Mapped[FeedVisibility] = mapped_column(
+        Enum(FeedVisibility, name="feed_visibility"), default=FeedVisibility.public
+    )
+    comment_policy: Mapped[CommentPolicy] = mapped_column(
+        Enum(CommentPolicy, name="comment_policy"), default=CommentPolicy.everyone
+    )
     scheduled_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
 
     # Relationships
     author: Mapped[UserModel] = relationship(back_populates="feeds")
-    parent: Mapped[FeedModel | None] = relationship(remote_side="FeedModel.id", back_populates="comments", foreign_keys=[parent_id])
-    quote: Mapped[FeedModel | None] = relationship(remote_side="FeedModel.id", back_populates="quotes", foreign_keys=[quote_id])
-    quotes: Mapped[list[FeedModel]] = relationship(back_populates="quote", foreign_keys=[quote_id], cascade="all, delete-orphan", passive_deletes=True)
-    comments: Mapped[list[FeedModel]] = relationship(back_populates="parent", foreign_keys=[parent_id], cascade="all, delete-orphan", passive_deletes=True)
+    parent: Mapped[FeedModel | None] = relationship(
+        remote_side="FeedModel.id", back_populates="comments", foreign_keys=[parent_id]
+    )
+    quote: Mapped[FeedModel | None] = relationship(
+        remote_side="FeedModel.id", back_populates="quotes", foreign_keys=[quote_id]
+    )
+    quotes: Mapped[list[FeedModel]] = relationship(
+        back_populates="quote", foreign_keys=[quote_id], cascade="all, delete-orphan", passive_deletes=True
+    )
+    comments: Mapped[list[FeedModel]] = relationship(
+        back_populates="parent", foreign_keys=[parent_id], cascade="all, delete-orphan", passive_deletes=True
+    )
     category: Mapped[FeedCategoryModel | None] = relationship(back_populates="feeds")
-    tag_links: Mapped[list[FeedTagLink]] = relationship(back_populates="feed", overlaps="feeds, tags", cascade="all, delete-orphan")
+    tag_links: Mapped[list[FeedTagLink]] = relationship(
+        back_populates="feed", overlaps="feeds, tags", cascade="all, delete-orphan"
+    )
     tags: Mapped[list[TagModel]] = relationship(secondary="feed_tag_links", back_populates="feeds", viewonly=True)
     engagements: Mapped[list[FeedEngagementModel]] = relationship(back_populates="feed", cascade="all, delete-orphan")
 

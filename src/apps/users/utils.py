@@ -16,8 +16,12 @@ async def finalize_session(req: Request, res: Response, user: UserModel, session
     new_access_token = create_token(user_id=user.id, type="access")
     new_refresh_token = create_token(user_id=user.id, type="refresh")
 
-    set_cookie(res, key="access_token", value=new_access_token, max_age=settings.jwt.access_token_expire_in_minutes * 60)
-    set_cookie(res, key="refresh_token", value=new_refresh_token, max_age=settings.jwt.refresh_token_expire_in_days * 86400)
+    set_cookie(
+        res, key="access_token", value=new_access_token, max_age=settings.jwt.access_token_expire_in_minutes * 60
+    )
+    set_cookie(
+        res, key="refresh_token", value=new_refresh_token, max_age=settings.jwt.refresh_token_expire_in_days * 86400
+    )
 
     await SessionsRepository.create(
         user_id=user.id,

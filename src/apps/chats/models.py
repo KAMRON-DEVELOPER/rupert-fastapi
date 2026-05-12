@@ -17,7 +17,9 @@ if TYPE_CHECKING:
 class ChatMessageModel(BaseMessageModel):
     __tablename__ = "chat_messages"
 
-    chat_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="chats.id", ondelete="CASCADE"), index=True)
+    chat_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey(column="chats.id", ondelete="CASCADE"), index=True
+    )
 
     # Relationships
     chat: Mapped[ChatModel] = relationship(back_populates="messages", passive_deletes=True)
@@ -27,8 +29,12 @@ class ChatMessageModel(BaseMessageModel):
 class ChatParticipantModel(BaseModel):
     __tablename__ = "chat_participants"
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE"), primary_key=True)
-    chat_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="chats.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE"), primary_key=True
+    )
+    chat_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey(column="chats.id", ondelete="CASCADE"), primary_key=True
+    )
     background_url: Mapped[str | None] = mapped_column(Text)
 
     # Relationships

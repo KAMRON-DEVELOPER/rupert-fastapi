@@ -19,7 +19,9 @@ from .router import vacancies_router
 async def list_vacancies(pagination: paginationDep, filters: vacancyListDep, auth: authProbeDep, session: DBSession):
     user_id = auth[0] if auth else None
     try:
-        return await VacanciesRepository.get_many(session=session, user_id=user_id, pagination=pagination, filters=filters)
+        return await VacanciesRepository.get_many(
+            session=session, user_id=user_id, pagination=pagination, filters=filters
+        )
     except Exception as e:
         logger.error("list_vacancies VacanciesRepository.get_many")
         pprint(e)

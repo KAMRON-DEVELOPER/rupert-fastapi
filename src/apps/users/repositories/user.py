@@ -42,7 +42,9 @@ class UsersRepository:
 
     @staticmethod
     async def update_by_id(id: UUID, schm: UserUpdateRequest, session: AsyncSession):
-        stmt = update(UserModel).where(UserModel.id == id).values(schm.model_dump(exclude_unset=True)).returning(UserModel)
+        stmt = (
+            update(UserModel).where(UserModel.id == id).values(schm.model_dump(exclude_unset=True)).returning(UserModel)
+        )
         result = await session.execute(stmt)
         return result.scalar_one()
 
@@ -62,11 +64,17 @@ class UsersRepository:
         today = now.date()
         start_date = today - timedelta(days=29)
 
-        looking_statuses = (JobSearchStatus.actively_looking, JobSearchStatus.open_to_offers, JobSearchStatus.interviewing)
+        looking_statuses = (
+            JobSearchStatus.actively_looking,
+            JobSearchStatus.open_to_offers,
+            JobSearchStatus.interviewing,
+        )
 
         totals_stmt = select(
             func.count(UserModel.id).label("total"),
-            func.count(UserModel.id).filter(UserModel.job_search_status.in_(looking_statuses)).label("looking_for_job_count"),
+            func.count(UserModel.id)
+            .filter(UserModel.job_search_status.in_(looking_statuses))
+            .label("looking_for_job_count"),
         )
         # row: Row[Tuple[int, int]]
         row = (await session.execute(totals_stmt)).one()

@@ -8,7 +8,14 @@ from src.apps.users.models import SessionModel
 
 class SessionsRepository:
     @staticmethod
-    async def create(user_id: UUID, user_agent: str | None, ip_addr: str | None, device_name: str | None, refresh_token: str, session: AsyncSession):
+    async def create(
+        user_id: UUID,
+        user_agent: str | None,
+        ip_addr: str | None,
+        device_name: str | None,
+        refresh_token: str,
+        session: AsyncSession,
+    ):
         record = SessionModel(
             user_id=user_id,
             user_agent=user_agent,

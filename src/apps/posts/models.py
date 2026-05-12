@@ -50,7 +50,9 @@ class PostCommentModel(BaseModel):
 
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     post_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"))
-    parent_id: Mapped[UUID | None] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("post_comments.id", ondelete="CASCADE"))
+    parent_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("post_comments.id", ondelete="CASCADE")
+    )
     body: Mapped[str] = mapped_column(Text)
 
     # Relationships
@@ -77,7 +79,9 @@ class PostModel(BaseModel):
     tag_links: Mapped[list["PostTagLink"]] = relationship(back_populates="post", cascade="all, delete-orphan")
     tags: Mapped[list["TagModel"]] = relationship(secondary="post_tag_links", back_populates="posts", viewonly=True)
     engagements: Mapped[list["PostEngagementModel"]] = relationship(back_populates="post", cascade="all, delete-orphan")
-    comments: Mapped[list["PostCommentModel"]] = relationship(back_populates="post", cascade="all, delete-orphan", passive_deletes=True)
+    comments: Mapped[list["PostCommentModel"]] = relationship(
+        back_populates="post", cascade="all, delete-orphan", passive_deletes=True
+    )
 
     def __repr__(self):
         return "<PostModel>"

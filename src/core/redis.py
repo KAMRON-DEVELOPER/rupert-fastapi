@@ -116,7 +116,9 @@ class ChatCacheManager:
         statuses: list[bool] = piped_results[len(participant_ids) :]
 
         chat_list = []
-        for chat_meta, last_msg, pid, profile, is_online in zip(chats, last_messages, participant_ids, profiles, statuses):
+        for chat_meta, last_msg, pid, profile, is_online in zip(
+            chats, last_messages, participant_ids, profiles, statuses
+        ):
             if not pid or not profile:
                 continue
 
@@ -127,7 +129,9 @@ class ChatCacheManager:
                     name=profile.get("name", ""),
                     username=profile.get("username", ""),
                     avatar_url=profile.get("avatar_url"),
-                    last_seen_at=datetime.fromtimestamp(int(profile.get("last_seen_at", 0))) if "last_seen_at" in profile else None,
+                    last_seen_at=datetime.fromtimestamp(int(profile.get("last_seen_at", 0)))
+                    if "last_seen_at" in profile
+                    else None,
                     is_online=is_online,
                 ),
                 last_activity_at=datetime.fromtimestamp(float(chat_meta.get("last_activity_at", time()))),

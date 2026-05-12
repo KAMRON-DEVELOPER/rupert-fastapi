@@ -11,7 +11,9 @@ from src.core.settings import get_settings
 settings = get_settings()
 
 
-async_engine: AsyncEngine = create_async_engine(settings.database.url, echo=False, pool_size=settings.database.pool_size)
+async_engine: AsyncEngine = create_async_engine(
+    settings.database.url, echo=False, pool_size=settings.database.pool_size
+)
 async_session = async_sessionmaker(async_engine, expire_on_commit=False, class_=AsyncSession)
 
 

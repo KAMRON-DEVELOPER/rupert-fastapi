@@ -68,20 +68,28 @@ async def initialize_minio():
 async def get_object_from_minio(object_name: str) -> bytes:
     try:
         async with aiohttp.ClientSession():
-            return await (await minio_client.get_object(bucket_name=settings.s3.bucket_name, object_name=object_name)).read()
+            return await (
+                await minio_client.get_object(bucket_name=settings.s3.bucket_name, object_name=object_name)
+            ).read()
     except Exception as e:
         print(f"Exception in get_data_from_minio: {e}")
         raise ValueError("Exception in get_data_from_minio: {e}")
 
 
-async def put_object_to_minio(object_name: str, data: bytes, content_type: str, old_object_name: str | None = None, for_update: bool = False) -> str:
+async def put_object_to_minio(
+    object_name: str, data: bytes, content_type: str, old_object_name: str | None = None, for_update: bool = False
+) -> str:
     try:
         if for_update and old_object_name:
             await minio_client.remove_object(bucket_name=settings.s3.bucket_name, object_name=old_object_name)
 
         _data = BytesIO(data)  # noqa
         result: ObjectWriteResult = await minio_client.put_object(
-            bucket_name=settings.s3.bucket_name, object_name=object_name, data=_data, length=len(data), content_type=content_type
+            bucket_name=settings.s3.bucket_name,
+            object_name=object_name,
+            data=_data,
+            length=len(data),
+            content_type=content_type,
         )
 
         return result.object_name
@@ -90,7 +98,9 @@ async def put_object_to_minio(object_name: str, data: bytes, content_type: str, 
         raise ValueError(f"Exception in put_data_to_minio: {e}")
 
 
-async def put_file_to_minio(object_name: str, file_path: Path, content_type: str, old_object_name: str | None = None, for_update=False) -> str:
+async def put_file_to_minio(
+    object_name: str, file_path: Path, content_type: str, old_object_name: str | None = None, for_update=False
+) -> str:
     try:
         if for_update and old_object_name:
             await minio_client.remove_object(bucket_name=settings.s3.bucket_name, object_name=old_object_name)
@@ -98,7 +108,10 @@ async def put_file_to_minio(object_name: str, file_path: Path, content_type: str
         logger.debug(f"file_path: {file_path}, content_type: {content_type}")
 
         result: ObjectWriteResult = await minio_client.fput_object(
-            bucket_name=settings.s3.bucket_name, object_name=object_name, file_path=str(file_path), content_type=content_type
+            bucket_name=settings.s3.bucket_name,
+            object_name=object_name,
+            file_path=str(file_path),
+            content_type=content_type,
         )
 
         return result.object_name
@@ -118,7 +131,9 @@ async def remove_objects_from_minio(object_names: list[str]) -> None:
 
 async def wipe_objects_from_minio(user_id: str) -> None:
     try:
-        list_objects: list[Object] = await minio_client.list_objects(bucket_name=settings.s3.bucket_name, prefix=f"users/{user_id}/", recursive=True)
+        list_objects: list[Object] = await minio_client.list_objects(
+            bucket_name=settings.s3.bucket_name, prefix=f"users/{user_id}/", recursive=True
+        )
         for user_object in list_objects:
             await remove_objects_from_minio(object_names=[f"{user_object.object_name}"])
     except Exception as e:

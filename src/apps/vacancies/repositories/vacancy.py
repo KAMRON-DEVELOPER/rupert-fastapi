@@ -243,7 +243,9 @@ class VacanciesRepository:
         return application
 
     @staticmethod
-    async def update_application_status(session: AsyncSession, application_id: UUID, status: ApplicationStatus, recruiter_note: str | None = None) -> ApplicationModel | None:
+    async def update_application_status(
+        session: AsyncSession, application_id: UUID, status: ApplicationStatus, recruiter_note: str | None = None
+    ) -> ApplicationModel | None:
         application = await VacanciesRepository.get_application_by_id(session, application_id)
         if not application:
             return None

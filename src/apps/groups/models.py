@@ -18,7 +18,9 @@ if TYPE_CHECKING:
 class GroupMessageModel(BaseMessageModel):
     __tablename__ = "group_messages"
 
-    group_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="groups.id", ondelete="CASCADE"), index=True)
+    group_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey(column="groups.id", ondelete="CASCADE"), index=True
+    )
 
     # Relationships
     group: Mapped[GroupModel] = relationship(back_populates="group_messages", passive_deletes=True)
@@ -29,10 +31,16 @@ class GroupParticipantModel(BaseModel):
     __tablename__ = "group_participants"
     __table_args__ = (UniqueConstraint("user_id", "group_id", name="uq_user_group"),)
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE"), primary_key=True)
-    group_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="groups.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE"), primary_key=True
+    )
+    group_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey(column="groups.id", ondelete="CASCADE"), primary_key=True
+    )
     background_url: Mapped[str | None] = mapped_column(Text)
-    role: Mapped[GroupMemberRole] = mapped_column(Enum(GroupMemberRole, name="group_member_role"), default=GroupMemberRole.regular)
+    role: Mapped[GroupMemberRole] = mapped_column(
+        Enum(GroupMemberRole, name="group_member_role"), default=GroupMemberRole.regular
+    )
 
     # Relationships
     user: Mapped[UserModel] = relationship(back_populates="group_participants")
@@ -48,20 +56,29 @@ class GroupModel(BaseModel):
 
     name: Mapped[str] = mapped_column(String(length=24))
     description: Mapped[str | None] = mapped_column(Text)
-    owner_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE"), index=True)
+    owner_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE"), index=True
+    )
     avatar_url: Mapped[str | None] = mapped_column(Text)
     background_url: Mapped[str | None] = mapped_column(Text)
     group_type: Mapped[GroupType] = mapped_column(Enum(GroupType, name="group_type"), default=GroupType.public)
     last_message_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
 
     # Relationships
-    users: Mapped[list[UserModel]] = relationship(secondary="group_participants", back_populates="groups", viewonly=True)
+    users: Mapped[list[UserModel]] = relationship(
+        secondary="group_participants", back_populates="groups", viewonly=True
+    )
     group_messages: Mapped[list[GroupMessageModel]] = relationship(back_populates="group", passive_deletes=True)
-    group_participants: Mapped[list[GroupParticipantModel]] = relationship(back_populates="group", cascade="all, delete-orphan")
+    group_participants: Mapped[list[GroupParticipantModel]] = relationship(
+        back_populates="group", cascade="all, delete-orphan"
+    )
 
     # Computed
     members_count: Mapped[int] = column_property(
-        select(func.count(GroupParticipantModel.id)).where(GroupParticipantModel.group_id == literal_column("groups.id")).correlate_except(GroupParticipantModel).scalar_subquery()
+        select(func.count(GroupParticipantModel.id))
+        .where(GroupParticipantModel.group_id == literal_column("groups.id"))
+        .correlate_except(GroupParticipantModel)
+        .scalar_subquery()
     )
     administrators_count: Mapped[int] = column_property(
         select(func.count(GroupParticipantModel.id))

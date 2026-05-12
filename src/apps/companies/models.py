@@ -21,7 +21,9 @@ class CompanyMemberModel(BaseModel):
 
     user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
     company_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"))
-    role: Mapped[CompanyMemberRole] = mapped_column(Enum(CompanyMemberRole, name="company_member_role"), default=CompanyMemberRole.member)
+    role: Mapped[CompanyMemberRole] = mapped_column(
+        Enum(CompanyMemberRole, name="company_member_role"), default=CompanyMemberRole.member
+    )
 
     user: Mapped[UserModel] = relationship(back_populates="company_memberships")
     company: Mapped[CompanyModel] = relationship(back_populates="members")
@@ -41,9 +43,13 @@ class CompanyModel(BaseLocationModel):
     type: Mapped[CompanyType] = mapped_column(Enum(CompanyType, name="company_type"))
     contact_email: Mapped[str | None] = mapped_column(String(128))
     contact_phone: Mapped[str | None] = mapped_column(String(32))
-    status: Mapped[CompanyStatus] = mapped_column(Enum(CompanyStatus, name="company_status"), default=CompanyStatus.pending)
+    status: Mapped[CompanyStatus] = mapped_column(
+        Enum(CompanyStatus, name="company_status"), default=CompanyStatus.pending
+    )
 
-    members: Mapped[list[CompanyMemberModel]] = relationship(back_populates="company", cascade="all, delete-orphan", passive_deletes=True)
+    members: Mapped[list[CompanyMemberModel]] = relationship(
+        back_populates="company", cascade="all, delete-orphan", passive_deletes=True
+    )
     vacancies: Mapped[list[VacancyModel]] = relationship(back_populates="company", passive_deletes=True)
 
     open_vacancies_count: int | None = None

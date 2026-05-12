@@ -22,10 +22,14 @@ class SkillModel(BaseModel):
     users: Mapped[list[UserModel]] = relationship(secondary="user_skill_links", back_populates="skills", viewonly=True)
 
     resume_links: Mapped[list[ResumeSkillLink]] = relationship(back_populates="skill", cascade="all, delete-orphan")
-    resumes: Mapped[list[ResumeModel]] = relationship(secondary="resume_skill_links", back_populates="skills", viewonly=True)
+    resumes: Mapped[list[ResumeModel]] = relationship(
+        secondary="resume_skill_links", back_populates="skills", viewonly=True
+    )
 
     vacancy_links: Mapped[list[VacancySkillLink]] = relationship(back_populates="skill", cascade="all, delete-orphan")
-    vacancies: Mapped[list[VacancyModel]] = relationship(secondary="vacancy_skill_links", back_populates="skills", viewonly=True)
+    vacancies: Mapped[list[VacancyModel]] = relationship(
+        secondary="vacancy_skill_links", back_populates="skills", viewonly=True
+    )
 
     def __repr__(self):
         return f"<SkillModel {self.name}>"

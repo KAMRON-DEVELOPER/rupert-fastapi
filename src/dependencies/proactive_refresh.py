@@ -61,7 +61,9 @@ def decode_token(jwt: str, expected_type: TokenType):
     verify_exp = expected_type != "access"
 
     try:
-        obj = decode(jwt, settings.jwt.secret_key, algorithms=[settings.jwt.algorithm], options={"verify_exp": verify_exp})
+        obj = decode(
+            jwt, settings.jwt.secret_key, algorithms=[settings.jwt.algorithm], options={"verify_exp": verify_exp}
+        )
     except ExpiredSignatureError:
         match expected_type:
             case "access":
@@ -104,7 +106,16 @@ def handle_decode(jwt: str, expected_type: CookieTokenType) -> tuple[bool, Token
 
 
 def set_cookie(res: Response, key: str, value: str, max_age: int):
-    res.set_cookie(key=key, value=value, max_age=max_age, domain=settings.jwt.domain, path="/", secure=not settings.debug, httponly=True, samesite="lax")
+    res.set_cookie(
+        key=key,
+        value=value,
+        max_age=max_age,
+        domain=settings.jwt.domain,
+        path="/",
+        secure=not settings.debug,
+        httponly=True,
+        samesite="lax",
+    )
 
 
 def clear_auth_cookies(res: Response):
@@ -143,7 +154,12 @@ class ProactiveRefresh:
                 if access_needs_refresh:
                     new_access_token = create_token(user_id=access_claims.sub, type="access")
                     access_token = new_access_token
-                    set_cookie(res, key="access_token", value=new_access_token, max_age=settings.jwt.access_token_expire_in_minutes * 60)
+                    set_cookie(
+                        res,
+                        key="access_token",
+                        value=new_access_token,
+                        max_age=settings.jwt.access_token_expire_in_minutes * 60,
+                    )
 
                 user_id = access_claims.sub
 
@@ -152,12 +168,22 @@ class ProactiveRefresh:
 
             new_access_token = create_token(user_id=refresh_claims.sub, type="access")
             access_token = new_access_token
-            set_cookie(res, key="access_token", value=new_access_token, max_age=settings.jwt.access_token_expire_in_minutes * 60)
+            set_cookie(
+                res,
+                key="access_token",
+                value=new_access_token,
+                max_age=settings.jwt.access_token_expire_in_minutes * 60,
+            )
 
             if refresh_needs_refresh:
                 new_refresh_token = create_token(user_id=refresh_claims.sub, type="refresh")
                 refresh_token = new_refresh_token
-                set_cookie(res, key="refresh_token", value=new_refresh_token, max_age=settings.jwt.refresh_token_expire_in_days * 86400)
+                set_cookie(
+                    res,
+                    key="refresh_token",
+                    value=new_refresh_token,
+                    max_age=settings.jwt.refresh_token_expire_in_days * 86400,
+                )
 
             user_id = refresh_claims.sub
 

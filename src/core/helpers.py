@@ -28,8 +28,12 @@ def generate_random_name(max_length: int = 14) -> str:
         first_len = random.randint(2, max_length // 2 - 1)
         second_len = random.randint(2, max_length - first_len - 1)
 
-        first_word = random.choice(string.ascii_uppercase) + "".join(random.choices(string.ascii_lowercase, k=first_len - 1))
-        second_word = random.choice(string.ascii_uppercase) + "".join(random.choices(string.ascii_lowercase, k=second_len - 1))
+        first_word = random.choice(string.ascii_uppercase) + "".join(
+            random.choices(string.ascii_lowercase, k=first_len - 1)
+        )
+        second_word = random.choice(string.ascii_uppercase) + "".join(
+            random.choices(string.ascii_lowercase, k=second_len - 1)
+        )
 
         full_name = f"{first_word} {second_word}"
         if len(full_name) <= max_length:
