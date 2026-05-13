@@ -13,3 +13,4 @@ config.json
 
 .ruff_cache
 .idea
+.pytest_cache
