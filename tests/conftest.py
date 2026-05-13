@@ -32,9 +32,7 @@ async def setup_db():
     """
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
     yield
-
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 

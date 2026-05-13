@@ -17,3 +17,18 @@ uv run alembic upgrade head
 ```bash
 uv run uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 ```
+
+```bash
+ruff format .
+ruff format . --check
+ruff check . --fix
+isort . && black .
+black --check .
+black --diff .
+```
+
+I like to know LOC so I use `cloc` tool to count line of code.
+
+```bash
+cloc --include-lang=Python src tests main.py
+```

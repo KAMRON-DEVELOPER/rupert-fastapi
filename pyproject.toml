@@ -40,35 +40,26 @@ dev = [
     "ruff>=0.15.8",
 ]
 
-
-[tool.pyrefly]
-python-interpreter-path = ".venv/bin/python"
-
-[tool.pyright]
-exclude = [".venv", "deploy"]
-typeCheckingMode = "standard"
-venvPath = "."
-venv = ".venv"
+[tool.basedpyright]
 include = ["src", "tests", "main.py"]
+exclude = [".venv", "deploy", "**/__pycache__"]
+typeCheckingMode = "standard"
 
 [tool.isort]
 profile = "black"
 line_length = 120
+extend_skip = ["alembic"]
 
 [tool.black]
 line-length = 120
+extend-exclude = "alembic"
 
 [tool.ruff]
 line-length = 120
 
 [tool.ruff.format]
 quote-style = "double"
+indent-style = "space"
 
 [tool.ruff.lint]
 select = ["I"]
-
-[tool.mypy]
-mypy_path = [".venv"]
-files = ["./", "./pod/"]
-strict = true
-ignore_missing_imports = false

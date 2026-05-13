@@ -42,13 +42,9 @@ from src.apps.companies.models import CompanyModel
 from src.apps.companies.repositories.company import CompaniesRepository
 from src.apps.companies.schemas.company import CompanyListParams
 from src.apps.shared.schemas import PaginationQuery
-from src.apps.shared.schemas.enums import (
+from src.apps.shared.schemas.enums import (  # Specialization,; SubmissionType,; VacancyStatus,; WorkFormat,
     CompanyStatus,
     CompanyType,
-    # Specialization,
-    # SubmissionType,
-    # VacancyStatus,
-    # WorkFormat,
 )
 from src.apps.vacancies.models import VacancyModel
 
