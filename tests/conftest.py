@@ -1,4 +1,4 @@
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -6,7 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from main import app
 from src.apps.shared.models.base import Base
+from src.apps.users.models import UserModel
+from src.apps.users.repositories.session import SessionsRepository
 from src.core.database import get_session
+from src.dependencies.proactive_refresh import create_token
 
 TEST_DATABASE_URL = "postgresql+asyncpg://postgres:password@localhost:5432/rupert_test_db"
 
@@ -52,3 +55,58 @@ async def session():
     """
     async with async_session() as s:
         yield s
+
+
+@pytest.fixture
+async def make_user(session: AsyncSession) -> Callable[..., Awaitable[UserModel]]:
+    async def _make_user(**kwargs) -> UserModel:
+        payload = {
+            "email": kwargs.pop("email", "user@example.com"),
+            "password_hash": kwargs.pop("password_hash", "hash"),
+            "first_name": kwargs.pop("first_name", "Test"),
+            "last_name": kwargs.pop("last_name", "User"),
+        }
+        user = UserModel(**payload, **kwargs)
+        session.add(user)
+        await session.flush()
+        return user
+
+    return _make_user
+
+
+@pytest.fixture
+async def auth_cookies() -> Callable[[UserModel], dict[str, str]]:
+    def _auth_cookies(user: UserModel) -> dict[str, str]:
+        return {
+            "access_token": create_token(user.id, "access"),
+            "refresh_token": create_token(user.id, "refresh"),
+        }
+
+    return _auth_cookies
+
+
+@pytest.fixture
+async def login_client(
+    client: AsyncClient,
+    session: AsyncSession,
+    make_user: Callable[..., Awaitable[UserModel]],
+    auth_cookies: Callable[[UserModel], dict[str, str]],
+):
+    async def _login(**kwargs):
+        user = await make_user(**kwargs)
+        cookies = auth_cookies(user)
+        await SessionsRepository.create(
+            user_id=user.id,
+            user_agent="pytest",
+            ip_addr="127.0.0.1",
+            device_name="test",
+            refresh_token=cookies["refresh_token"],
+            session=session,
+        )
+        await session.commit()
+
+        client.cookies.set("access_token", cookies["access_token"])
+        client.cookies.set("refresh_token", cookies["refresh_token"])
+        return user
+
+    return _login

@@ -9,8 +9,8 @@ class LocationRequest(RequestSchema):
 
 
 class NullableLocationRequest(RequestSchema):
-    country: str | None = Field(max_length=64)
-    city: str | None = Field(max_length=64)
+    country: str | None = Field(default=None, max_length=64)
+    city: str | None = Field(default=None, max_length=64)
 
 
 class BaseLocationModelResponse(BaseModelResponse):

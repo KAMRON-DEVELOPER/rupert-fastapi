@@ -129,9 +129,11 @@ class ChatCacheManager:
                     name=profile.get("name", ""),
                     username=profile.get("username", ""),
                     avatar_url=profile.get("avatar_url"),
-                    last_seen_at=datetime.fromtimestamp(int(profile.get("last_seen_at", 0)))
-                    if "last_seen_at" in profile
-                    else None,
+                    last_seen_at=(
+                        datetime.fromtimestamp(int(profile.get("last_seen_at", 0)))
+                        if "last_seen_at" in profile
+                        else None
+                    ),
                     is_online=is_online,
                 ),
                 last_activity_at=datetime.fromtimestamp(float(chat_meta.get("last_activity_at", time()))),

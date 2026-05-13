@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import TIMESTAMP, func
+from sqlalchemy import TIMESTAMP
 from sqlalchemy import UUID as PG_UUID
+from sqlalchemy import func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 

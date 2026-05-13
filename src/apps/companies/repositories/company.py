@@ -18,7 +18,7 @@ class CompaniesRepository:
     async def get_many(
         session: AsyncSession,
         pagination: paginationDep,
-        filters: companyListDep,
+        filters: companyListDep | None,
     ) -> PaginatedResponse[CompanySummary]:
         # Correlated scalar subquery: counts open vacancies for each company
         # in the outer query. SQLAlchemy auto-correlates this because CompanyModel.id
