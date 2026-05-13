@@ -89,10 +89,10 @@ async def github_oauth_callback(
 async def password_setup(token: Annotated[str, Query], schm: PasswordSetupRequest, session: DBSession):
     decoded = decode_token(token, "password_setup")
 
-    hash_password_bytes = await asyncio.to_thread(hashpw, schm.password.encode(), gensalt(rounds=8))
-    hash_password = hash_password_bytes.decode()
+    password_hash_bytes = await asyncio.to_thread(hashpw, schm.password.encode(), gensalt(rounds=8))
+    password_hash = password_hash_bytes.decode()
 
-    stmt = update(UserModel).where(UserModel.id == decoded.sub).values(hash_password=hash_password)
+    stmt = update(UserModel).where(UserModel.id == decoded.sub).values(password_hash=password_hash)
     try:
         await session.execute(stmt)
     except Exception as e:
