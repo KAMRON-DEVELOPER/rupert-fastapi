@@ -5,11 +5,11 @@ from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from apps.vacancies.schemas.application import ApplicationDetail, applicationListDep
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
 from src.apps.shared.schemas.enums import ApplicationStatus, VacancyStatus
 from src.apps.stats.schemas import SpecializationBucket, VacanciesStats, VacancyStatusBucket
 from src.apps.vacancies.models import ApplicationModel, SavedVacancyModel, VacancyModel, VacancySkillLink
+from src.apps.vacancies.schemas.application import ApplicationDetail, applicationListDep
 from src.apps.vacancies.schemas.vacancy import VacancyDetail, VacancySummary, vacancyListDep
 from src.core.helpers import percentage
 

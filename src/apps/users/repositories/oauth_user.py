@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.shared.schemas.enums import Provider
+from src.apps.shared.schemas.enums import Provider
 from src.apps.users.models import OAuthUserModel
 
 

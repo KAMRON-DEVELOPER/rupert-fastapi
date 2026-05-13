@@ -11,7 +11,7 @@ from src.apps.users.repositories.session import SessionsRepository
 from src.core.database import get_session
 from src.dependencies.proactive_refresh import create_token
 
-TEST_DATABASE_URL = "postgresql+asyncpg://postgres:password@localhost:5432/rupert_test_db"
+TEST_DATABASE_URL = "postgresql+asyncpg://postgres:password@192.168.10.11:5432/rupert_test_db"
 
 async_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 async_session = async_sessionmaker(async_engine, expire_on_commit=False, class_=AsyncSession)
