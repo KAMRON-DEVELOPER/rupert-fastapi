@@ -8,8 +8,8 @@ from uuid import UUID
 import aiohttp
 from PIL import Image
 
+from src.core.boto3 import put_object_to_boto3
 from src.core.logger import logger
-from src.core.minio import put_object_to_minio
 
 
 def percentage(count: int, total: int) -> float:
@@ -115,7 +115,7 @@ async def generate_avatar_url(user_id: UUID, image_url: str) -> str | None:
             if image_data:
                 print(f"🔨 3 Uploading image of size {len(image_data)} bytes to MinIO.")
                 print(f"🔨 4 Uploading image of size {len(image_stream.getbuffer())} bytes to MinIO.")
-                uploaded_object = await put_object_to_minio(
+                uploaded_object = await put_object_to_boto3(
                     object_name=f"users/{user_id.hex}/avatar.{extension}",
                     data=image_data,
                     content_type=content_type,
