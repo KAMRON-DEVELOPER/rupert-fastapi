@@ -16,14 +16,16 @@ from src.apps.vacancies.models import ApplicationModel, VacancyModel
 @pytest.mark.asyncio
 async def test_list_and_get_application(client, session, make_user):
     user = await make_user(email="app@example.com")
-    company = CompanyModel(name="AppCmp", type=CompanyType.enterprise, status=CompanyStatus.approved)
+    company = CompanyModel(
+        name="AppCmp", type=CompanyType.enterprise, status=CompanyStatus.approved, country="US", city="NY"
+    )
     session.add(company)
     await session.flush()
     vacancy = VacancyModel(
         company_id=company.id,
         title="Role",
         description="desc",
-        submission_type=SubmissionType.resume,
+        submission_type=SubmissionType.profile,
         specialization=Specialization.backend,
         work_format=WorkFormat.remote,
         status=VacancyStatus.open,

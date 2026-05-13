@@ -25,7 +25,9 @@ from src.apps.vacancies.schemas.vacancy import VacancyListParams
 @pytest.mark.asyncio
 async def test_vacancies_repository_methods(session: AsyncSession, make_user):
     user = await make_user(email="applicant@example.com")
-    company = CompanyModel(name="VacCo", type=CompanyType.product_company, status=CompanyStatus.approved)
+    company = CompanyModel(
+        name="VacCo", country="US", city="NY", type=CompanyType.product_company, status=CompanyStatus.approved
+    )
     session.add(company)
     await session.flush()
 

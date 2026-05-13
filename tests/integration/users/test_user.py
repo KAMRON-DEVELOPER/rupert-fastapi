@@ -1,5 +1,4 @@
 import pytest
-from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
@@ -19,6 +18,6 @@ async def test_get_update_delete_user_flow(client, login_client):
 
 
 @pytest.mark.asyncio
-async def test_get_user_unauthenticated(client: AsyncClient):
+async def test_get_user_unauthenticated(client):
     res = await client.get("/api/v1/users/")
     assert res.status_code == 401

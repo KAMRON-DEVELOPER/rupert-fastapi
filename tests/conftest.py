@@ -54,7 +54,10 @@ async def session():
     Provides a direct database session for tests to arrange data or assert DB state.
     """
     async with async_session() as s:
-        yield s
+        try:
+            yield s
+        finally:
+            await s.rollback()
 
 
 @pytest.fixture

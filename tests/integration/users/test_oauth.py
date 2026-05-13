@@ -3,8 +3,6 @@ from typing import Any
 
 import pytest
 from fastapi.routing import APIRoute
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from main import app
 from src.apps.users.models import UserModel
@@ -18,7 +16,7 @@ def _callback_dep(path: str) -> Any:
 
 
 @pytest.mark.asyncio
-async def test_google_callback_with_override(client: AsyncClient, session: AsyncSession):
+async def test_google_callback_with_override(client, session):
     dep = _callback_dep("/api/v1/users/auth/google/callback")
 
     async def fake_google_user():
@@ -34,7 +32,8 @@ async def test_google_callback_with_override(client: AsyncClient, session: Async
     assert (await session.execute(UserModel.__table__.select())).first() is not None
 
 
-async def test_github_callback_with_override(client: AsyncClient):
+@pytest.mark.asyncio
+async def test_github_callback_with_override(client):
     dep = _callback_dep("/api/v1/users/auth/github/callback")
 
     async def fake_github_user():
@@ -50,6 +49,6 @@ async def test_github_callback_with_override(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_password_setup_invalid_token(client: AsyncClient):
+async def test_password_setup_invalid_token(client):
     res = await client.post("/api/v1/users/auth/password-setup?token=bad", json={"password": "secret123"})
     assert res.status_code == 401
