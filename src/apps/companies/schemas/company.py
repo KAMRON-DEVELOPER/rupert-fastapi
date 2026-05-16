@@ -4,7 +4,11 @@ from uuid import UUID
 from fastapi import Depends, Query
 from pydantic import AnyUrl, EmailStr, Field
 
-from src.apps.shared.schemas import BaseLocationModelResponse, LocationRequest, RequestSchema
+from src.apps.shared.schemas import (
+    BaseLocationModelResponse,
+    LocationRequest,
+    RequestSchema,
+)
 from src.apps.shared.schemas.enums import CompanyStatus, CompanyType
 from src.apps.shared.schemas.location import NullableLocationRequest
 

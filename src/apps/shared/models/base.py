@@ -17,6 +17,12 @@ class BaseModel(Base):
     __abstract__ = True
     __allow_unmapped__ = True
 
-    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), default=uuid4, primary_key=True)
-    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now(), onupdate=func.now())
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), default=uuid4, primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), default=func.now(), onupdate=func.now()
+    )

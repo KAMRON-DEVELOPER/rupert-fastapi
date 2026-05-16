@@ -1,4 +1,12 @@
-from dead_simple_oauth_fastapi import GitHubOAuthClient, GoogleOAuthClient
+from typing import Annotated
+
+from dead_simple_oauth_fastapi import (
+    GitHubOAuthClient,
+    GithubUser,
+    GoogleOAuthClient,
+    GoogleUser,
+)
+from fastapi import Depends
 
 from src.core.settings import get_settings
 
@@ -15,3 +23,9 @@ github = GitHubOAuthClient(
     client_secret=settings.github_oauth.client_secret,
     redirect_uri=settings.github_oauth.redirect_url,
 )
+
+google_callback_dep = google.callback_dependency()
+github_callback_dep = github.callback_dependency()
+
+GoogleUserDep = Annotated[GoogleUser, Depends(google_callback_dep)]
+GithubUserDep = Annotated[GithubUser, Depends(github_callback_dep)]

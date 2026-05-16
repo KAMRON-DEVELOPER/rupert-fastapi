@@ -5,7 +5,11 @@ from fastapi import Depends, Query
 from pydantic import AnyUrl, Field, field_validator
 
 from src.apps.companies.schemas.company import CompanySummary
-from src.apps.shared.schemas import BaseModelResponse, LocationRequest, RequestSchema
+from src.apps.shared.schemas import (
+    BaseModelResponse,
+    LocationRequest,
+    RequestSchema,
+)
 from src.apps.shared.schemas.enums import (
     EmploymentType,
     PaymentFrequency,
@@ -15,7 +19,10 @@ from src.apps.shared.schemas.enums import (
     VacancyStatus,
     WorkFormat,
 )
-from src.apps.vacancies.schemas.skill_links import VacancySkillLinkRequest, VacancySkillLinkResponse
+from src.apps.vacancies.schemas.skill_links import (
+    VacancySkillLinkRequest,
+    VacancySkillLinkResponse,
+)
 
 
 class VacancyCreateRequest(LocationRequest):

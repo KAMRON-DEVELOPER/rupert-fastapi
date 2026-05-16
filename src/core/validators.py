@@ -24,7 +24,9 @@ violent_words = [
     "nudes",
     "nudity",
 ]
-violent_words_regex = r"(" + "|".join(re.escape(word) for word in violent_words) + r")"
+violent_words_regex = (
+    r"(" + "|".join(re.escape(word) for word in violent_words) + r")"
+)
 allowed_image_extension = {"png", "jpg", "jpeg"}
 allowed_video_extension = {"mp4", "mov"}
 
@@ -33,9 +35,13 @@ def validate_username(username: str | None = None) -> None:
     if username is not None:
         if not username:
             raise ValidationException(detail="Username cannot be empty.")
-        validate_length(field=username, min_len=3, max_len=20, field_name="Username")
+        validate_length(
+            field=username, min_len=3, max_len=20, field_name="Username"
+        )
         if re.search(violent_words_regex, username, re.IGNORECASE):
-            raise ValidationException("Username contains restricted or inappropriate content.")
+            raise ValidationException(
+                "Username contains restricted or inappropriate content."
+            )
 
 
 def validate_email(email: str | None = None) -> None:
@@ -57,16 +63,24 @@ def validate_password(password_string: str | None = None) -> None:
     if password_string is not None:
         if not password_string:
             raise ValidationException(detail="Password cannot be empty.")
-        validate_length(field=password_string, min_len=8, max_len=255, field_name="Password")
+        validate_length(
+            field=password_string, min_len=8, max_len=255, field_name="Password"
+        )
         if not re.search(pattern=r"\d", string=password_string):
-            raise ValidationException("Password must contain at least one digit.")
+            raise ValidationException(
+                "Password must contain at least one digit."
+            )
         if not re.search(pattern=r"[a-zA-Z]", string=password_string):
-            raise ValidationException("Password must contain at least one letter.")
+            raise ValidationException(
+                "Password must contain at least one letter."
+            )
 
 
 def validate_length(field: str, min_len: int, max_len: int, field_name: str):
     if not (min_len <= len(field) <= max_len):
-        raise ValidationException(f"{field_name} must be between {min_len} and {max_len} characters.")
+        raise ValidationException(
+            f"{field_name} must be between {min_len} and {max_len} characters."
+        )
 
 
 def get_file_extension(file: UploadFile) -> str:
@@ -122,11 +136,17 @@ def convert_for_redis(data: dict) -> dict:
 
 def escape_redisearch_special_chars(value: str) -> str:
     # RediSearch special characters (from official docs)
-    special_chars = r'[\[\]\(\)\{\}\<\>\:\\"\'\+\-\=\&\|\!\~\@\#\^\*\%\`\?\.\,\/]'
+    special_chars = (
+        r'[\[\]\(\)\{\}\<\>\:\\"\'\+\-\=\&\|\!\~\@\#\^\*\%\`\?\.\,\/]'
+    )
     return re.sub(special_chars, lambda m: f"\\{m.group(0)}", value)
 
 
-def generate_full_name(given_name: str | None = None, family_name: str | None = None, email: str | None = None) -> str:
+def generate_full_name(
+    given_name: str | None = None,
+    family_name: str | None = None,
+    email: str | None = None,
+) -> str:
     given_name = (given_name or "").strip()
     family_name = (family_name or "").strip()
 
@@ -143,6 +163,10 @@ def generate_full_name(given_name: str | None = None, family_name: str | None = 
 
 
 def generate_unique_username(base_name: str) -> str:
-    base = "".join(ch for ch in base_name.lower().replace(" ", "_") if ch.isalnum() or ch == "_")
+    base = "".join(
+        ch
+        for ch in base_name.lower().replace(" ", "_")
+        if ch.isalnum() or ch == "_"
+    )
     suffix = "".join(random.choices(string.digits, k=4))
     return f"{base}_{suffix}"

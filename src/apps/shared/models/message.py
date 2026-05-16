@@ -14,7 +14,9 @@ from .base import BaseModel
 class BaseMessageModel(BaseModel):
     __abstract__ = True
 
-    sender_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE"))
+    sender_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE")
+    )
     message: Mapped[str] = mapped_column(Text)
     image_urls: Mapped[list[str]] = mapped_column(ARRAY(item_type=String))
     video_urls: Mapped[list[str]] = mapped_column(ARRAY(item_type=String))

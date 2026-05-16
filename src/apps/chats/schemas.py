@@ -18,7 +18,10 @@ class ParticipantSchema(BaseModel):
 
     class Config:
         from_attributes = True
-        json_encoders = {UUID: lambda v: v.hex, datetime: lambda v: int(v.timestamp()) if v is not None else None}
+        json_encoders = {
+            UUID: lambda v: v.hex,
+            datetime: lambda v: int(v.timestamp()) if v is not None else None,
+        }
 
 
 class ChatMessageSchema(BaseModel):
@@ -30,7 +33,10 @@ class ChatMessageSchema(BaseModel):
 
     class Config:
         from_attributes = True
-        json_encoders = {UUID: lambda v: v.hex, datetime: lambda v: int(v.timestamp())}
+        json_encoders = {
+            UUID: lambda v: v.hex,
+            datetime: lambda v: int(v.timestamp()),
+        }
 
 
 class ChatSchema(BaseModel):
@@ -41,7 +47,10 @@ class ChatSchema(BaseModel):
 
     class Config:
         from_attributes = True
-        json_encoders = {UUID: lambda v: v.hex, datetime: lambda v: int(v.timestamp())}
+        json_encoders = {
+            UUID: lambda v: v.hex,
+            datetime: lambda v: int(v.timestamp()),
+        }
 
 
 class ChatResponseSchema(BaseModel):
@@ -55,4 +64,7 @@ class ChatMessageResponseSchema(BaseModel):
 
     class Config:
         from_attributes = True
-        json_encoders = {UUID: lambda v: v.hex, datetime: lambda v: int(v.timestamp())}
+        json_encoders = {
+            UUID: lambda v: v.hex,
+            datetime: lambda v: int(v.timestamp()),
+        }

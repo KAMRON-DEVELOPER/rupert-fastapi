@@ -17,7 +17,11 @@ def percentage(count: int, total: int) -> float:
 
 
 def generate_username_from_base_name(base_name: str) -> str:
-    return re.sub(pattern=r"[^a-zA-Z0-9_]", repl="", string=base_name.lower().replace(" ", "_"))
+    return re.sub(
+        pattern=r"[^a-zA-Z0-9_]",
+        repl="",
+        string=base_name.lower().replace(" ", "_"),
+    )
 
 
 def generate_random_name(max_length: int = 14) -> str:
@@ -41,7 +45,9 @@ def generate_random_name(max_length: int = 14) -> str:
 
 
 def generate_random_username(length: int = 8) -> str:
-    return "".join(random.choices(string.ascii_lowercase + string.digits, k=length))
+    return "".join(
+        random.choices(string.ascii_lowercase + string.digits, k=length)
+    )
 
 
 def generate_password_string() -> str:
@@ -53,9 +59,13 @@ def generate_password_string() -> str:
 async def download_image(image_url: str) -> tuple[bytes, str, str]:
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(image_url, timeout=aiohttp.ClientTimeout(total=60)) as response:
+            async with session.get(
+                image_url, timeout=aiohttp.ClientTimeout(total=60)
+            ) as response:
                 if response.status != 200:
-                    raise ValueError(f"Failed to download image from {image_url}")
+                    raise ValueError(
+                        f"Failed to download image from {image_url}"
+                    )
                 image_data = await response.read()
 
                 if not image_data:
@@ -69,7 +79,9 @@ async def download_image(image_url: str) -> tuple[bytes, str, str]:
                     raise ValueError(f"Couldn't get image extension. {e}")
 
                 # Get the content type
-                content_type = mimetypes.types_map.get(f".{extension}", "application/octet-stream")
+                content_type = mimetypes.types_map.get(
+                    f".{extension}", "application/octet-stream"
+                )
 
                 return image_data, extension, content_type
     except Exception as e:
@@ -77,7 +89,9 @@ async def download_image(image_url: str) -> tuple[bytes, str, str]:
         raise Exception("🌋 Exception in download_image")
 
 
-async def prepare_image_data(image_data: bytes, max_width: int = 72, max_height: int = 72) -> BytesIO:
+async def prepare_image_data(
+    image_data: bytes, max_width: int = 72, max_height: int = 72
+) -> BytesIO:
     try:
         # Open the image using BytesIO
         print(f"🔨 2 Uploading image of size {len(image_data)} bytes to MinIO.")
@@ -107,21 +121,33 @@ async def generate_avatar_url(user_id: UUID, image_url: str) -> str | None:
     print(f"🚧 image_url: {image_url}, user_id: {user_id}")
 
     try:
-        image_data, extension, content_type = await download_image(image_url=image_url)
-        logger.debug(f"generate_avatar_url len(image_data): {len(image_data)}, extension: {extension}")
+        image_data, extension, content_type = await download_image(
+            image_url=image_url
+        )
+        logger.debug(
+            f"generate_avatar_url len(image_data): {len(image_data)}, extension: {extension}"
+        )
         if image_data:
-            image_stream: BytesIO = await prepare_image_data(image_data=image_data)
+            image_stream: BytesIO = await prepare_image_data(
+                image_data=image_data
+            )
             image_data: bytes = image_stream.read()
             if image_data:
-                print(f"🔨 3 Uploading image of size {len(image_data)} bytes to MinIO.")
-                print(f"🔨 4 Uploading image of size {len(image_stream.getbuffer())} bytes to MinIO.")
+                print(
+                    f"🔨 3 Uploading image of size {len(image_data)} bytes to MinIO."
+                )
+                print(
+                    f"🔨 4 Uploading image of size {len(image_stream.getbuffer())} bytes to MinIO."
+                )
                 uploaded_object = await put_object_to_boto3(
                     object_name=f"users/{user_id.hex}/avatar.{extension}",
                     data=image_data,
                     content_type=content_type,
                 )
                 if uploaded_object:
-                    print(f"✅ Successfully uploaded image to MinIO: {uploaded_object}")
+                    print(
+                        f"✅ Successfully uploaded image to MinIO: {uploaded_object}"
+                    )
                 return uploaded_object
         return None
     except Exception as e:

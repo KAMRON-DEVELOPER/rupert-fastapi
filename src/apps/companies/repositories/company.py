@@ -6,7 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.apps.companies.models import CompanyMemberModel, CompanyModel
-from src.apps.companies.schemas.company import CompanyDetail, CompanySummary, companyListDep
+from src.apps.companies.schemas.company import (
+    CompanyDetail,
+    CompanySummary,
+    companyListDep,
+)
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
 from src.apps.stats.schemas import CompaniesStats, CompanyTypeBucket
 from src.apps.vacancies.models import VacancyModel
@@ -51,7 +55,9 @@ class CompaniesRepository:
             if filters.skill_ids:
                 pass
 
-        count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
+        count_stmt = select(func.count()).select_from(
+            stmt.order_by(None).subquery()
+        )
         total = await session.scalar(count_stmt) or 0
 
         stmt = stmt.order_by(CompanyModel.created_at.desc())
@@ -71,7 +77,9 @@ class CompaniesRepository:
         return PaginatedResponse(data=data, total=total)
 
     @staticmethod
-    async def get_by_id(session: AsyncSession, company_id: UUID) -> CompanyDetail:
+    async def get_by_id(
+        session: AsyncSession, company_id: UUID
+    ) -> CompanyDetail:
         open_vacancies_count = (
             select(func.count(VacancyModel.id))
             .where(
@@ -95,7 +103,9 @@ class CompaniesRepository:
         stmt = (
             select(CompanyModel, open_vacancies_count, member_count)
             .options(
-                selectinload(CompanyModel.members).selectinload(CompanyMemberModel.user),
+                selectinload(CompanyModel.members).selectinload(
+                    CompanyMemberModel.user
+                ),
                 selectinload(CompanyModel.vacancies),
             )
             .where(CompanyModel.id == company_id)

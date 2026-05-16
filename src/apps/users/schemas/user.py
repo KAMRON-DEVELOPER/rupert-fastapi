@@ -3,7 +3,13 @@ from datetime import date, datetime, timedelta, timezone
 from pydantic import Field, field_validator
 
 from src.apps.shared.schemas import BaseNullableLocationModelResponse
-from src.apps.shared.schemas.enums import FollowPolicy, JobSearchStatus, Specialization, UserRole, UserStatus
+from src.apps.shared.schemas.enums import (
+    FollowPolicy,
+    JobSearchStatus,
+    Specialization,
+    UserRole,
+    UserStatus,
+)
 from src.apps.shared.schemas.location import NullableLocationRequest
 from src.apps.users.schemas.resume import ResumeSummary
 from src.apps.users.schemas.skill_links import UserSkillLinkResponse
@@ -28,9 +34,13 @@ class UserUpdateRequest(NullableLocationRequest):
     def validate_birthdate(cls, value: datetime | None):
         if value is not None:
             min_age_date = datetime.now(timezone.utc) - timedelta(days=12 * 365)
-            max_age_date = datetime.now(timezone.utc) - timedelta(days=100 * 365)
+            max_age_date = datetime.now(timezone.utc) - timedelta(
+                days=100 * 365
+            )
             if not (max_age_date <= value <= min_age_date):
-                raise ValidationException(detail="Birthdate must be between 12 and 100 years ago.")
+                raise ValidationException(
+                    detail="Birthdate must be between 12 and 100 years ago."
+                )
         return value
 
 

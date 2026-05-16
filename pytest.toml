@@ -1,0 +1,8 @@
+[pytest]
+minversion = "9.0"
+asyncio_mode = "auto"
+pythonpath = ["."]
+testpaths = ["tests"]
+# asyncio_default_fixture_loop_scope = "function"
+addopts = ["--strict-markers"]
+markers = ["unit", "integration"]

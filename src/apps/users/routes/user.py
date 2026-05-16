@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
 from src.apps.users.schemas.user import UserDetail, UserUpdateRequest
-from src.core.database import DBSession
+from src.core.database import sessionDep
 from src.core.logger import logger
 from src.core.settings import get_settings
 from src.dependencies.proactive_refresh import authDep
@@ -16,7 +16,7 @@ settings = get_settings()
 
 
 @users_router.get("/", response_model=UserDetail)
-async def get_user(auth: authDep, session: DBSession):
+async def get_user(auth: authDep, session: sessionDep):
     user_id, _, _ = auth
 
     try:
@@ -33,7 +33,9 @@ async def get_user(auth: authDep, session: DBSession):
 
 
 @users_router.patch("/")
-async def update_user(auth: authDep, schm: UserUpdateRequest, session: DBSession):
+async def update_user(
+    auth: authDep, schm: UserUpdateRequest, session: sessionDep
+):
     user_id, _, _ = auth
 
     try:
@@ -45,13 +47,15 @@ async def update_user(auth: authDep, schm: UserUpdateRequest, session: DBSession
 
 
 @users_router.delete("/")
-async def delete_user(auth: authDep, session: DBSession):
+async def delete_user(auth: authDep, session: sessionDep):
     user_id, _, refresh_token = auth
 
     try:
         await SessionsRepository.delete(user_id, refresh_token, session)
         await UsersRepository.delete_by_id(user_id, session)
     except Exception as e:
-        logger.error("update_user [SessionsRepository.delete, UsersRepository.delete_by_id]")
+        logger.error(
+            "update_user [SessionsRepository.delete, UsersRepository.delete_by_id]"
+        )
         pprint(e)
         raise HTTPException(status_code=500, detail="Something went wrong")

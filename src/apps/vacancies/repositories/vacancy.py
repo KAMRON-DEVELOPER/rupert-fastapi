@@ -7,10 +7,26 @@ from sqlalchemy.orm import selectinload
 
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
 from src.apps.shared.schemas.enums import ApplicationStatus, VacancyStatus
-from src.apps.stats.schemas import SpecializationBucket, VacanciesStats, VacancyStatusBucket
-from src.apps.vacancies.models import ApplicationModel, SavedVacancyModel, VacancyModel, VacancySkillLink
-from src.apps.vacancies.schemas.application import ApplicationDetail, applicationListDep
-from src.apps.vacancies.schemas.vacancy import VacancyDetail, VacancySummary, vacancyListDep
+from src.apps.stats.schemas import (
+    SpecializationBucket,
+    VacanciesStats,
+    VacancyStatusBucket,
+)
+from src.apps.vacancies.models import (
+    ApplicationModel,
+    SavedVacancyModel,
+    VacancyModel,
+    VacancySkillLink,
+)
+from src.apps.vacancies.schemas.application import (
+    ApplicationDetail,
+    applicationListDep,
+)
+from src.apps.vacancies.schemas.vacancy import (
+    VacancyDetail,
+    VacancySummary,
+    vacancyListDep,
+)
 from src.core.helpers import percentage
 
 
@@ -28,11 +44,17 @@ class VacanciesRepository:
             if filters.company_id:
                 stmt = stmt.where(VacancyModel.company_id == filters.company_id)
             if filters.title:
-                stmt = stmt.where(VacancyModel.title.ilike(f"%{filters.title}%"))
+                stmt = stmt.where(
+                    VacancyModel.title.ilike(f"%{filters.title}%")
+                )
             if filters.submission_type:
-                stmt = stmt.where(VacancyModel.submission_type == filters.submission_type)
+                stmt = stmt.where(
+                    VacancyModel.submission_type == filters.submission_type
+                )
             if filters.specialization:
-                stmt = stmt.where(VacancyModel.specialization == filters.specialization)
+                stmt = stmt.where(
+                    VacancyModel.specialization == filters.specialization
+                )
             if filters.salary_min:
                 stmt = stmt.where(VacancyModel.salary_max.is_not(None))
                 stmt = stmt.where(VacancyModel.salary_max >= filters.salary_min)
@@ -40,14 +62,25 @@ class VacanciesRepository:
                 stmt = stmt.where(VacancyModel.salary_min.is_not(None))
                 stmt = stmt.where(VacancyModel.salary_min <= filters.salary_max)
             if filters.salary_currency:
-                stmt = stmt.where(VacancyModel.salary_currency == filters.salary_currency)
+                stmt = stmt.where(
+                    VacancyModel.salary_currency == filters.salary_currency
+                )
             if filters.years_of_experience_min:
-                stmt = stmt.where(VacancyModel.years_of_experience_min.is_not(None))
-                stmt = stmt.where(VacancyModel.years_of_experience_min >= filters.years_of_experience_min)
+                stmt = stmt.where(
+                    VacancyModel.years_of_experience_min.is_not(None)
+                )
+                stmt = stmt.where(
+                    VacancyModel.years_of_experience_min
+                    >= filters.years_of_experience_min
+                )
             if filters.work_format:
-                stmt = stmt.where(VacancyModel.work_format == filters.work_format)
+                stmt = stmt.where(
+                    VacancyModel.work_format == filters.work_format
+                )
             if filters.employment_type:
-                stmt = stmt.where(VacancyModel.employment_type == filters.employment_type)
+                stmt = stmt.where(
+                    VacancyModel.employment_type == filters.employment_type
+                )
             if filters.status:
                 stmt = stmt.where(VacancyModel.status == filters.status)
             if filters.skill_ids:
@@ -68,7 +101,9 @@ class VacanciesRepository:
         # Count total BEFORE pagination (filters already applied above)
         # Sorting rows is computationally expensive for the database.
         # If you just want to know how many rows exist, sorting them first is a massive waste of time.
-        count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
+        count_stmt = select(func.count()).select_from(
+            stmt.order_by(None).subquery()
+        )
         total = await session.scalar(count_stmt) or 0
 
         stmt = stmt.order_by(VacancyModel.created_at.desc())
@@ -106,19 +141,25 @@ class VacanciesRepository:
         return PaginatedResponse(data=data, total=total)
 
     @staticmethod
-    async def get_by_id(session: AsyncSession, id: UUID, user_id: UUID | None = None) -> VacancyDetail:
+    async def get_by_id(
+        session: AsyncSession, id: UUID, user_id: UUID | None = None
+    ) -> VacancyDetail:
         stmt = (
             select(VacancyModel)
             .options(
                 selectinload(VacancyModel.company),
-                selectinload(VacancyModel.skill_links).selectinload(VacancySkillLink.skill),
+                selectinload(VacancyModel.skill_links).selectinload(
+                    VacancySkillLink.skill
+                ),
             )
             .where(VacancyModel.id == id)
         )
 
         load_options = [
             selectinload(VacancyModel.company),
-            selectinload(VacancyModel.skill_links).selectinload(VacancySkillLink.skill),
+            selectinload(VacancyModel.skill_links).selectinload(
+                VacancySkillLink.skill
+            ),
         ]
 
         if user_id:
@@ -148,12 +189,18 @@ class VacanciesRepository:
             vacancy.has_applied = has_applied
             return cast(VacancyDetail, vacancy)
 
-        stmt = select(VacancyModel).options(*load_options).where(VacancyModel.id == id)
+        stmt = (
+            select(VacancyModel)
+            .options(*load_options)
+            .where(VacancyModel.id == id)
+        )
         vacancy = (await session.execute(stmt)).one().tuple()[0]
         return cast(VacancyDetail, vacancy)
 
     @staticmethod
-    async def create(session: AsyncSession, company_id: UUID, data: dict) -> VacancyModel:
+    async def create(
+        session: AsyncSession, company_id: UUID, data: dict
+    ) -> VacancyModel:
         skills_data = data.pop("skills", [])
         vacancy = VacancyModel(company_id=company_id, **data)
         session.add(vacancy)
@@ -168,7 +215,9 @@ class VacanciesRepository:
         return vacancy
 
     @staticmethod
-    async def update(session: AsyncSession, vacancy_id: UUID, data: dict) -> VacancyDetail | None:
+    async def update(
+        session: AsyncSession, vacancy_id: UUID, data: dict
+    ) -> VacancyDetail | None:
         vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
 
         for key, value in data.items():
@@ -197,9 +246,13 @@ class VacanciesRepository:
 
         if filters:
             if filters.vacancy_id:
-                stmt = stmt.where(ApplicationModel.vacancy_id == filters.vacancy_id)
+                stmt = stmt.where(
+                    ApplicationModel.vacancy_id == filters.vacancy_id
+                )
             if filters.applicant_id:
-                stmt = stmt.where(ApplicationModel.applicant_id == filters.applicant_id)
+                stmt = stmt.where(
+                    ApplicationModel.applicant_id == filters.applicant_id
+                )
             if filters.status:
                 stmt = stmt.where(ApplicationModel.status == filters.status)
 
@@ -209,7 +262,9 @@ class VacanciesRepository:
 
         # Apply loading options and ordering
         stmt = stmt.options(
-            selectinload(ApplicationModel.vacancy).selectinload(VacancyModel.company),
+            selectinload(ApplicationModel.vacancy).selectinload(
+                VacancyModel.company
+            ),
             selectinload(ApplicationModel.resume),
             selectinload(ApplicationModel.applicant),
         ).order_by(ApplicationModel.created_at.desc())
@@ -222,11 +277,15 @@ class VacanciesRepository:
         return PaginatedResponse(data=data, total=total)
 
     @staticmethod
-    async def get_application_by_id(session: AsyncSession, id: UUID) -> ApplicationModel:
+    async def get_application_by_id(
+        session: AsyncSession, id: UUID
+    ) -> ApplicationModel:
         stmt = (
             select(ApplicationModel)
             .options(
-                selectinload(ApplicationModel.vacancy).selectinload(VacancyModel.company),
+                selectinload(ApplicationModel.vacancy).selectinload(
+                    VacancyModel.company
+                ),
                 selectinload(ApplicationModel.resume),
                 selectinload(ApplicationModel.applicant),
             )
@@ -235,7 +294,9 @@ class VacanciesRepository:
         return (await session.execute(stmt)).scalar_one()
 
     @staticmethod
-    async def apply_to_vacancy(session: AsyncSession, applicant_id: UUID, data: dict) -> ApplicationModel:
+    async def apply_to_vacancy(
+        session: AsyncSession, applicant_id: UUID, data: dict
+    ) -> ApplicationModel:
         application = ApplicationModel(applicant_id=applicant_id, **data)
         session.add(application)
         await session.commit()
@@ -244,9 +305,14 @@ class VacanciesRepository:
 
     @staticmethod
     async def update_application_status(
-        session: AsyncSession, application_id: UUID, status: ApplicationStatus, recruiter_note: str | None = None
+        session: AsyncSession,
+        application_id: UUID,
+        status: ApplicationStatus,
+        recruiter_note: str | None = None,
     ) -> ApplicationModel | None:
-        application = await VacanciesRepository.get_application_by_id(session, application_id)
+        application = await VacanciesRepository.get_application_by_id(
+            session, application_id
+        )
         if not application:
             return None
 
@@ -262,7 +328,9 @@ class VacanciesRepository:
     async def get_stats(session: AsyncSession):
         totals_stmt = select(
             func.count(VacancyModel.id).label("total"),
-            func.count(VacancyModel.id).filter(VacancyModel.status == VacancyStatus.open).label("open"),
+            func.count(VacancyModel.id)
+            .filter(VacancyModel.status == VacancyStatus.open)
+            .label("open"),
         )
         total, open = (await session.execute(totals_stmt)).one()
 
@@ -291,10 +359,14 @@ class VacanciesRepository:
                 func.count(VacancyModel.id).label("count"),
             )
             .group_by(VacancyModel.specialization)
-            .order_by(func.count(VacancyModel.id).desc(), VacancyModel.specialization)
+            .order_by(
+                func.count(VacancyModel.id).desc(), VacancyModel.specialization
+            )
         )
         # by_specialization_rows: Sequence[Row[Tuple[Specialization, int]]]
-        by_specialization_rows = (await session.execute(by_specialization_stmt)).all()
+        by_specialization_rows = (
+            await session.execute(by_specialization_stmt)
+        ).all()
         by_specialization = [
             SpecializationBucket(
                 key=specialization,
@@ -304,4 +376,9 @@ class VacanciesRepository:
             for specialization, count in by_specialization_rows
         ]
 
-        return VacanciesStats(total=total, open=open, by_status=by_status, by_specialization=by_specialization)
+        return VacanciesStats(
+            total=total,
+            open=open,
+            by_status=by_status,
+            by_specialization=by_specialization,
+        )

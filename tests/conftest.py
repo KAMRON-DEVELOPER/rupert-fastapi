@@ -1,126 +1,139 @@
 from collections.abc import AsyncGenerator, Awaitable, Callable
+from uuid import uuid4
 
 import pytest
+import pytest_asyncio
 from dead_simple_oauth_fastapi import GoogleUser
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import NullPool
+from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from main import app
 from src.apps.shared.models.base import Base
+from src.apps.shared.schemas.enums import Provider
 from src.apps.users.models import UserModel
+from src.apps.users.repositories.oauth_user import OAuthUsersRepository
 from src.apps.users.repositories.session import SessionsRepository
+from src.apps.users.repositories.user import UsersRepository
 from src.core.database import get_session
-from src.core.oauth import google
-from src.dependencies.proactive_refresh import auth_checker, create_token
+from src.core.oauth import google_callback_dep
+from src.dependencies.proactive_refresh import create_token
 
-TEST_DATABASE_URL = "postgresql+asyncpg://postgres:password@192.168.10.11:5432/rupert_test_db"
-
-async_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-async_session = async_sessionmaker(
-    async_engine, autocommit=False, autoflush=False, expire_on_commit=False, class_=AsyncSession
+TEST_DATABASE_URL = (
+    "postgresql+asyncpg://postgres:password@localhost:5432/rupert_test_db"
 )
 
+engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool, echo=False)
 
-async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
-    async with async_session() as s:
+
+@pytest_asyncio.fixture(scope="session", loop_scope="session", autouse=True)
+async def setup_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+
+    yield
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
+
+
+@pytest.fixture
+async def connection() -> AsyncGenerator[AsyncConnection, None]:
+    async with engine.connect() as conn:
+        tx = await conn.begin()
+
+        try:
+            yield conn
+        finally:
+            await tx.rollback()
+
+
+@pytest.fixture
+async def session(
+    connection: AsyncConnection,
+) -> AsyncGenerator[AsyncSession, None]:
+    session = async_sessionmaker(
+        bind=connection,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autoflush=False,
+        join_transaction_mode="create_savepoint",
+    )
+
+    async with session() as s:
         yield s
 
 
-app.dependency_overrides[get_session] = override_get_session
+@pytest.fixture
+async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    async def override_get_session():
+        yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        follow_redirects=False,
+    ) as ac:
+        yield ac
+
+    app.dependency_overrides.clear()
 
 
-async def override_callback_dependency():
-    return GoogleUser(
-        sub="1234567890",
-        email="oauth.test@gmail.com",
-        given_name="OAuth",
-        family_name="User",
-        email_verified=True,
-    )
+@pytest.fixture
+def mock_google_oauth():
+    async def override_google_callback_dep():
+        return GoogleUser(
+            sub="google",
+            email="google@gmail.com",
+            email_verified=True,
+            given_name="Goo",
+            family_name="Gle",
+        )
 
-
-app.dependency_overrides[google.callback_dependency()] = override_callback_dependency
-
-
-async def override_auth_checker():
-    return ("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "fake_access", "fake_refresh")
-
-
-app.dependency_overrides[auth_checker] = override_auth_checker
-
-
-@pytest.fixture(autouse=True, scope="session")
-async def setup_db():
-    """
-    Creates fresh tables before each test and drops them after.
-    """
-    async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    app.dependency_overrides[google_callback_dep] = override_google_callback_dep
     yield
-    async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+    app.dependency_overrides.pop(google_callback_dep, None)
 
 
 @pytest.fixture
-async def session():
-    """
-    Provides a direct database session for tests to arrange data or assert DB state.
-    """
-    async with async_session() as s:
-        try:
-            yield s
-        finally:
-            await s.rollback()
+async def authenticate_user(
+    client: AsyncClient, session: AsyncSession
+) -> Callable[..., Awaitable[UserModel]]:
+    async def _authenticate_user(**kwargs) -> UserModel:
+        password = (
+            kwargs.pop("password_hash", "securepassword")
+            if kwargs.pop("no_password", False)
+            else None
+        )
+        user = await UsersRepository.create(
+            kwargs.pop("email", "user@example.com"),
+            password,
+            kwargs.pop("first_name", "Test"),
+            kwargs.pop("last_name", "User"),
+            session,
+        )
+        if kwargs.get("with_oauth_user", False):
+            await OAuthUsersRepository.create(
+                session,
+                provider_id=uuid4(),
+                user_id=user.id,
+                provider=Provider.google,
+            )
 
-
-@pytest.fixture
-async def client():
-    """
-    Provides an async HTTP client to make requests to the FastAPI app.
-    """
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
-
-
-@pytest.fixture
-async def make_user(session: AsyncSession) -> Callable[..., Awaitable[UserModel]]:
-    async def _make_user(**kwargs) -> UserModel:
-        payload = {
-            "email": kwargs.pop("email", "user@example.com"),
-            "password_hash": kwargs.pop("password_hash", "hash"),
-            "first_name": kwargs.pop("first_name", "Test"),
-            "last_name": kwargs.pop("last_name", "User"),
-        }
-        user = UserModel(**payload, **kwargs)
-        session.add(user)
-        await session.flush()
-        return user
-
-    return _make_user
-
-
-@pytest.fixture
-async def auth_cookies() -> Callable[[UserModel], dict[str, str]]:
-    def _auth_cookies(user: UserModel) -> dict[str, str]:
-        return {
+        cookies = {
             "access_token": create_token(user.id, "access"),
             "refresh_token": create_token(user.id, "refresh"),
         }
 
-    return _auth_cookies
-
-
-@pytest.fixture
-async def login_client(
-    client: AsyncClient,
-    session: AsyncSession,
-    make_user: Callable[..., Awaitable[UserModel]],
-    auth_cookies: Callable[[UserModel], dict[str, str]],
-):
-    async def _login(**kwargs):
-        user = await make_user(**kwargs)
-        cookies = auth_cookies(user)
         await SessionsRepository.create(
             user_id=user.id,
             user_agent="pytest",
@@ -129,10 +142,11 @@ async def login_client(
             refresh_token=cookies["refresh_token"],
             session=session,
         )
-        await session.commit()
+        await session.flush()
 
         client.cookies.set("access_token", cookies["access_token"])
         client.cookies.set("refresh_token", cookies["refresh_token"])
+
         return user
 
-    return _login
+    return _authenticate_user

@@ -3,8 +3,7 @@ from pprint import pprint
 from typing import Annotated
 
 from bcrypt import gensalt, hashpw
-from dead_simple_oauth_fastapi import GithubUser, GoogleUser
-from fastapi import Depends, HTTPException, Query, Request, status
+from fastapi import HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import update
 
@@ -12,9 +11,9 @@ from src.apps.shared.schemas.enums import UserStatus
 from src.apps.users.models import UserModel
 from src.apps.users.schemas.auth import PasswordSetupRequest
 from src.apps.users.utils import finalize_session
-from src.core.database import DBSession
+from src.core.database import sessionDep
 from src.core.logger import logger
-from src.core.oauth import github, google
+from src.core.oauth import GithubUserDep, GoogleUserDep, github, google
 from src.core.settings import get_settings
 from src.dependencies.proactive_refresh import decode_token
 
@@ -30,9 +29,7 @@ async def google_oauth(req: Request):
 
 @users_router.get("/auth/google/callback")
 async def google_oauth_callback(
-    req: Request,
-    oauth_user: Annotated[GoogleUser, Depends(google.callback_dependency())],
-    session: DBSession,
+    req: Request, oauth_user: GoogleUserDep, session: sessionDep
 ):
     try:
         user = UserModel(
@@ -46,12 +43,14 @@ async def google_oauth_callback(
         await session.flush()
 
         redirect = RedirectResponse(settings.frontend_endpoint)
-        await finalize_session(req, redirect, user, session)
+        await finalize_session(req, redirect, user.id, session)
         return redirect
     except Exception as e:
         logger.error("google_oauth_callback [session.flush, finalize_session]")
         pprint(e)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong"
+        )
 
 
 @users_router.get("/auth/github")
@@ -61,9 +60,7 @@ async def github_oauth(request: Request):
 
 @users_router.get("/auth/github/callback")
 async def github_oauth_callback(
-    req: Request,
-    oauth_user: Annotated[GithubUser, Depends(github.callback_dependency())],
-    session: DBSession,
+    req: Request, oauth_user: GithubUserDep, session: sessionDep
 ):
     try:
         user = UserModel(
@@ -77,25 +74,39 @@ async def github_oauth_callback(
         await session.flush()
 
         redirect = RedirectResponse(settings.frontend_endpoint)
-        await finalize_session(req, redirect, user, session)
+        await finalize_session(req, redirect, user.id, session)
         return redirect
     except Exception as e:
         logger.error("google_oauth_callback [session.flush, finalize_session]")
         pprint(e)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong"
+        )
 
 
 @users_router.post("/auth/password-setup")
-async def password_setup(token: Annotated[str, Query], schm: PasswordSetupRequest, session: DBSession):
+async def password_setup(
+    token: Annotated[str, Query],
+    schm: PasswordSetupRequest,
+    session: sessionDep,
+):
     decoded = decode_token(token, "password_setup")
 
-    password_hash_bytes = await asyncio.to_thread(hashpw, schm.password.encode(), gensalt(rounds=8))
+    password_hash_bytes = await asyncio.to_thread(
+        hashpw, schm.password.encode(), gensalt(rounds=8)
+    )
     password_hash = password_hash_bytes.decode()
 
-    stmt = update(UserModel).where(UserModel.id == decoded.sub).values(password_hash=password_hash)
+    stmt = (
+        update(UserModel)
+        .where(UserModel.id == decoded.sub)
+        .values(password_hash=password_hash)
+    )
     try:
         await session.execute(stmt)
     except Exception as e:
         logger.error("password_setup session.execute")
         pprint(e)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong"
+        )

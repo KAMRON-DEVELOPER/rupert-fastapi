@@ -3,8 +3,16 @@ from uuid import UUID
 from pydantic import Field, ValidationInfo, field_validator
 
 from src.apps.shared.schemas import BaseModelResponse, RequestSchema
-from src.apps.shared.schemas.enums import EmploymentType, SalaryCurrency, Specialization, WorkFormat
-from src.apps.users.schemas.skill_links import ResumeSkillLinkRequest, ResumeSkillLinkResponse
+from src.apps.shared.schemas.enums import (
+    EmploymentType,
+    SalaryCurrency,
+    Specialization,
+    WorkFormat,
+)
+from src.apps.users.schemas.skill_links import (
+    ResumeSkillLinkRequest,
+    ResumeSkillLinkResponse,
+)
 
 
 class ResumeRequest(RequestSchema):
@@ -25,7 +33,9 @@ class ResumeRequest(RequestSchema):
     def max_gte_min(cls, v: int | None, info: ValidationInfo) -> int | None:
         min_ = info.data.get("salary_expectation_min")
         if v and min_ and v < min_:
-            raise ValueError("salary_expectation_max must be >= salary_expectation_min")
+            raise ValueError(
+                "salary_expectation_max must be >= salary_expectation_min"
+            )
         return v
 
 

@@ -1,6 +1,10 @@
 from uuid import UUID
 
-from src.apps.shared.schemas import BaseModelResponse, RequestSchema, SkillResponse
+from src.apps.shared.schemas import (
+    BaseModelResponse,
+    RequestSchema,
+    SkillResponse,
+)
 from src.apps.shared.schemas.enums import ProficiencyLevel
 
 

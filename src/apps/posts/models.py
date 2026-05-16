@@ -2,7 +2,14 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import TIMESTAMP, Enum, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    TIMESTAMP,
+    Enum,
+    ForeignKey,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -18,12 +25,20 @@ if TYPE_CHECKING:
 class PostTagLink(BaseModel):
     __tablename__ = "post_tag_links"
 
-    post_id: Mapped[UUID] = mapped_column(ForeignKey(column="posts.id", ondelete="CASCADE"), primary_key=True)
-    tag_id: Mapped[UUID] = mapped_column(ForeignKey(column="tags.id", ondelete="CASCADE"), primary_key=True)
+    post_id: Mapped[UUID] = mapped_column(
+        ForeignKey(column="posts.id", ondelete="CASCADE"), primary_key=True
+    )
+    tag_id: Mapped[UUID] = mapped_column(
+        ForeignKey(column="tags.id", ondelete="CASCADE"), primary_key=True
+    )
 
     # Relationships
-    post: Mapped["PostModel"] = relationship(back_populates="tag_links", overlaps="posts,tags")
-    tag: Mapped["TagModel"] = relationship(back_populates="post_links", overlaps="posts,tag_links")
+    post: Mapped["PostModel"] = relationship(
+        back_populates="tag_links", overlaps="posts,tags"
+    )
+    tag: Mapped["TagModel"] = relationship(
+        back_populates="post_links", overlaps="posts,tag_links"
+    )
 
     def __repr__(self):
         return "<PostTagLink>"
@@ -31,15 +46,27 @@ class PostTagLink(BaseModel):
 
 class PostEngagementModel(BaseModel):
     __tablename__ = "post_engagements"
-    __table_args__ = (UniqueConstraint("user_id", "post_id", name="uq_user_post_engagement"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "post_id", name="uq_user_post_engagement"),
+    )
 
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    post_id: Mapped[UUID] = mapped_column(ForeignKey("posts.id", ondelete="CASCADE"))
-    type: Mapped[PostEngagementType] = mapped_column(Enum(PostEngagementType, name="post_engagement_type"))
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    post_id: Mapped[UUID] = mapped_column(
+        ForeignKey("posts.id", ondelete="CASCADE")
+    )
+    type: Mapped[PostEngagementType] = mapped_column(
+        Enum(PostEngagementType, name="post_engagement_type")
+    )
 
     # Relationships
-    user: Mapped["UserModel"] = relationship(back_populates="post_engagements", passive_deletes=True)
-    post: Mapped["PostModel"] = relationship(back_populates="engagements", passive_deletes=True)
+    user: Mapped["UserModel"] = relationship(
+        back_populates="post_engagements", passive_deletes=True
+    )
+    post: Mapped["PostModel"] = relationship(
+        back_populates="engagements", passive_deletes=True
+    )
 
     def __repr__(self):
         return "<PostEngagementModel>"
@@ -48,18 +75,27 @@ class PostEngagementModel(BaseModel):
 class PostCommentModel(BaseModel):
     __tablename__ = "post_comments"
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    post_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"))
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    post_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE")
+    )
     parent_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("post_comments.id", ondelete="CASCADE")
+        PG_UUID(as_uuid=True),
+        ForeignKey("post_comments.id", ondelete="CASCADE"),
     )
     body: Mapped[str] = mapped_column(Text)
 
     # Relationships
     user: Mapped[UserModel] = relationship(back_populates="post_comments")
     post: Mapped[PostModel] = relationship(back_populates="comments")
-    parent: Mapped[PostCommentModel | None] = relationship(remote_side="PostCommentModel.id", back_populates="replies")
-    replies: Mapped[list[PostCommentModel]] = relationship(back_populates="parent", cascade="all, delete-orphan")
+    parent: Mapped[PostCommentModel | None] = relationship(
+        remote_side="PostCommentModel.id", back_populates="replies"
+    )
+    replies: Mapped[list[PostCommentModel]] = relationship(
+        back_populates="parent", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return "<PostCommentModel>"
@@ -68,19 +104,33 @@ class PostCommentModel(BaseModel):
 class PostModel(BaseModel):
     __tablename__ = "posts"
 
-    author_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    author_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
     title: Mapped[str] = mapped_column(String(128))
     body: Mapped[dict] = mapped_column(JSONB)
-    status: Mapped[PostStatus] = mapped_column(Enum(PostStatus, name="post_status"), default=PostStatus.draft)
-    scheduled_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    status: Mapped[PostStatus] = mapped_column(
+        Enum(PostStatus, name="post_status"), default=PostStatus.draft
+    )
+    scheduled_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
 
     # Relationships
     author: Mapped["UserModel"] = relationship(back_populates="posts")
-    tag_links: Mapped[list["PostTagLink"]] = relationship(back_populates="post", cascade="all, delete-orphan")
-    tags: Mapped[list["TagModel"]] = relationship(secondary="post_tag_links", back_populates="posts", viewonly=True)
-    engagements: Mapped[list["PostEngagementModel"]] = relationship(back_populates="post", cascade="all, delete-orphan")
+    tag_links: Mapped[list["PostTagLink"]] = relationship(
+        back_populates="post", cascade="all, delete-orphan"
+    )
+    tags: Mapped[list["TagModel"]] = relationship(
+        secondary="post_tag_links", back_populates="posts", viewonly=True
+    )
+    engagements: Mapped[list["PostEngagementModel"]] = relationship(
+        back_populates="post", cascade="all, delete-orphan"
+    )
     comments: Mapped[list["PostCommentModel"]] = relationship(
-        back_populates="post", cascade="all, delete-orphan", passive_deletes=True
+        back_populates="post",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     def __repr__(self):

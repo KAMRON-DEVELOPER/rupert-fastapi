@@ -37,7 +37,9 @@ class PasswordSetupRequest(BaseModel):
 class EmailAuthRequest(RequestSchema):
     email: EmailStr
     password: Annotated[str, AfterValidator(validate_password)]
-    first_name: Annotated[str | None, AfterValidator(validate_first_name)] = None
+    first_name: Annotated[str | None, AfterValidator(validate_first_name)] = (
+        None
+    )
     last_name: Annotated[str | None, AfterValidator(validate_last_name)] = None
 
 

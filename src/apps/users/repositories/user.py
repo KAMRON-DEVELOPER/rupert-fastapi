@@ -1,30 +1,64 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from fastapi import HTTPException, status
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.apps.shared.schemas.enums import JobSearchStatus
-from src.apps.stats.schemas import DailyActiveUsersBucket, JobSearchStatusBucket, SpecializationBucket, UsersStats
+from src.apps.stats.schemas import (
+    DailyActiveUsersBucket,
+    JobSearchStatusBucket,
+    SpecializationBucket,
+    UsersStats,
+)
 from src.apps.users.models import ActivityModel, UserModel
 from src.apps.users.schemas.user import UserUpdateRequest
 from src.core.helpers import percentage
+from src.core.logger import logger
 
 
 class UsersRepository:
     @staticmethod
-    async def find_by_email(email: str, session: AsyncSession):
-        stmt = select(UserModel).where(UserModel.email == email)
-        result = await session.execute(stmt)
-        return result.scalar_one_or_none()
+    async def find_by_email(
+        email: str, session: AsyncSession
+    ) -> UserModel | None:
+        try:
+            stmt = select(UserModel).where(UserModel.email == email)
+            return await session.scalar(stmt)
+        except Exception as e:
+            logger.error(f"[UsersRepository] find_by_email: {e}")
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while searching user by email",
+            )
 
     @staticmethod
-    async def create(email: str, password_hash: str | None, first_name: str, last_name: str, session: AsyncSession):
-        record = UserModel(email=email, password_hash=password_hash, first_name=first_name, last_name=last_name)
-        session.add(record)
-        await session.flush()
-        return record
+    async def create(
+        email: str,
+        password_hash: str | None,
+        first_name: str,
+        last_name: str,
+        session: AsyncSession,
+    ):
+        try:
+            record = UserModel(
+                email=email,
+                password_hash=password_hash,
+                first_name=first_name,
+                last_name=last_name,
+            )
+            session.add(record)
+            await session.flush()
+            return record
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[UsersRepository] create: {e}")
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while creating user",
+            )
 
     @staticmethod
     async def get_by_id(id: UUID, session: AsyncSession):
@@ -41,9 +75,14 @@ class UsersRepository:
         return result.scalar_one()
 
     @staticmethod
-    async def update_by_id(id: UUID, schm: UserUpdateRequest, session: AsyncSession):
+    async def update_by_id(
+        id: UUID, schm: UserUpdateRequest, session: AsyncSession
+    ):
         stmt = (
-            update(UserModel).where(UserModel.id == id).values(schm.model_dump(exclude_unset=True)).returning(UserModel)
+            update(UserModel)
+            .where(UserModel.id == id)
+            .values(schm.model_dump(exclude_unset=True))
+            .returning(UserModel)
         )
         result = await session.execute(stmt)
         return result.scalar_one()
@@ -55,7 +94,11 @@ class UsersRepository:
 
     @staticmethod
     async def set_email_verified(id: UUID, session: AsyncSession):
-        stmt = update(UserModel).where(UserModel.id == id).values(email_verified=True)
+        stmt = (
+            update(UserModel)
+            .where(UserModel.id == id)
+            .values(email_verified=True)
+        )
         await session.execute(stmt)
 
     @staticmethod
@@ -97,7 +140,9 @@ class UsersRepository:
             .tuples()
             .all()
         )
-        dau_counts_by_date = {activity_date: count for activity_date, count in dau_chart_rows}
+        dau_counts_by_date = {
+            activity_date: count for activity_date, count in dau_chart_rows
+        }
         dau_chart = [
             DailyActiveUsersBucket(
                 count=dau_counts_by_date.get(day, 0),
@@ -136,7 +181,9 @@ class UsersRepository:
             .order_by(func.count(UserModel.id).desc(), UserModel.specialization)
         )
         # by_specialization_rows: Sequence[Row[Tuple[Specialization | None, int]]]
-        by_specialization_rows = (await session.execute(by_specialization_stmt)).all()
+        by_specialization_rows = (
+            await session.execute(by_specialization_stmt)
+        ).all()
         by_specialization = [
             SpecializationBucket(
                 key=specialization,

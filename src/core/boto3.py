@@ -4,7 +4,6 @@ from pathlib import Path
 
 import aioboto3
 from aiobotocore.config import AioConfig
-from botocore.client import Config
 from botocore.exceptions import ClientError
 from types_aiobotocore_s3.type_defs import ObjectIdentifierTypeDef
 
@@ -42,7 +41,9 @@ async def initialize_boto3():
                 logger.info(f"Bucket '{bucket_name}' not found. Creating...")
                 await s3.create_bucket(
                     Bucket=bucket_name,
-                    CreateBucketConfiguration={"LocationConstraint": settings.s3.region},
+                    CreateBucketConfiguration={
+                        "LocationConstraint": settings.s3.region
+                    },
                 )
                 logger.info(f"Bucket '{bucket_name}' created.")
             else:
@@ -60,13 +61,17 @@ async def initialize_boto3():
                 logger.info("✅ Bucket policy is already correct.")
             else:
                 logger.warning("⚠️ Bucket policy mismatch. Updating...")
-                await s3.put_bucket_policy(Bucket=bucket_name, Policy=json.dumps(desired_policy))
+                await s3.put_bucket_policy(
+                    Bucket=bucket_name, Policy=json.dumps(desired_policy)
+                )
                 logger.info("✅ Bucket policy updated.")
 
         except ClientError as e:
             if e.response.get("Error", {}).get("Code") == "NoSuchBucketPolicy":
                 logger.warning("⚠️ No bucket policy found. Setting it now.")
-                await s3.put_bucket_policy(Bucket=bucket_name, Policy=json.dumps(desired_policy))
+                await s3.put_bucket_policy(
+                    Bucket=bucket_name, Policy=json.dumps(desired_policy)
+                )
                 logger.info("✅ Bucket policy has been set.")
             else:
                 logger.error(f"Unhandled S3Error while getting policy: {e}")
@@ -76,7 +81,9 @@ async def initialize_boto3():
 async def get_object_from_boto3(object_name: str) -> bytes:
     async with s3_client() as s3:
         try:
-            response = await s3.get_object(Bucket=settings.s3.bucket_name, Key=object_name)
+            response = await s3.get_object(
+                Bucket=settings.s3.bucket_name, Key=object_name
+            )
             return await response["Body"].read()
         except ClientError as e:
             logger.error(f"Failed to get object '{object_name}': {e}")
@@ -93,7 +100,9 @@ async def put_object_to_boto3(
     async with s3_client() as s3:
         try:
             if for_update and old_object_name:
-                await s3.delete_object(Bucket=settings.s3.bucket_name, Key=old_object_name)
+                await s3.delete_object(
+                    Bucket=settings.s3.bucket_name, Key=old_object_name
+                )
 
             await s3.put_object(
                 Bucket=settings.s3.bucket_name,
@@ -118,7 +127,9 @@ async def put_file_to_boto3(
     async with s3_client() as s3:
         try:
             if for_update and old_object_name:
-                await s3.delete_object(Bucket=settings.s3.bucket_name, Key=old_object_name)
+                await s3.delete_object(
+                    Bucket=settings.s3.bucket_name, Key=old_object_name
+                )
 
             logger.debug(f"Uploading file: {file_path} as {object_name}")
 
@@ -142,9 +153,14 @@ async def remove_objects_from_boto3(object_names: list[str]) -> None:
         if not object_names:
             return
         try:
-            objects_to_delete: list[ObjectIdentifierTypeDef] = [{"Key": name} for name in object_names]
+            objects_to_delete: list[ObjectIdentifierTypeDef] = [
+                {"Key": name} for name in object_names
+            ]
             logger.debug(f"Removing {len(objects_to_delete)} objects from S3.")
-            await s3.delete_objects(Bucket=settings.s3.bucket_name, Delete={"Objects": objects_to_delete})
+            await s3.delete_objects(
+                Bucket=settings.s3.bucket_name,
+                Delete={"Objects": objects_to_delete},
+            )
         except ClientError as e:
             logger.error(f"Failed to remove objects: {e}")
             raise
@@ -155,7 +171,9 @@ async def wipe_objects_from_boto3(user_id: str) -> None:
         try:
             paginator = s3.get_paginator("list_objects_v2")
             object_keys_to_delete = []
-            async for page in paginator.paginate(Bucket=settings.s3.bucket_name, Prefix=f"users/{user_id}/"):
+            async for page in paginator.paginate(
+                Bucket=settings.s3.bucket_name, Prefix=f"users/{user_id}/"
+            ):
                 if "Contents" in page:
                     for obj in page["Contents"]:
                         key = obj.get("Key")
