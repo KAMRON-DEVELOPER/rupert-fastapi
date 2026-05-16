@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator, Awaitable, Callable
 
 import pytest
+from dead_simple_oauth_fastapi import GoogleUser
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -9,12 +10,15 @@ from src.apps.shared.models.base import Base
 from src.apps.users.models import UserModel
 from src.apps.users.repositories.session import SessionsRepository
 from src.core.database import get_session
-from src.dependencies.proactive_refresh import create_token
+from src.core.oauth import google
+from src.dependencies.proactive_refresh import auth_checker, create_token
 
 TEST_DATABASE_URL = "postgresql+asyncpg://postgres:password@192.168.10.11:5432/rupert_test_db"
 
 async_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-async_session = async_sessionmaker(async_engine, expire_on_commit=False, class_=AsyncSession)
+async_session = async_sessionmaker(
+    async_engine, autocommit=False, autoflush=False, expire_on_commit=False, class_=AsyncSession
+)
 
 
 async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
@@ -25,7 +29,27 @@ async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
 app.dependency_overrides[get_session] = override_get_session
 
 
-@pytest.fixture(autouse=True)
+async def override_callback_dependency():
+    return GoogleUser(
+        sub="1234567890",
+        email="oauth.test@gmail.com",
+        given_name="OAuth",
+        family_name="User",
+        email_verified=True,
+    )
+
+
+app.dependency_overrides[google.callback_dependency()] = override_callback_dependency
+
+
+async def override_auth_checker():
+    return ("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "fake_access", "fake_refresh")
+
+
+app.dependency_overrides[auth_checker] = override_auth_checker
+
+
+@pytest.fixture(autouse=True, scope="session")
 async def setup_db():
     """
     Creates fresh tables before each test and drops them after.
@@ -38,15 +62,6 @@ async def setup_db():
 
 
 @pytest.fixture
-async def client():
-    """
-    Provides an async HTTP client to make requests to the FastAPI app.
-    """
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        yield client
-
-
-@pytest.fixture
 async def session():
     """
     Provides a direct database session for tests to arrange data or assert DB state.
@@ -56,6 +71,16 @@ async def session():
             yield s
         finally:
             await s.rollback()
+
+
+@pytest.fixture
+async def client():
+    """
+    Provides an async HTTP client to make requests to the FastAPI app.
+    """
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
 
 
 @pytest.fixture

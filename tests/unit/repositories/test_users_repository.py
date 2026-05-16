@@ -2,6 +2,7 @@ from datetime import date
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.companies.models import CompanyModel
@@ -28,8 +29,89 @@ from src.apps.vacancies.schemas.application import ApplicationListParams
 from src.apps.vacancies.schemas.vacancy import VacancyListParams
 
 
+@pytest.mark.anyio
+async def test_create_user_success(db_session):
+    user = await UsersRepository.create(
+        email="test@example.com",
+        password_hash="hashed_pw",
+        first_name="John",
+        last_name="Doe",
+        session=db_session,
+    )
+    assert user.id is not None
+    assert user.email == "test@example.com"
+    assert user.first_name == "John"
+
+
+@pytest.mark.anyio
+async def test_create_user_duplicate_email_raises_error(db_session):
+    await UsersRepository.create(
+        email="duplicate@example.com",
+        password_hash="pw",
+        first_name="A",
+        last_name="B",
+        session=db_session,
+    )
+
+    with pytest.raises(IntegrityError):
+        await UsersRepository.create(
+            email="duplicate@example.com",
+            password_hash="pw2",
+            first_name="C",
+            last_name="D",
+            session=db_session,
+        )
+
+
+@pytest.mark.anyio
+async def test_update_user_mutation(db_session):
+    # Setup
+    user = await UsersRepository.create(
+        email="update@example.com", password_hash="pw", first_name="Old", last_name="Name", session=db_session
+    )
+    await db_session.commit()  # Commit to finalize the insert
+
+    # Execute Mutation
+    update_data = UserUpdateRequest(first_name="New", headline="Python Dev", specialization=Specialization.backend)
+    updated_user = await UsersRepository.update_by_id(id=user.id, schm=update_data, session=db_session)
+
+    # Assert
+    assert updated_user.first_name == "New"
+    assert updated_user.headline == "Python Dev"
+    assert updated_user.specialization == Specialization.backend
+    # Ensure un-updated fields remain intact
+    assert updated_user.last_name == "Name"
+
+
+@pytest.mark.anyio
+async def test_delete_user_cascade(db_session):
+    # Setup
+    user = await UsersRepository.create(
+        email="delete@example.com", password_hash="pw", first_name="A", last_name="B", session=db_session
+    )
+    await db_session.commit()
+
+    # Execute
+    await UsersRepository.delete_by_id(id=user.id, session=db_session)
+    await db_session.commit()
+
+    # Assert
+    deleted_user = await UsersRepository.find_by_email("delete@example.com", db_session)
+    assert deleted_user is None
+
+
 @pytest.mark.asyncio
 async def test_users_repository_crud_and_stats(session: AsyncSession, make_user):
+    """
+    Coverage:
+        create
+        find_by_email
+        get_by_id, update_by_id
+        set_email_verified
+        get_stats
+        delete_by_id
+    """
+
     user = await UsersRepository.create("repo@example.com", "hash", "A", "B", session)
     await session.commit()
 

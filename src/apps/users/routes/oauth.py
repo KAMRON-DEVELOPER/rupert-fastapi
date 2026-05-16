@@ -4,7 +4,7 @@ from typing import Annotated
 
 from bcrypt import gensalt, hashpw
 from dead_simple_oauth_fastapi import GithubUser, GoogleUser
-from fastapi import Depends, HTTPException, Query, Request, Response, status
+from fastapi import Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import update
 
@@ -31,7 +31,6 @@ async def google_oauth(req: Request):
 @users_router.get("/auth/google/callback")
 async def google_oauth_callback(
     req: Request,
-    res: Response,
     oauth_user: Annotated[GoogleUser, Depends(google.callback_dependency())],
     session: DBSession,
 ):
@@ -46,8 +45,9 @@ async def google_oauth_callback(
         session.add(user)
         await session.flush()
 
-        await finalize_session(req, res, user, session)
-        return RedirectResponse(settings.frontend_endpoint)
+        redirect = RedirectResponse(settings.frontend_endpoint)
+        await finalize_session(req, redirect, user, session)
+        return redirect
     except Exception as e:
         logger.error("google_oauth_callback [session.flush, finalize_session]")
         pprint(e)
@@ -62,7 +62,6 @@ async def github_oauth(request: Request):
 @users_router.get("/auth/github/callback")
 async def github_oauth_callback(
     req: Request,
-    res: Response,
     oauth_user: Annotated[GithubUser, Depends(github.callback_dependency())],
     session: DBSession,
 ):
@@ -77,8 +76,9 @@ async def github_oauth_callback(
         session.add(user)
         await session.flush()
 
-        await finalize_session(req, res, user, session)
-        return RedirectResponse(settings.frontend_endpoint)
+        redirect = RedirectResponse(settings.frontend_endpoint)
+        await finalize_session(req, redirect, user, session)
+        return redirect
     except Exception as e:
         logger.error("google_oauth_callback [session.flush, finalize_session]")
         pprint(e)

@@ -44,6 +44,11 @@ dev = [
 include = ["src", "tests", "main.py"]
 exclude = [".venv", "deploy", "**/__pycache__"]
 typeCheckingMode = "standard"
+reportUnusedParameter = "warning"
+reportUnusedVariable = "warning"
+reportUnusedExpression = "warning"
+reportUnusedCoroutine = "warning"
+reportUnusedImport = "warning"
 
 [tool.isort]
 profile = "black"
@@ -56,10 +61,11 @@ extend-exclude = "alembic"
 
 [tool.ruff]
 line-length = 120
+extend-exclude = ["alembic"]
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint]
-select = ["I"]
+extend-select = ["I"]
