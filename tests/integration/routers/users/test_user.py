@@ -17,6 +17,8 @@ async def test_get_user_authenticated(
     client: AsyncClient, authenticate_user: Callable[..., Awaitable[UserModel]]
 ):
     user = await authenticate_user()
+    assert user is not None
+
     res = await client.get("/api/v1/users/")
 
     assert res.status_code == 200

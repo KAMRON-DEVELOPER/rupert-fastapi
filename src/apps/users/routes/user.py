@@ -51,7 +51,7 @@ async def delete_user(auth: authDep, session: sessionDep):
     user_id, _, refresh_token = auth
 
     try:
-        await SessionsRepository.delete(user_id, refresh_token, session)
+        await SessionsRepository.delete(session, user_id, refresh_token)
         await UsersRepository.delete_by_id(user_id, session)
     except Exception as e:
         logger.error(

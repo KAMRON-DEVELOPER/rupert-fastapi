@@ -10,7 +10,11 @@ from src.apps.shared.schemas import MessageResponse
 from src.apps.users.repositories.oauth_user import OAuthUsersRepository
 from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
-from src.apps.users.schemas.auth import AuthProbeResponse, EmailAuthRequest
+from src.apps.users.schemas.auth import (
+    AuthProbeResponse,
+    EmailAuthRequest,
+    EmailAuthResponse,
+)
 from src.apps.users.utils import finalize_session
 from src.core.database import sessionDep
 from src.core.exceptions import ValidationException
@@ -19,6 +23,7 @@ from src.core.settings import get_settings
 from src.dependencies.proactive_refresh import (
     authDep,
     authProbeDep,
+    clear_auth_cookies,
     create_token,
     decode_token,
 )
@@ -51,7 +56,7 @@ async def email_auth(
 
             await finalize_session(req, res, user.id, session)
             await session.commit()
-            return user
+            return EmailAuthResponse.model_validate(user)
 
         # Password not set
         providers = await OAuthUsersRepository.find_providers_by_user_id(
@@ -114,7 +119,7 @@ async def email_auth(
         await session.rollback()
         raise e
 
-    return user
+    return EmailAuthResponse.model_validate(user)
 
 
 @users_router.post("/auth/verify")
@@ -132,11 +137,7 @@ async def verify(
                 status_code=status.HTTP_400_BAD_REQUEST, content=content
             )
 
-    try:
-        await UsersRepository.set_email_verified(claims.sub, session)
-    except Exception as e:
-        logger.error(f"logout SessionsRepository.delete: {e}")
-        raise HTTPException(status_code=500, detail="Something went wrong")
+    await UsersRepository.set_email_verified(claims.sub, session)
 
     if auth:
         return MessageResponse(message="Your email verified successfully")
@@ -147,11 +148,10 @@ async def verify(
 
 
 @users_router.post("/auth/logout")
-async def logout(auth: authDep, session: sessionDep):
+async def logout(res: Response, auth: authDep, session: sessionDep):
     user_id, _, refresh_token = auth
+    await SessionsRepository.delete(session, user_id, refresh_token)
 
-    try:
-        return await SessionsRepository.delete(user_id, refresh_token, session)
-    except Exception as e:
-        logger.error(f"logout SessionsRepository.delete: {e}")
-        raise HTTPException(status_code=500, detail="Something went wrong")
+    clear_auth_cookies(res)
+
+    return MessageResponse(message="You successfully logged out")

@@ -62,17 +62,24 @@ class UsersRepository:
 
     @staticmethod
     async def get_by_id(id: UUID, session: AsyncSession):
-        stmt = (
-            select(UserModel)
-            .options(
-                selectinload(UserModel.resumes),
-                selectinload(UserModel.skills),
-                selectinload(UserModel.work_experiences),
+        try:
+            stmt = (
+                select(UserModel)
+                .options(
+                    selectinload(UserModel.resumes),
+                    selectinload(UserModel.skills),
+                    selectinload(UserModel.work_experiences),
+                )
+                .where(UserModel.id == id)
             )
-            .where(UserModel.id == id)
-        )
-        result = await session.execute(stmt)
-        return result.scalar_one()
+            result = await session.execute(stmt)
+            return result.scalar_one()
+        except Exception as e:
+            logger.error(f"[SessionsRepository] get_by_id: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while getting user by id",
+            )
 
     @staticmethod
     async def update_by_id(
@@ -99,7 +106,14 @@ class UsersRepository:
             .where(UserModel.id == id)
             .values(email_verified=True)
         )
-        await session.execute(stmt)
+        try:
+            await session.execute(stmt)
+        except Exception as e:
+            logger.error(f"[SessionsRepository] delete: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while setting email verified",
+            )
 
     @staticmethod
     async def get_stats(session: AsyncSession):

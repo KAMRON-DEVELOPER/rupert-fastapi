@@ -1,5 +1,6 @@
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Literal
+from urllib.parse import urlparse
 from uuid import UUID
 
 from fastapi import Cookie, Depends, HTTPException, status
@@ -137,12 +138,25 @@ def handle_decode(
     return (needs_refresh, claims, expired)
 
 
+def get_cookie_domain() -> str | None:
+    raw = settings.jwt.domain
+
+    parsed = urlparse(raw)
+    domain = parsed.hostname or raw
+
+    if settings.debug or domain in ("localhost", "127.0.0.1"):
+        return None
+
+    return domain
+
+
 def set_cookie(res: Response, key: str, value: str, max_age: int):
+    domain = get_cookie_domain()
     res.set_cookie(
         key=key,
         value=value,
         max_age=max_age,
-        domain=settings.jwt.domain,
+        domain=domain,
         path="/",
         secure=not settings.debug,
         httponly=True,
@@ -151,8 +165,9 @@ def set_cookie(res: Response, key: str, value: str, max_age: int):
 
 
 def clear_auth_cookies(res: Response):
-    res.delete_cookie(key="access_token", domain=settings.jwt.domain, path="/")
-    res.delete_cookie(key="refresh_token", domain=settings.jwt.domain, path="/")
+    domain = get_cookie_domain()
+    res.delete_cookie(key="access_token", domain=domain, path="/")
+    res.delete_cookie(key="refresh_token", domain=domain, path="/")
 
 
 class Cookies(BaseModel):
@@ -194,7 +209,7 @@ class ProactiveRefresh:
         access_token = auth_cookies.access_token
         refresh_token = auth_cookies.refresh_token
         dau = auth_cookies.dau
-        user_id = None
+        user_id: UUID | None = None
 
         if access_token:
             access_needs_refresh, access_claims, expired = handle_decode(
@@ -217,7 +232,9 @@ class ProactiveRefresh:
 
                 user_id = access_claims.sub
 
-        if refresh_token:
+        access_missing_or_expired = not access_token or user_id is None
+
+        if refresh_token and access_missing_or_expired:
             refresh_needs_refresh, refresh_claims, _ = handle_decode(
                 refresh_token, "refresh"
             )

@@ -1,8 +1,9 @@
+import asyncio
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from bcrypt import gensalt, hashpw
 from dead_simple_oauth_fastapi import GoogleUser
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import NullPool
@@ -22,7 +23,11 @@ from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
 from src.core.database import get_session
 from src.core.oauth import google_callback_dep
+from src.core.settings import get_settings
 from src.dependencies.proactive_refresh import create_token
+
+settings = get_settings()
+
 
 TEST_DATABASE_URL = (
     "postgresql+asyncpg://postgres:password@localhost:5432/rupert_test_db"
@@ -78,9 +83,10 @@ async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_session] = override_get_session
 
+    base_url = "http://localhost"
     async with AsyncClient(
         transport=ASGITransport(app=app),
-        base_url="http://test",
+        base_url=base_url,
         follow_redirects=False,
     ) as ac:
         yield ac
@@ -104,19 +110,29 @@ def mock_google_oauth():
     app.dependency_overrides.pop(google_callback_dep, None)
 
 
+def set_client_cookie(client: AsyncClient, name: str, value: str):
+    client.cookies.set(
+        name=name, value=value, domain="localhost.local", path="/"
+    )
+
+
 @pytest.fixture
 async def authenticate_user(
     client: AsyncClient, session: AsyncSession
 ) -> Callable[..., Awaitable[UserModel]]:
     async def _authenticate_user(**kwargs) -> UserModel:
-        password = (
-            kwargs.pop("password_hash", "securepassword")
-            if kwargs.pop("no_password", False)
-            else None
-        )
+
+        hash_password: str | None = None
+        if kwargs.pop("no_password", True):
+            password_str = str(kwargs.pop("password_hash", "securepassword"))
+            hash_password_bytes = await asyncio.to_thread(
+                hashpw, password_str.encode(), gensalt(rounds=8)
+            )
+            hash_password = hash_password_bytes.decode()
+
         user = await UsersRepository.create(
             kwargs.pop("email", "user@example.com"),
-            password,
+            hash_password,
             kwargs.pop("first_name", "Test"),
             kwargs.pop("last_name", "User"),
             session,
@@ -124,7 +140,7 @@ async def authenticate_user(
         if kwargs.get("with_oauth_user", False):
             await OAuthUsersRepository.create(
                 session,
-                provider_id=uuid4(),
+                provider_id="1234567890",
                 user_id=user.id,
                 provider=Provider.google,
             )
@@ -135,17 +151,17 @@ async def authenticate_user(
         }
 
         await SessionsRepository.create(
-            user_id=user.id,
+            session,
+            cookies["refresh_token"],
+            user.id,
             user_agent="pytest",
             ip_addr="127.0.0.1",
             device_name="test",
-            refresh_token=cookies["refresh_token"],
-            session=session,
         )
         await session.flush()
 
-        client.cookies.set("access_token", cookies["access_token"])
-        client.cookies.set("refresh_token", cookies["refresh_token"])
+        set_client_cookie(client, "access_token", cookies["access_token"])
+        set_client_cookie(client, "refresh_token", cookies["refresh_token"])
 
         return user
 

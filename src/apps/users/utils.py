@@ -34,13 +34,15 @@ async def finalize_session(
         )
 
         await SessionsRepository.create(
-            user_id=user_id,
+            session,
+            new_refresh_token,
+            user_id,
             user_agent=user_agent,
             ip_addr=ip_addr,
             device_name="",
-            refresh_token=new_refresh_token,
-            session=session,
         )
+    except HTTPException as e:
+        raise e
     except Exception:
         await session.rollback()
         raise HTTPException(

@@ -3,6 +3,7 @@ import random
 import re
 import string
 from io import BytesIO
+from urllib.parse import urlparse
 from uuid import UUID
 
 import aiohttp
@@ -10,6 +11,25 @@ from PIL import Image
 
 from src.core.boto3 import put_object_to_boto3
 from src.core.logger import logger
+
+
+def normalize_url(url: str, strip_trailing_slash=False) -> str:
+    url = url.strip()
+    if "://" not in url:
+        host = url.split(":")[0].split("/")[0]
+        scheme = "http" if host in ("localhost", "127.0.0.1") else "https"
+        url = f"{scheme}://{url}"
+
+    parsed = urlparse(url)
+
+    scheme = parsed.scheme
+    netloc = parsed.netloc
+    path = parsed.path
+
+    if strip_trailing_slash:
+        path = parsed.path.rstrip("/")
+
+    return f"{scheme}://{netloc}{path}" if path else f"{scheme}://{netloc}"
 
 
 def percentage(count: int, total: int) -> float:

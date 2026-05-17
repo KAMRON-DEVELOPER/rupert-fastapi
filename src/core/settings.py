@@ -79,7 +79,7 @@ class S3Config(BaseModel):
 class JwtConfig(BaseModel):
     secret_key: str = ""
     algorithm: str = "HS256"
-    domain: str | None = None
+    domain: str = "rupert.uz"
     access_token_expire_in_minutes: int = 60
     refresh_token_expire_in_days: int = 90
     email_verification_token_expire_in_hours: int = 24

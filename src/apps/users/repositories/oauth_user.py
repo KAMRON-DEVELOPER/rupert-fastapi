@@ -14,7 +14,7 @@ class OAuthUsersRepository:
     @staticmethod
     async def create(
         session: AsyncSession,
-        provider_id: UUID,
+        provider_id: str,
         user_id: UUID,
         provider: Provider,
         username: str | None = None,
