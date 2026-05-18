@@ -51,7 +51,7 @@ async def test_email_auth_create_user(
 
     assert res.status_code == 200
 
-    user = await UsersRepository.find_by_email("user@example.com", session)
+    user = await UsersRepository.get_by_email(session, "user@example.com")
     assert user is not None
     assert user.first_name == "Test"
 
@@ -62,10 +62,10 @@ async def test_email_auth_create_user(
 @pytest.mark.integration
 async def test_email_auth_correct_password(
     client: AsyncClient,
-    authenticate_user: Callable[..., Awaitable[UserModel]],
+    make_user: Callable[..., Awaitable[UserModel]],
 ):
     """User exist, correct password"""
-    user = await authenticate_user()
+    user = await make_user()
     assert user is not None
 
     payload = {"email": "user@example.com", "password": "securepassword"}
@@ -78,10 +78,10 @@ async def test_email_auth_correct_password(
 @pytest.mark.integration
 async def test_email_auth_incorrect_password(
     client: AsyncClient,
-    authenticate_user: Callable[..., Awaitable[UserModel]],
+    make_user: Callable[..., Awaitable[UserModel]],
 ):
     """User exist, incorrect password"""
-    user = await authenticate_user()
+    user = await make_user()
     assert user is not None
 
     payload = {"email": "user@example.com", "password": "incorrectpassword"}
@@ -94,7 +94,7 @@ async def test_email_auth_incorrect_password(
 @pytest.mark.integration
 async def test_email_auth_password_not_set(
     client: AsyncClient,
-    authenticate_user: Callable[..., Awaitable[UserModel]],
+    make_user: Callable[..., Awaitable[UserModel]],
     monkeypatch,
 ):
     """Password not set"""
@@ -113,7 +113,7 @@ async def test_email_auth_password_not_set(
         classmethod(fake_send_password_setup_link),
     )
 
-    user = await authenticate_user(no_password=False, with_oauth_user=True)
+    user = await make_user(with_password=False, with_oauth_user=True)
     assert user is not None
 
     payload = {"email": "user@example.com", "password": "anypassword"}
@@ -128,10 +128,10 @@ async def test_email_auth_password_not_set(
 @pytest.mark.integration
 async def test_email_auth_password_not_set_no_providers(
     client: AsyncClient,
-    authenticate_user: Callable[..., Awaitable[UserModel]],
+    make_user: Callable[..., Awaitable[UserModel]],
 ):
     """Password not set, no providers"""
-    user = await authenticate_user(no_password=False)
+    user = await make_user(with_password=False)
     assert user is not None
 
     payload = {"email": "user@example.com", "password": "anypassword"}
@@ -145,10 +145,10 @@ async def test_email_auth_password_not_set_no_providers(
 async def test_verify_email_message_response(
     client: AsyncClient,
     session: AsyncSession,
-    authenticate_user: Callable[..., Awaitable[UserModel]],
+    make_user: Callable[..., Awaitable[UserModel]],
 ):
     "Verify email message response"
-    user = await authenticate_user()
+    user = await make_user()
     assert user is not None
 
     token = create_token(user.id, "email_verification")
@@ -159,8 +159,26 @@ async def test_verify_email_message_response(
     assert res.status_code == 200
     assert "message" in res.json()
 
-    user = await UsersRepository.get_by_id(user.id, session)
+    user = await UsersRepository.get_summary_by_id(session, user.id)
+    assert user is not None
     assert user.email_verified
+
+
+@pytest.mark.integration
+async def test_verify_email_redirect(
+    client: AsyncClient,
+    make_user: Callable[..., Awaitable[UserModel]],
+):
+    user = await make_user(with_session=False)
+    assert user is not None
+
+    token = create_token(user.id, "email_verification")
+
+    res = await client.post(
+        "/api/v1/users/auth/verify", params={"token": token}
+    )
+    assert res.status_code == 307
+    assert "auth" in res.headers["location"]
 
 
 @pytest.mark.integration
@@ -174,10 +192,10 @@ async def test_logout_requires_auth(client: AsyncClient):
 @pytest.mark.integration
 async def test_logout_delete_session_delete_cookies(
     client: AsyncClient,
-    authenticate_user: Callable[..., Awaitable[UserModel]],
+    make_user: Callable[..., Awaitable[UserModel]],
 ):
     "Logout, delete session, delete cookies"
-    user = await authenticate_user(with_session=True)
+    user = await make_user(with_session=True)
     assert user is not None
 
     refresh_token = client.cookies.get("refresh_token")

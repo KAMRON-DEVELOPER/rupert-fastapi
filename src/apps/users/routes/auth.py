@@ -44,7 +44,7 @@ async def auth_probe(auth: authProbeDep):
 async def email_auth(
     req: Request, res: Response, schm: EmailAuthRequest, session: sessionDep
 ):
-    user = await UsersRepository.find_by_email(schm.email, session)
+    user = await UsersRepository.get_by_email(session, schm.email, False)
 
     if user:
         if user.password_hash:
@@ -54,13 +54,13 @@ async def email_auth(
             if not is_valid:
                 raise ValidationException("password is not match.")
 
-            await finalize_session(req, res, user.id, session)
+            await finalize_session(req, res, session, user.id)
             await session.commit()
             return EmailAuthResponse.model_validate(user)
 
         # Password not set
         providers = await OAuthUsersRepository.find_providers_by_user_id(
-            user.id, session
+            session, user.id
         )
 
         if len(providers) == 0:
@@ -87,22 +87,19 @@ async def email_auth(
             message=f"This account was created with {providers_text}. Use that provider to sign in, or use the link we sent to set a password."
         )
 
-    # User not exist
-    ## New user
     if not schm.first_name or not schm.last_name:
         return MessageResponse(message="new_user")
 
-    ## Create user
     hash_password_bytes = await asyncio.to_thread(
         hashpw, schm.password.encode(), gensalt(rounds=8)
     )
     hash_password = hash_password_bytes.decode()
 
     user = await UsersRepository.create(
-        schm.email, hash_password, schm.first_name, schm.last_name, session
+        session, schm.email, schm.first_name, schm.last_name, hash_password
     )
 
-    await finalize_session(req, res, user.id, session)
+    await finalize_session(req, res, session, user.id)
 
     token = create_token(user.id, "email_verification")
     link = f"{settings.frontend_endpoint}/auth/verify?token={token}"
@@ -114,9 +111,11 @@ async def email_auth(
             link,
             settings.mailtrap,
         )
+
         await session.commit()
-    except Exception as e:
+    except HTTPException as e:
         await session.rollback()
+        clear_auth_cookies(res)
         raise e
 
     return EmailAuthResponse.model_validate(user)
@@ -137,7 +136,8 @@ async def verify(
                 status_code=status.HTTP_400_BAD_REQUEST, content=content
             )
 
-    await UsersRepository.set_email_verified(claims.sub, session)
+    await UsersRepository.set_email_verified(session, claims.sub)
+    await session.commit()
 
     if auth:
         return MessageResponse(message="Your email verified successfully")
@@ -150,7 +150,9 @@ async def verify(
 @users_router.post("/auth/logout")
 async def logout(res: Response, auth: authDep, session: sessionDep):
     user_id, _, refresh_token = auth
+
     await SessionsRepository.delete(session, user_id, refresh_token)
+    await session.commit()
 
     clear_auth_cookies(res)
 

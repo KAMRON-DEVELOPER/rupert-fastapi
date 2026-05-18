@@ -1,10 +1,10 @@
 from datetime import date
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, EmailStr, field_validator
+from pydantic import AfterValidator, EmailStr, field_validator
 
 from src.apps.shared.schemas import (
-    BaseModelResponse,
+    BaseNullableLocationModelResponse,
     RequestSchema,
     ResponseSchema,
 )
@@ -48,7 +48,7 @@ class EmailAuthRequest(RequestSchema):
     last_name: Annotated[str | None, AfterValidator(validate_last_name)] = None
 
 
-class EmailAuthResponse(BaseModelResponse):
+class EmailAuthResponse(BaseNullableLocationModelResponse):
     email: str
     email_verified: bool
     password_hash: str | None
@@ -69,7 +69,7 @@ class EmailAuthResponse(BaseModelResponse):
     job_search_status: JobSearchStatus
 
 
-class PasswordSetupRequest(BaseModel):
+class PasswordSetupRequest(RequestSchema):
     password: str
 
     @field_validator("password")

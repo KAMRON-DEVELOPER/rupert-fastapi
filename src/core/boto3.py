@@ -5,6 +5,7 @@ from pathlib import Path
 import aioboto3
 from aiobotocore.config import AioConfig
 from botocore.exceptions import ClientError
+from fastapi import HTTPException, status
 from types_aiobotocore_s3.type_defs import ObjectIdentifierTypeDef
 
 from src.core.logger import logger
@@ -96,7 +97,7 @@ async def put_object_to_boto3(
     content_type: str,
     old_object_name: str | None = None,
     for_update: bool = False,
-) -> str:
+):
     async with s3_client() as s3:
         try:
             if for_update and old_object_name:
@@ -111,10 +112,12 @@ async def put_object_to_boto3(
                 ContentType=content_type,
                 ContentLength=len(data),
             )
-            return object_name
         except ClientError as e:
             logger.error(f"Failed to put object '{object_name}': {e}")
-            raise ValueError(f"Could not upload object: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not upload object",
+            )
 
 
 async def put_file_to_boto3(
@@ -148,7 +151,7 @@ async def put_file_to_boto3(
             raise
 
 
-async def remove_objects_from_boto3(object_names: list[str]) -> None:
+async def delete_objects_from_boto3(object_names: list[str]) -> None:
     async with s3_client() as s3:
         if not object_names:
             return
@@ -162,8 +165,11 @@ async def remove_objects_from_boto3(object_names: list[str]) -> None:
                 Delete={"Objects": objects_to_delete},
             )
         except ClientError as e:
-            logger.error(f"Failed to remove objects: {e}")
-            raise
+            logger.error(f"Failed to delete objects: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete object(s)",
+            )
 
 
 async def wipe_objects_from_boto3(user_id: str) -> None:
@@ -181,13 +187,16 @@ async def wipe_objects_from_boto3(user_id: str) -> None:
                             object_keys_to_delete.append(key)
 
             if object_keys_to_delete:
-                await remove_objects_from_boto3(object_keys_to_delete)
+                await delete_objects_from_boto3(object_keys_to_delete)
             else:
                 logger.info(f"No objects found to wipe for user '{user_id}'.")
 
         except ClientError as e:
             logger.error(f"Failed to wipe objects for user '{user_id}': {e}")
-            raise ValueError(f"Could not wipe user objects: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not wipe user objects",
+            )
 
 
 desired_policy = {

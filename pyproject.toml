@@ -26,6 +26,7 @@ dependencies = [
     "types-aioboto3[s3]>=15.5.0",
     "uvicorn[standard]>=0.42.0",
     "scalar-fastapi>=1.8.2",
+    "faker>=40.18.0",
 ]
 
 [dependency-groups]

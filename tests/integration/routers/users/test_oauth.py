@@ -1,97 +1,93 @@
-# from types import SimpleNamespace
-# from typing import Any
+from collections.abc import Awaitable, Callable
+from uuid import uuid4
 
-# from fastapi.responses import RedirectResponse
-# import pytest
-# from fastapi.routing import APIRoute
-# from sqlalchemy import select
+import pytest
+from dead_simple_oauth_fastapi import GoogleUser
+from fastapi.responses import RedirectResponse
+from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-# from core.oauth import google
-# from main import app
-# from src.apps.users.models import UserModel
-
-
-# @pytest.mark.integration
-# async def test_google_callback_creates_user(client, session):
-
-#     res = await client.get("/api/v1/users/auth/google/callback")
-
-#     assert res.status_code == 307
-
-#     result = await session.execute(
-#         select(UserModel).where(UserModel.email == "g@example.com")
-#     )
-#     user = result.scalar_one_or_none()
-
-#     assert user is not None
-#     assert user.email_verified is True
+from src.apps.users.models import OAuthUserModel, SessionModel, UserModel
+from src.core.oauth import google
+from src.dependencies.proactive_refresh import create_token
 
 
-# @pytest.mark.anyio
-# @pytest.mark.integration
-# async def test_google_oauth_redirect(client, monkeypatch):
-#     async def fake_redirect(req):
-#         return RedirectResponse("https://provider.test/oauth")
+@pytest.mark.integration
+async def test_google_oauth_redirect(client: AsyncClient, monkeypatch):
+    async def fake_redirect(_req):
+        return RedirectResponse("https://provider.test/oauth")
 
-#     monkeypatch.setattr(google, "redirect", fake_redirect)
+    monkeypatch.setattr(google, "redirect", fake_redirect)
 
-#     res = await client.get("/api/v1/users/auth/google")
+    res = await client.get("/api/v1/users/auth/google")
 
-#     assert res.status_code == 307
-#     assert res.headers["location"] == "https://provider.test/oauth"
-
-
-# def _callback_dep(path: str) -> Any:
-#     for route in app.routes:
-#         if isinstance(route, APIRoute) and route.path == path:
-#             return route.dependant.dependencies[0].call
-#     raise AssertionError("dependency not found")
+    assert res.status_code == 307
+    assert res.headers["location"] == "https://provider.test/oauth"
 
 
-# @pytest.mark.asyncio
-# async def test_google_callback_with_override(client, session):
-#     dep = _callback_dep("/api/v1/users/auth/google/callback")
+@pytest.mark.integration
+async def test_google_oauth_callback_creates_user(
+    client: AsyncClient, session: AsyncSession, mock_google_oauth: GoogleUser
+):
+    res = await client.get("/api/v1/users/auth/google/callback", params={})
+    assert res.status_code == 307
 
-#     async def fake_google_user():
-#         return SimpleNamespace(
-#             email="g@example.com",
-#             email_verified=True,
-#             given_name="G",
-#             family_name="User",
-#         )
+    user = await session.scalar(
+        select(UserModel).where(UserModel.email == mock_google_oauth.email)
+    )
+    assert user is not None
+    assert user.email_verified is True
 
-#     app.dependency_overrides[dep] = fake_google_user
-#     try:
-#         res = await client.get("/api/v1/users/auth/google/callback")
-#     finally:
-#         app.dependency_overrides.clear()
+    oauth_user = await session.scalar(
+        select(OAuthUserModel).where(
+            OAuthUserModel.provider_id == mock_google_oauth.sub
+        )
+    )
+    assert oauth_user is not None
 
-#     assert res.status_code == 307
-#     assert (
-#         await session.execute(UserModel.__table__.select())
-#     ).first() is not None
+    user_session = await session.scalar(
+        select(SessionModel).where(SessionModel.user_id == user.id)
+    )
+    assert user_session is not None
 
-
-# @pytest.mark.asyncio
-# async def test_github_callback_with_override(client):
-#     dep = _callback_dep("/api/v1/users/auth/github/callback")
-
-#     async def fake_github_user():
-#         return SimpleNamespace(email="gh@example.com", name="GH User")
-
-#     app.dependency_overrides[dep] = fake_github_user
-#     try:
-#         res = await client.get("/api/v1/users/auth/github/callback")
-#     finally:
-#         app.dependency_overrides.clear()
-
-#     assert res.status_code == 307
+    assert "access_token" in client.cookies
+    assert "refresh_token" in client.cookies
 
 
-# @pytest.mark.asyncio
-# async def test_password_setup_invalid_token(client):
-#     res = await client.post(
-#         "/api/v1/users/auth/password-setup?token=bad",
-#         json={"password": "secret123"},
-#     )
-#     assert res.status_code == 401
+@pytest.mark.integration
+async def test_password_setup_valid_token(
+    client: AsyncClient, make_user: Callable[..., Awaitable[UserModel]]
+):
+    user = await make_user()
+    assert user is not None
+
+    token = create_token(user.id, "password_setup")
+    res = await client.post(
+        "/api/v1/users/auth/password-setup",
+        json={"password": "supersecret"},
+        params={"token": token},
+    )
+    assert res.status_code == 307
+    assert "auth" in res.headers["location"]
+
+
+@pytest.mark.integration
+async def test_password_setup_valid_token_no_user(client: AsyncClient):
+    token = create_token(uuid4(), "password_setup")
+    res = await client.post(
+        "/api/v1/users/auth/password-setup",
+        json={"password": "supersecret"},
+        params={"token": token},
+    )
+    assert res.status_code == 400
+
+
+@pytest.mark.integration
+async def test_password_setup_invalid_token(client):
+    res = await client.post(
+        "/api/v1/users/auth/password-setup",
+        json={"password": "supersecret"},
+        params={"token": "bad"},
+    )
+    assert res.status_code == 401

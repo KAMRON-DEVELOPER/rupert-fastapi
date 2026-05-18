@@ -20,20 +20,22 @@ class OAuthUsersRepository:
         username: str | None = None,
         email: str | None = None,
         picture: str | None = None,
-    ) -> OAuthUserModel:
+    ):
+        record = OAuthUserModel(
+            provider_id=provider_id,
+            user_id=user_id,
+            provider=provider,
+            username=username,
+            email=email,
+            picture=picture,
+        )
+
         try:
-            record = OAuthUserModel(
-                provider_id=provider_id,
-                user_id=user_id,
-                provider=provider,
-                username=username,
-                email=email,
-                picture=picture,
-            )
             session.add(record)
             await session.flush()
             return record
         except Exception as e:
+            await session.rollback()
             logger.error(f"[OAuthUsersRepository] create: {e}")
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -42,12 +44,13 @@ class OAuthUsersRepository:
 
     @staticmethod
     async def find_providers_by_user_id(
-        user_id: UUID, session: AsyncSession
+        session: AsyncSession, user_id: UUID
     ) -> Sequence[Provider]:
+        stmt = select(OAuthUserModel.provider).where(
+            OAuthUserModel.user_id == user_id
+        )
+
         try:
-            stmt = select(OAuthUserModel.provider).where(
-                OAuthUserModel.user_id == user_id
-            )
             result = await session.scalars(stmt)
             return result.all()
         except Exception as e:
@@ -57,4 +60,29 @@ class OAuthUsersRepository:
             raise HTTPException(
                 status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while searching oauth user by email",
+            )
+
+    @staticmethod
+    async def get_by_provider_id(
+        session: AsyncSession, provider_id: str, required=True
+    ):
+        stmt = select(OAuthUserModel).where(
+            OAuthUserModel.provider_id == provider_id
+        )
+
+        try:
+            record = await session.scalar(stmt)
+
+            if not record and required:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="OAuth user not found by the provider id",
+                )
+
+            return record
+        except Exception as e:
+            logger.error(f"[OAuthUsersRepository] get_by_id: {e}")
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving oauth user by provider id",
             )

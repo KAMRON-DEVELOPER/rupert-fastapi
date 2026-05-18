@@ -94,22 +94,6 @@ async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides.clear()
 
 
-@pytest.fixture
-def mock_google_oauth():
-    async def override_google_callback_dep():
-        return GoogleUser(
-            sub="google",
-            email="google@gmail.com",
-            email_verified=True,
-            given_name="Goo",
-            family_name="Gle",
-        )
-
-    app.dependency_overrides[google_callback_dep] = override_google_callback_dep
-    yield
-    app.dependency_overrides.pop(google_callback_dep, None)
-
-
 def set_client_cookie(client: AsyncClient, name: str, value: str):
     client.cookies.set(
         name=name, value=value, domain="localhost.local", path="/"
@@ -117,13 +101,13 @@ def set_client_cookie(client: AsyncClient, name: str, value: str):
 
 
 @pytest.fixture
-async def authenticate_user(
+async def make_user(
     client: AsyncClient, session: AsyncSession
 ) -> Callable[..., Awaitable[UserModel]]:
-    async def _authenticate_user(**kwargs) -> UserModel:
-
+    async def _make_user(**kwargs) -> UserModel:
         hash_password: str | None = None
-        if kwargs.pop("no_password", True):
+
+        if kwargs.pop("with_password", True):
             password_str = str(kwargs.pop("password_hash", "securepassword"))
             hash_password_bytes = await asyncio.to_thread(
                 hashpw, password_str.encode(), gensalt(rounds=8)
@@ -131,12 +115,13 @@ async def authenticate_user(
             hash_password = hash_password_bytes.decode()
 
         user = await UsersRepository.create(
+            session,
             kwargs.pop("email", "user@example.com"),
-            hash_password,
             kwargs.pop("first_name", "Test"),
             kwargs.pop("last_name", "User"),
-            session,
+            hash_password,
         )
+
         if kwargs.get("with_oauth_user", False):
             await OAuthUsersRepository.create(
                 session,
@@ -145,24 +130,44 @@ async def authenticate_user(
                 provider=Provider.google,
             )
 
-        cookies = {
-            "access_token": create_token(user.id, "access"),
-            "refresh_token": create_token(user.id, "refresh"),
-        }
+        if kwargs.get("with_session", True):
+            cookies = {
+                "access_token": create_token(user.id, "access"),
+                "refresh_token": create_token(user.id, "refresh"),
+            }
 
-        await SessionsRepository.create(
-            session,
-            cookies["refresh_token"],
-            user.id,
-            user_agent="pytest",
-            ip_addr="127.0.0.1",
-            device_name="test",
-        )
+            await SessionsRepository.create(
+                session,
+                cookies["refresh_token"],
+                user.id,
+                user_agent="pytest",
+                ip_addr="127.0.0.1",
+                device_name="test",
+            )
+
+            set_client_cookie(client, "access_token", cookies["access_token"])
+            set_client_cookie(client, "refresh_token", cookies["refresh_token"])
+
         await session.flush()
-
-        set_client_cookie(client, "access_token", cookies["access_token"])
-        set_client_cookie(client, "refresh_token", cookies["refresh_token"])
 
         return user
 
-    return _authenticate_user
+    return _make_user
+
+
+@pytest.fixture
+def mock_google_oauth():
+    google_user = GoogleUser(
+        sub="google",
+        email="google@gmail.com",
+        email_verified=True,
+        given_name="Goo",
+        family_name="Gle",
+    )
+
+    async def override_google_callback_dep():
+        return google_user
+
+    app.dependency_overrides[google_callback_dep] = override_google_callback_dep
+    yield google_user
+    app.dependency_overrides.pop(google_callback_dep, None)

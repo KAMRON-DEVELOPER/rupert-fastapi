@@ -1,17 +1,15 @@
 import json
-import random
 import re
-import string
 import subprocess
 import uuid
 from datetime import datetime
 from io import BytesIO
 
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile, status
 from PIL import Image
-from PIL.ImageFile import ImageFile
 
 from src.core.exceptions import ValidationException
+from src.core.logger import logger
 
 email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
 violent_words = [
@@ -27,8 +25,17 @@ violent_words = [
 violent_words_regex = (
     r"(" + "|".join(re.escape(word) for word in violent_words) + r")"
 )
-allowed_image_extension = {"png", "jpg", "jpeg"}
-allowed_video_extension = {"mp4", "mov"}
+allowed_image_extensions = {
+    "png",
+    "jpg",
+    "jpeg",
+    "gif",
+    "svg",
+    "webp",
+    "avif",
+    "apng",
+}
+allowed_video_extension = {"mp4", "webm", "ogg", "ogv", "mov", "avi", "mkv"}
 
 
 def validate_username(username: str | None = None) -> None:
@@ -83,10 +90,23 @@ def validate_length(field: str, min_len: int, max_len: int, field_name: str):
         )
 
 
-def get_file_extension(file: UploadFile) -> str:
+def get_file_extension(file: UploadFile):
     if file.filename and "." in file.filename:
         return file.filename.rsplit(sep=".", maxsplit=1)[-1].lower()
-    return ""
+    return None
+
+
+def get_image_dimensions(image_bytes: bytes) -> tuple[int, int]:
+    try:
+        image = Image.open(BytesIO(image_bytes))
+        width, height = image.size
+        return width, height
+    except Exception as e:
+        logger.error(f"Failed to get image dimensions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get image dimensions",
+        )
 
 
 async def get_video_duration_using_ffprobe(file_path: str) -> float:
@@ -108,15 +128,6 @@ async def get_video_duration_using_ffprobe(file_path: str) -> float:
     return float(output["format"]["duration"])
 
 
-def get_image_dimensions(image_bytes: bytes) -> tuple[int, int]:
-    try:
-        image: ImageFile = Image.open(fp=BytesIO(image_bytes))  # noqa
-        width, height = image.size
-        return width, height
-    except Exception as e:
-        raise ValueError(f"Failed to get image dimensions: {e}")
-
-
 def convert_for_redis(data: dict) -> dict:
     """Convert UUID to hex and datetime to ISO format for Redis compatibility."""
 
@@ -132,41 +143,3 @@ def convert_for_redis(data: dict) -> dict:
         return value
 
     return {key: convert_value(value) for key, value in data.items()}
-
-
-def escape_redisearch_special_chars(value: str) -> str:
-    # RediSearch special characters (from official docs)
-    special_chars = (
-        r'[\[\]\(\)\{\}\<\>\:\\"\'\+\-\=\&\|\!\~\@\#\^\*\%\`\?\.\,\/]'
-    )
-    return re.sub(special_chars, lambda m: f"\\{m.group(0)}", value)
-
-
-def generate_full_name(
-    given_name: str | None = None,
-    family_name: str | None = None,
-    email: str | None = None,
-) -> str:
-    given_name = (given_name or "").strip()
-    family_name = (family_name or "").strip()
-
-    if given_name and family_name:
-        return f"{given_name} {family_name}".strip()
-    elif given_name:
-        return given_name
-    elif family_name:
-        return family_name
-    elif email:
-        return email.split("@")[0]
-    else:
-        return "New User"
-
-
-def generate_unique_username(base_name: str) -> str:
-    base = "".join(
-        ch
-        for ch in base_name.lower().replace(" ", "_")
-        if ch.isalnum() or ch == "_"
-    )
-    suffix = "".join(random.choices(string.digits, k=4))
-    return f"{base}_{suffix}"

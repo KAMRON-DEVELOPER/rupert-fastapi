@@ -14,41 +14,29 @@ from src.apps.stats.schemas import (
     UsersStats,
 )
 from src.apps.users.models import ActivityModel, UserModel
-from src.apps.users.schemas.user import UserUpdateRequest
 from src.core.helpers import percentage
 from src.core.logger import logger
 
 
 class UsersRepository:
     @staticmethod
-    async def find_by_email(
-        email: str, session: AsyncSession
-    ) -> UserModel | None:
-        try:
-            stmt = select(UserModel).where(UserModel.email == email)
-            return await session.scalar(stmt)
-        except Exception as e:
-            logger.error(f"[UsersRepository] find_by_email: {e}")
-            raise HTTPException(
-                status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while searching user by email",
-            )
-
-    @staticmethod
     async def create(
+        session: AsyncSession,
         email: str,
-        password_hash: str | None,
         first_name: str,
         last_name: str,
-        session: AsyncSession,
+        password_hash: str | None = None,
+        email_verified=False,
     ):
+        record = UserModel(
+            email=email,
+            password_hash=password_hash,
+            first_name=first_name,
+            last_name=last_name,
+            email_verified=email_verified,
+        )
+
         try:
-            record = UserModel(
-                email=email,
-                password_hash=password_hash,
-                first_name=first_name,
-                last_name=last_name,
-            )
             session.add(record)
             await session.flush()
             return record
@@ -61,58 +49,164 @@ class UsersRepository:
             )
 
     @staticmethod
-    async def get_by_id(id: UUID, session: AsyncSession):
-        try:
-            stmt = (
-                select(UserModel)
-                .options(
-                    selectinload(UserModel.resumes),
-                    selectinload(UserModel.skills),
-                    selectinload(UserModel.work_experiences),
-                )
-                .where(UserModel.id == id)
-            )
-            result = await session.execute(stmt)
-            return result.scalar_one()
-        except Exception as e:
-            logger.error(f"[SessionsRepository] get_by_id: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while getting user by id",
-            )
-
-    @staticmethod
-    async def update_by_id(
-        id: UUID, schm: UserUpdateRequest, session: AsyncSession
-    ):
+    async def update(session: AsyncSession, id: UUID, values: dict):
         stmt = (
             update(UserModel)
             .where(UserModel.id == id)
-            .values(schm.model_dump(exclude_unset=True))
-            .returning(UserModel)
+            .values(values)
+            .returning(UserModel.id)
         )
-        result = await session.execute(stmt)
-        return result.scalar_one()
+
+        try:
+            updated_id = await session.scalar(stmt)
+
+            if not updated_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Session not found to update",
+                )
+
+            await session.flush()
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[UsersRepository] delete: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while updating user",
+            )
 
     @staticmethod
-    async def delete_by_id(id: UUID, session: AsyncSession):
-        stmt = delete(UserModel).where(UserModel.id == id)
-        await session.execute(stmt)
+    async def delete(session: AsyncSession, id: UUID):
+        stmt = (
+            delete(UserModel).where(UserModel.id == id).returning(UserModel.id)
+        )
+
+        try:
+            deleted_id = await session.scalar(stmt)
+
+            if not deleted_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="User not found to delete",
+                )
+
+            await session.flush()
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[UsersRepository] delete: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while deleting user",
+            )
 
     @staticmethod
-    async def set_email_verified(id: UUID, session: AsyncSession):
+    async def set_email_verified(session: AsyncSession, id: UUID):
         stmt = (
             update(UserModel)
             .where(UserModel.id == id)
             .values(email_verified=True)
+            .returning(UserModel.id)
         )
+
         try:
-            await session.execute(stmt)
+            updated_id = await session.scalar(stmt)
+
+            if not updated_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="User not found to set email verified",
+                )
+
+            await session.flush()
+        except HTTPException as e:
+            raise e
         except Exception as e:
-            logger.error(f"[SessionsRepository] delete: {e}")
+            await session.rollback()
+            logger.error(f"[UsersRepository] delete: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while setting email verified",
+            )
+
+    @staticmethod
+    async def get_by_email(session: AsyncSession, email: str, required=True):
+        stmt = select(UserModel).where(UserModel.email == email)
+
+        try:
+            record = await session.scalar(stmt)
+
+            if not record and required:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="User not found associated with the email",
+                )
+
+            return record
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"[UsersRepository] get_by_email: {e}")
+            raise HTTPException(
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving user by email",
+            )
+
+    @staticmethod
+    async def get_summary_by_id(session: AsyncSession, id: UUID, required=True):
+        stmt = select(UserModel).where(UserModel.id == id)
+
+        try:
+            record = await session.scalar(stmt)
+
+            if not record and required:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="User not found",
+                )
+
+            return record
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"[UsersRepository] get_summary_by_id: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving user summary by id",
+            )
+
+    @staticmethod
+    async def get_detail_by_id(session: AsyncSession, id: UUID, required=True):
+        stmt = (
+            select(UserModel)
+            .options(
+                selectinload(UserModel.resumes),
+                selectinload(UserModel.skills),
+                selectinload(UserModel.work_experiences),
+            )
+            .where(UserModel.id == id)
+        )
+
+        try:
+            record = await session.scalar(stmt)
+
+            if not record and required:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="User not found",
+                )
+
+            return record
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            logger.error(f"[UsersRepository] get_detail_by_id: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving user detail by id",
             )
 
     @staticmethod
