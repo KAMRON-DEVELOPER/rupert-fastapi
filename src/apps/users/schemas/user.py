@@ -32,6 +32,8 @@ class UserUpdateRequest(NullableLocationRequest):
     telegram_username: str | None = None
     follow_policy: FollowPolicy | None = None
     job_search_status: JobSearchStatus | None = None
+    delete_avatar: bool | None = None
+    delete_banner: bool | None = None
 
     @field_validator("birthdate")
     def validate_birthdate(cls, value: date | None):
@@ -54,6 +56,8 @@ class UserUpdateRequest(NullableLocationRequest):
         cls,
         first_name: Annotated[str | None, Form(alias="firstName")] = None,
         last_name: Annotated[str | None, Form(alias="lastName")] = None,
+        country: Annotated[str | None, Form()] = None,
+        city: Annotated[str | None, Form()] = None,
         headline: Annotated[str | None, Form()] = None,
         birthdate: Annotated[date | None, Form()] = None,
         bio: Annotated[str | None, Form()] = None,
@@ -70,10 +74,18 @@ class UserUpdateRequest(NullableLocationRequest):
             JobSearchStatus | None,
             Form(alias="jobSearchStatus"),
         ] = None,
+        delete_avatar: Annotated[
+            bool | None, Form(alias="deleteAvatar")
+        ] = None,
+        delete_banner: Annotated[
+            bool | None, Form(alias="deleteBanner")
+        ] = None,
     ):
         return cls(
             first_name=first_name,
             last_name=last_name,
+            country=country,
+            city=city,
             headline=headline,
             birthdate=birthdate,
             bio=bio,
@@ -83,6 +95,8 @@ class UserUpdateRequest(NullableLocationRequest):
             telegram_username=telegram_username,
             follow_policy=follow_policy,
             job_search_status=job_search_status,
+            delete_avatar=delete_avatar,
+            delete_banner=delete_banner,
         )
 
 
@@ -120,7 +134,7 @@ class UserDetailResponse(BaseNullableLocationModelResponse):
 
     # Relationships
     resumes: list[ResumeSummary]
-    skills: list[UserSkillLinkResponse]
+    skills: list[UserSkillLinkResponse] = Field(validation_alias="skill_links")
     work_experiences: list[WorkExperienceResponse]
 
     # Computed

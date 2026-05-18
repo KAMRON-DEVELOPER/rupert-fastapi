@@ -15,6 +15,11 @@ class ResumeSkillLinkRequest(RequestSchema):
     last_used_at: date | None = None
 
 
+class ResumeSkillLinkUpdateRequest(RequestSchema):
+    proficiency: ProficiencyLevel | None = None
+    last_used_at: date | None = None
+
+
 class ResumeSkillLinkResponse(BaseModelResponse):
     resume_id: UUID
     skill: SkillResponse
@@ -25,6 +30,11 @@ class ResumeSkillLinkResponse(BaseModelResponse):
 class UserSkillLinkRequest(RequestSchema):
     skill_id: UUID
     proficiency: ProficiencyLevel
+    last_used_at: date | None = None
+
+
+class UserSkillLinkUpdateRequest(RequestSchema):
+    proficiency: ProficiencyLevel | None = None
     last_used_at: date | None = None
 
 

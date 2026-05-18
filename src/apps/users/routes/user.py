@@ -100,18 +100,16 @@ async def update_user_form(
     avatar_key = f"users/{user_id.hex}/avatar"
     banner_key = f"users/{user_id.hex}/banner"
 
-    avatar_delete_requested = (
-        "avatar_url" in values and values["avatar_url"] is None
-    )
-    banner_delete_requested = (
-        "banner_url" in values and values["banner_url"] is None
-    )
+    avatar_delete_requested = bool(values.pop("delete_avatar", False))
+    banner_delete_requested = bool(values.pop("delete_banner", False))
 
     if avatar_delete_requested:
         await delete_objects_from_boto3([avatar_key])
+        values["avatar_url"] = None
 
     if banner_delete_requested:
         await delete_objects_from_boto3([banner_key])
+        values["banner_url"] = None
 
     if avatar:
         avatar_bytes, content_type = await read_validated_image(

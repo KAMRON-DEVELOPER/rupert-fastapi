@@ -32,7 +32,7 @@ class ResumeRequest(RequestSchema):
     @classmethod
     def max_gte_min(cls, v: int | None, info: ValidationInfo) -> int | None:
         min_ = info.data.get("salary_expectation_min")
-        if v and min_ and v < min_:
+        if v is not None and min_ is not None and v < min_:
             raise ValueError(
                 "salary_expectation_max must be >= salary_expectation_min"
             )
@@ -52,6 +52,16 @@ class ResumeUpdateRequest(RequestSchema):
     employment_type: EmploymentType | None = None
     skills: list[ResumeSkillLinkRequest] | None = None
 
+    @field_validator("salary_expectation_max")
+    @classmethod
+    def max_gte_min(cls, v: int | None, info: ValidationInfo) -> int | None:
+        min_ = info.data.get("salary_expectation_min")
+        if v is not None and min_ is not None and v < min_:
+            raise ValueError(
+                "salary_expectation_max must be >= salary_expectation_min"
+            )
+        return v
+
 
 class ResumeResponse(BaseModelResponse):
     user_id: UUID
@@ -65,7 +75,9 @@ class ResumeResponse(BaseModelResponse):
     salary_currency: SalaryCurrency | None
     work_format: WorkFormat | None
     employment_type: EmploymentType | None
-    skills: list[ResumeSkillLinkResponse]
+    skills: list[ResumeSkillLinkResponse] = Field(
+        validation_alias="skill_links"
+    )
 
 
 class ResumeSummary(BaseModelResponse):

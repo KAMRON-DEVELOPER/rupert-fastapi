@@ -13,7 +13,7 @@ from src.apps.stats.schemas import (
     SpecializationBucket,
     UsersStats,
 )
-from src.apps.users.models import ActivityModel, UserModel
+from src.apps.users.models import ActivityModel, UserModel, UserSkillLink
 from src.core.helpers import percentage
 from src.core.logger import logger
 
@@ -63,7 +63,7 @@ class UsersRepository:
             if not updated_id:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Session not found to update",
+                    detail="User not found to update",
                 )
 
             await session.flush()
@@ -71,7 +71,7 @@ class UsersRepository:
             raise e
         except Exception as e:
             await session.rollback()
-            logger.error(f"[UsersRepository] delete: {e}")
+            logger.error(f"[UsersRepository] update: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while updating user",
@@ -184,7 +184,9 @@ class UsersRepository:
             select(UserModel)
             .options(
                 selectinload(UserModel.resumes),
-                selectinload(UserModel.skills),
+                selectinload(UserModel.skill_links).selectinload(
+                    UserSkillLink.skill
+                ),
                 selectinload(UserModel.work_experiences),
             )
             .where(UserModel.id == id)

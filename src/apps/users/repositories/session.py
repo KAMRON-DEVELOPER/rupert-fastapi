@@ -10,6 +10,26 @@ from src.core.logger import logger
 
 class SessionsRepository:
     @staticmethod
+    async def list_by_user_id(session: AsyncSession, user_id: UUID):
+        stmt = (
+            select(SessionModel)
+            .where(
+                SessionModel.user_id == user_id,
+                SessionModel.is_active.is_(True),
+            )
+            .order_by(SessionModel.last_activity_at.desc())
+        )
+
+        try:
+            return (await session.scalars(stmt)).all()
+        except Exception as e:
+            logger.error(f"[SessionsRepository] list_by_user_id: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving sessions",
+            )
+
+    @staticmethod
     async def create(
         session: AsyncSession,
         refresh_token: str,
@@ -70,6 +90,70 @@ class SessionsRepository:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while deleting session",
+            )
+
+    @staticmethod
+    async def delete_by_id(
+        session: AsyncSession, user_id: UUID, session_id: UUID
+    ) -> None:
+        stmt = (
+            delete(SessionModel)
+            .where(
+                SessionModel.id == session_id,
+                SessionModel.user_id == user_id,
+                SessionModel.is_active.is_(True),
+            )
+            .returning(SessionModel.id)
+        )
+
+        try:
+            deleted_id = await session.scalar(stmt)
+
+            if not deleted_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Session not found",
+                )
+
+            await session.flush()
+        except HTTPException as e:
+            raise e
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[SessionsRepository] delete_by_id: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while deleting session",
+            )
+
+    @staticmethod
+    async def delete_all_by_user_id(
+        session: AsyncSession,
+        user_id: UUID,
+        except_refresh_token: str | None = None,
+    ) -> int:
+        stmt = delete(SessionModel).where(
+            SessionModel.user_id == user_id,
+            SessionModel.is_active.is_(True),
+        )
+
+        if except_refresh_token:
+            stmt = stmt.where(
+                SessionModel.refresh_token != except_refresh_token
+            )
+
+        stmt = stmt.returning(SessionModel.id)
+
+        try:
+            deleted_ids = (await session.scalars(stmt)).all()
+            await session.flush()
+            return len(deleted_ids)
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[SessionsRepository] delete_all_by_user_id: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while deleting sessions",
             )
 
     @staticmethod
