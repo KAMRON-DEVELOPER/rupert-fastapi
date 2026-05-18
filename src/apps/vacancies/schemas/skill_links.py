@@ -15,7 +15,14 @@ class VacancySkillLinkRequest(RequestSchema):
     is_required: bool = True
 
 
+class VacancySkillLinkUpdateRequest(RequestSchema):
+    proficiency: ProficiencyLevel | None = None
+    years_of_experience_min: float | None = None
+    is_required: bool | None = None
+
+
 class VacancySkillLinkResponse(BaseModelResponse):
+    vacancy_id: UUID
     skill: SkillResponse
     proficiency: ProficiencyLevel
     years_of_experience_min: float | None

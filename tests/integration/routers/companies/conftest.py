@@ -1,10 +1,10 @@
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.apps.shared.models import SkillModel
 from src.apps.users.models import UserModel
 from src.apps.users.repositories.session import SessionsRepository
 from src.dependencies.proactive_refresh import create_token
@@ -33,19 +33,15 @@ async def _authenticate_as(
     return refresh_token
 
 
-async def _create_skill(session: AsyncSession, name: str) -> SkillModel:
-    record = SkillModel(name=name)
-
-    session.add(record)
-    await session.flush()
-
-    return record
-
-
-def _resume_payload(**overrides: object) -> dict[str, object]:
+def _company_payload(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
-        "title": "Backend Resume",
-        "specialization": "backend",
+        "name": "Rupert Labs",
+        "tagline": "Hiring better",
+        "description": "A product company for developer hiring.",
+        "websiteUrl": "https://rupert.example.com",
+        "type": "startup",
+        "contactEmail": "hello@rupert.example.com",
+        "contactPhone": "+998901234567",
         "country": "UZ",
         "city": "Tashkent",
     }
@@ -61,15 +57,19 @@ def authenticate_as() -> Callable[
 
 
 @pytest.fixture
-def resume_payload() -> Callable[..., dict[str, object]]:
-    return _resume_payload
+def company_payload() -> Callable[..., dict[str, object]]:
+    return _company_payload
 
 
 @pytest.fixture
-async def skill(session: AsyncSession) -> SkillModel:
-    return await _create_skill(session, "Python")
+def create_company(
+    client: AsyncClient, company_payload: Callable[..., dict[str, object]]
+) -> Callable[..., Awaitable[dict[str, Any]]]:
+    async def _create_company(**overrides: object) -> dict[str, Any]:
+        res = await client.post(
+            "/api/v1/companies/", json=company_payload(**overrides)
+        )
+        assert res.status_code == 201
+        return res.json()
 
-
-@pytest.fixture
-async def another_skill(session: AsyncSession) -> SkillModel:
-    return await _create_skill(session, "FastAPI")
+    return _create_company

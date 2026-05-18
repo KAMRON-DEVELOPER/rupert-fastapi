@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import Depends
 
-from src.apps.shared.schemas import RequestSchema, ResponseSchema
+from src.apps.shared.schemas import BaseModelResponse, RequestSchema
 from src.apps.shared.schemas.enums import ApplicationStatus
 from src.apps.users.schemas.resume import ResumeSummary
 from src.apps.users.schemas.user import UserSummaryResponse
@@ -30,7 +30,7 @@ class ApplicationStatusUpdateRequest(RequestSchema):
     recruiter_note: str | None = None
 
 
-class ApplicationSummary(ResponseSchema):
+class ApplicationSummary(BaseModelResponse):
     vacancy_id: UUID
     applicant_id: UUID
     status: ApplicationStatus

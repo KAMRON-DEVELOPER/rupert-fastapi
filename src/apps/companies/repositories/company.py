@@ -1,7 +1,9 @@
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import func, select
+from fastapi import HTTPException, status
+from sqlalchemy import delete, exists, func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -12,9 +14,11 @@ from src.apps.companies.schemas.company import (
     companyListDep,
 )
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
+from src.apps.shared.schemas.enums import CompanyMemberRole, VacancyStatus
 from src.apps.stats.schemas import CompaniesStats, CompanyTypeBucket
-from src.apps.vacancies.models import VacancyModel
+from src.apps.vacancies.models import VacancyModel, VacancySkillLink
 from src.core.helpers import percentage
+from src.core.logger import logger
 
 
 class CompaniesRepository:
@@ -31,6 +35,7 @@ class CompaniesRepository:
             select(func.count(VacancyModel.id))
             .where(
                 VacancyModel.company_id == CompanyModel.id,
+                VacancyModel.status == VacancyStatus.open,
             )
             .correlate(CompanyModel)
             .scalar_subquery()
@@ -50,10 +55,22 @@ class CompaniesRepository:
                 stmt = stmt.where(CompanyModel.country == filters.country)
             if filters.city:
                 stmt = stmt.where(CompanyModel.city == filters.city)
-            if filters.has_open_vacancies:
-                pass
+            if filters.has_open_vacancies is not None:
+                open_vacancy_exists = exists().where(
+                    VacancyModel.company_id == CompanyModel.id,
+                    VacancyModel.status == VacancyStatus.open,
+                )
+                if filters.has_open_vacancies:
+                    stmt = stmt.where(open_vacancy_exists)
+                else:
+                    stmt = stmt.where(~open_vacancy_exists)
             if filters.skill_ids:
-                pass
+                skill_exists = exists().where(
+                    VacancyModel.company_id == CompanyModel.id,
+                    VacancySkillLink.vacancy_id == VacancyModel.id,
+                    VacancySkillLink.skill_id.in_(filters.skill_ids),
+                )
+                stmt = stmt.where(skill_exists)
 
         count_stmt = select(func.count()).select_from(
             stmt.order_by(None).subquery()
@@ -66,7 +83,14 @@ class CompaniesRepository:
             stmt = stmt.offset(pagination.offset).limit(pagination.limit)
 
         # res: Sequence[Tuple[CompanyModel, int]]
-        res = (await session.execute(stmt)).tuples().all()
+        try:
+            res = (await session.execute(stmt)).tuples().all()
+        except Exception as e:
+            logger.error(f"[CompaniesRepository] get_many: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving companies",
+            )
 
         companies: list[CompanyModel] = []
         for company, open_count in res:
@@ -84,6 +108,7 @@ class CompaniesRepository:
             select(func.count(VacancyModel.id))
             .where(
                 VacancyModel.company_id == CompanyModel.id,
+                VacancyModel.status == VacancyStatus.open,
             )
             .correlate(CompanyModel)
             .scalar_subquery()
@@ -111,13 +136,308 @@ class CompaniesRepository:
             .where(CompanyModel.id == company_id)
         )
 
-        # res: Tuple[CompanyModel, int, int]
-        res = (await session.execute(stmt)).one().tuple()
+        try:
+            res = (await session.execute(stmt)).one_or_none()
+        except Exception as e:
+            logger.error(f"[CompaniesRepository] get_by_id: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving company",
+            )
 
-        company, open_count, member_count_value = res
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Company not found",
+            )
+
+        company, open_count, member_count_value = res._tuple()
         company.open_vacancies_count = open_count
         company.member_count = member_count_value
         return cast(CompanyDetail, company)
+
+    @staticmethod
+    async def create(session: AsyncSession, user_id: UUID, values: dict):
+        record = CompanyModel(**values)
+
+        try:
+            session.add(record)
+            await session.flush()
+            session.add(
+                CompanyMemberModel(
+                    user_id=user_id,
+                    company_id=record.id,
+                    role=CompanyMemberRole.owner,
+                )
+            )
+            await session.flush()
+            return await CompaniesRepository.get_by_id(session, record.id)
+        except HTTPException:
+            raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[CompaniesRepository] create integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Company already exists or contains invalid data",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[CompaniesRepository] create: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while creating company",
+            )
+
+    @staticmethod
+    async def update(
+        session: AsyncSession, user_id: UUID, company_id: UUID, values: dict
+    ):
+        await CompaniesRepository.ensure_member(
+            session, user_id, company_id, (CompanyMemberRole.owner,)
+        )
+
+        try:
+            if values:
+                stmt = (
+                    update(CompanyModel)
+                    .where(CompanyModel.id == company_id)
+                    .values(values)
+                    .returning(CompanyModel.id)
+                )
+                await session.scalar(stmt)
+                await session.flush()
+
+            return await CompaniesRepository.get_by_id(session, company_id)
+        except HTTPException:
+            raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[CompaniesRepository] update integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Company already exists or contains invalid data",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[CompaniesRepository] update: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while updating company",
+            )
+
+    @staticmethod
+    async def delete(session: AsyncSession, user_id: UUID, company_id: UUID):
+        await CompaniesRepository.ensure_member(
+            session, user_id, company_id, (CompanyMemberRole.owner,)
+        )
+
+        stmt = (
+            delete(CompanyModel)
+            .where(CompanyModel.id == company_id)
+            .returning(CompanyModel.id)
+        )
+
+        try:
+            deleted_id = await session.scalar(stmt)
+
+            if not deleted_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Company not found",
+                )
+
+            await session.flush()
+        except HTTPException:
+            raise
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[CompaniesRepository] delete: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while deleting company",
+            )
+
+    @staticmethod
+    async def ensure_member(
+        session: AsyncSession,
+        user_id: UUID,
+        company_id: UUID,
+        roles: tuple[CompanyMemberRole, ...] | None = None,
+    ):
+        stmt = select(CompanyMemberModel).where(
+            CompanyMemberModel.user_id == user_id,
+            CompanyMemberModel.company_id == company_id,
+        )
+        member = await session.scalar(stmt)
+
+        if not member:
+            exists_stmt = select(CompanyModel.id).where(
+                CompanyModel.id == company_id
+            )
+            company_exists = await session.scalar(exists_stmt)
+            if not company_exists:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Company not found",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not a member of this company",
+            )
+
+        if roles and member.role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission for this company",
+            )
+
+        return member
+
+    @staticmethod
+    async def add_member(
+        session: AsyncSession,
+        user_id: UUID,
+        company_id: UUID,
+        values: dict,
+    ):
+        await CompaniesRepository.ensure_member(
+            session, user_id, company_id, (CompanyMemberRole.owner,)
+        )
+
+        try:
+            record = CompanyMemberModel(company_id=company_id, **values)
+            session.add(record)
+            await session.flush()
+            return await CompaniesRepository.get_member_by_id(
+                session, company_id, record.id
+            )
+        except HTTPException:
+            raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[CompaniesRepository] add_member integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Company member already exists or references invalid user",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[CompaniesRepository] add_member: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while adding company member",
+            )
+
+    @staticmethod
+    async def get_member_by_id(
+        session: AsyncSession, company_id: UUID, member_id: UUID
+    ):
+        stmt = (
+            select(CompanyMemberModel)
+            .options(selectinload(CompanyMemberModel.user))
+            .where(
+                CompanyMemberModel.id == member_id,
+                CompanyMemberModel.company_id == company_id,
+            )
+        )
+        record = await session.scalar(stmt)
+        if not record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Company member not found",
+            )
+        return record
+
+    @staticmethod
+    async def update_member(
+        session: AsyncSession,
+        user_id: UUID,
+        company_id: UUID,
+        member_id: UUID,
+        values: dict,
+    ):
+        await CompaniesRepository.ensure_member(
+            session, user_id, company_id, (CompanyMemberRole.owner,)
+        )
+        member = await CompaniesRepository.get_member_by_id(
+            session, company_id, member_id
+        )
+
+        if (
+            member.user_id == user_id
+            and values.get("role") != CompanyMemberRole.owner
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Company owner cannot change own role",
+            )
+
+        try:
+            if values:
+                stmt = (
+                    update(CompanyMemberModel)
+                    .where(
+                        CompanyMemberModel.id == member_id,
+                        CompanyMemberModel.company_id == company_id,
+                    )
+                    .values(values)
+                    .returning(CompanyMemberModel.id)
+                )
+                await session.scalar(stmt)
+                await session.flush()
+
+            return await CompaniesRepository.get_member_by_id(
+                session, company_id, member_id
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[CompaniesRepository] update_member: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while updating company member",
+            )
+
+    @staticmethod
+    async def delete_member(
+        session: AsyncSession,
+        user_id: UUID,
+        company_id: UUID,
+        member_id: UUID,
+    ):
+        await CompaniesRepository.ensure_member(
+            session, user_id, company_id, (CompanyMemberRole.owner,)
+        )
+        member = await CompaniesRepository.get_member_by_id(
+            session, company_id, member_id
+        )
+
+        if member.user_id == user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Company owner cannot remove self",
+            )
+
+        try:
+            stmt = (
+                delete(CompanyMemberModel)
+                .where(
+                    CompanyMemberModel.id == member_id,
+                    CompanyMemberModel.company_id == company_id,
+                )
+                .returning(CompanyMemberModel.id)
+            )
+            await session.scalar(stmt)
+            await session.flush()
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[CompaniesRepository] delete_member: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while deleting company member",
+            )
 
     @staticmethod
     async def get_stats(session: AsyncSession):

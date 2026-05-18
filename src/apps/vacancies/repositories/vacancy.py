@@ -1,17 +1,25 @@
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import exists, func, select
+from fastapi import HTTPException, status
+from sqlalchemy import delete, exists, func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.apps.companies.repositories.company import CompaniesRepository
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
-from src.apps.shared.schemas.enums import ApplicationStatus, VacancyStatus
+from src.apps.shared.schemas.enums import (
+    ApplicationStatus,
+    CompanyMemberRole,
+    VacancyStatus,
+)
 from src.apps.stats.schemas import (
     SpecializationBucket,
     VacanciesStats,
     VacancyStatusBucket,
 )
+from src.apps.users.models import ResumeModel
 from src.apps.vacancies.models import (
     ApplicationModel,
     SavedVacancyModel,
@@ -23,11 +31,11 @@ from src.apps.vacancies.schemas.application import (
     applicationListDep,
 )
 from src.apps.vacancies.schemas.vacancy import (
-    VacancyDetail,
     VacancySummary,
     vacancyListDep,
 )
 from src.core.helpers import percentage
+from src.core.logger import logger
 
 
 class VacanciesRepository:
@@ -55,17 +63,17 @@ class VacanciesRepository:
                 stmt = stmt.where(
                     VacancyModel.specialization == filters.specialization
                 )
-            if filters.salary_min:
+            if filters.salary_min is not None:
                 stmt = stmt.where(VacancyModel.salary_max.is_not(None))
                 stmt = stmt.where(VacancyModel.salary_max >= filters.salary_min)
-            if filters.salary_max:
+            if filters.salary_max is not None:
                 stmt = stmt.where(VacancyModel.salary_min.is_not(None))
                 stmt = stmt.where(VacancyModel.salary_min <= filters.salary_max)
             if filters.salary_currency:
                 stmt = stmt.where(
                     VacancyModel.salary_currency == filters.salary_currency
                 )
-            if filters.years_of_experience_min:
+            if filters.years_of_experience_min is not None:
                 stmt = stmt.where(
                     VacancyModel.years_of_experience_min.is_not(None)
                 )
@@ -84,15 +92,11 @@ class VacanciesRepository:
             if filters.status:
                 stmt = stmt.where(VacancyModel.status == filters.status)
             if filters.skill_ids:
-                # JOIN creates duplicate rows when a vacancy matches multiple skills,
-                # so .distinct() is required here — both for correctness and for the count.
-                stmt = (
-                    stmt.join(VacancyModel.skill_links)
-                    .where(
-                        VacancySkillLink.skill_id.in_(filters.skill_ids),
-                    )
-                    .distinct(VacancyModel.id)
+                skill_exists = exists().where(
+                    VacancySkillLink.vacancy_id == VacancyModel.id,
+                    VacancySkillLink.skill_id.in_(filters.skill_ids),
                 )
+                stmt = stmt.where(skill_exists)
             if filters.country:
                 stmt = stmt.where(VacancyModel.country == filters.country)
             if filters.city:
@@ -125,9 +129,16 @@ class VacanciesRepository:
                 has_applied_subquery.label("has_applied"),
             )
 
-            res = await session.execute(stmt)
-            vacancies: list[VacancyModel] = []
+            try:
+                res = await session.execute(stmt)
+            except Exception as e:
+                logger.error(f"[VacanciesRepository] get_many: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Something went wrong while retrieving vacancies",
+                )
 
+            vacancies: list[VacancyModel] = []
             for vacancy, is_saved, has_applied in res.unique().all():
                 vacancy.is_saved = is_saved
                 vacancy.has_applied = has_applied
@@ -136,14 +147,22 @@ class VacanciesRepository:
             data = cast(list[VacancySummary], vacancies)
             return PaginatedResponse(data=data, total=total)
 
-        res = await session.scalars(stmt)
+        try:
+            res = await session.scalars(stmt)
+        except Exception as e:
+            logger.error(f"[VacanciesRepository] get_many: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving vacancies",
+            )
+
         data = cast(list[VacancySummary], list(res.unique().all()))
         return PaginatedResponse(data=data, total=total)
 
     @staticmethod
     async def get_by_id(
         session: AsyncSession, id: UUID, user_id: UUID | None = None
-    ) -> VacancyDetail:
+    ) -> VacancyModel:
         stmt = (
             select(VacancyModel)
             .options(
@@ -183,58 +202,311 @@ class VacanciesRepository:
                 .where(VacancyModel.id == id)
             )
             # row: Row[Tuple[VacancyModel, bool, bool]]
-            row = (await session.execute(stmt)).one()
-            vacancy, is_saved, has_applied = row.tuple()
+            row = (await session.execute(stmt)).one_or_none()
+            if not row:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Vacancy not found",
+                )
+            vacancy, is_saved, has_applied = row._tuple()
             vacancy.is_saved = is_saved
             vacancy.has_applied = has_applied
-            return cast(VacancyDetail, vacancy)
+            return vacancy
 
         stmt = (
             select(VacancyModel)
             .options(*load_options)
             .where(VacancyModel.id == id)
         )
-        vacancy = (await session.execute(stmt)).one().tuple()[0]
-        return cast(VacancyDetail, vacancy)
+        vacancy = await session.scalar(stmt)
+        if not vacancy:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Vacancy not found",
+            )
+        return vacancy
 
     @staticmethod
     async def create(
-        session: AsyncSession, company_id: UUID, data: dict
+        session: AsyncSession, user_id: UUID, company_id: UUID, data: dict
     ) -> VacancyModel:
-        skills_data = data.pop("skills", [])
-        vacancy = VacancyModel(company_id=company_id, **data)
-        session.add(vacancy)
-        await session.flush()
+        await CompaniesRepository.ensure_member(
+            session,
+            user_id,
+            company_id,
+            (CompanyMemberRole.owner, CompanyMemberRole.recruiter),
+        )
 
-        for skill_item in skills_data:
-            link = VacancySkillLink(vacancy_id=vacancy.id, **skill_item)
-            session.add(link)
+        skills_data: list[dict] = data.pop("skills", [])
 
-        await session.commit()
-        await session.refresh(vacancy)
-        return vacancy
+        try:
+            vacancy = VacancyModel(company_id=company_id, **data)
+            session.add(vacancy)
+            await session.flush()
+
+            await VacanciesRepository._replace_skills(
+                session, vacancy.id, skills_data
+            )
+            await session.flush()
+            return await VacanciesRepository.get_by_id(session, vacancy.id)
+        except HTTPException:
+            raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[VacanciesRepository] create integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Vacancy data is invalid or contains duplicate skills",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[VacanciesRepository] create: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while creating vacancy",
+            )
 
     @staticmethod
     async def update(
-        session: AsyncSession, vacancy_id: UUID, data: dict
-    ) -> VacancyDetail | None:
+        session: AsyncSession, user_id: UUID, vacancy_id: UUID, data: dict
+    ) -> VacancyModel:
         vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
+        await CompaniesRepository.ensure_member(
+            session,
+            user_id,
+            vacancy.company_id,
+            (CompanyMemberRole.owner, CompanyMemberRole.recruiter),
+        )
 
-        for key, value in data.items():
-            if value is not None:
-                setattr(vacancy, key, value)
+        skills = data.pop("skills", None)
 
-        await session.commit()
-        await session.refresh(vacancy)
-        return vacancy
+        try:
+            if data:
+                stmt = (
+                    update(VacancyModel)
+                    .where(VacancyModel.id == vacancy_id)
+                    .values(data)
+                    .returning(VacancyModel.id)
+                )
+                await session.scalar(stmt)
+
+            if skills is not None:
+                await VacanciesRepository._replace_skills(
+                    session, vacancy_id, skills
+                )
+
+            await session.flush()
+            return await VacanciesRepository.get_by_id(session, vacancy_id)
+        except HTTPException:
+            raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[VacanciesRepository] update integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Vacancy data is invalid or contains duplicate skills",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[VacanciesRepository] update: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while updating vacancy",
+            )
 
     @staticmethod
-    async def delete(session: AsyncSession, vacancy_id: UUID) -> bool:
+    async def delete(
+        session: AsyncSession, user_id: UUID, vacancy_id: UUID
+    ) -> bool:
         vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
+        await CompaniesRepository.ensure_member(
+            session,
+            user_id,
+            vacancy.company_id,
+            (CompanyMemberRole.owner, CompanyMemberRole.recruiter),
+        )
 
-        await session.delete(vacancy)
-        await session.commit()
-        return True
+        try:
+            await session.delete(vacancy)
+            await session.flush()
+            return True
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[VacanciesRepository] delete: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while deleting vacancy",
+            )
+
+    @staticmethod
+    async def _replace_skills(
+        session: AsyncSession, vacancy_id: UUID, skills: list[dict]
+    ):
+        await session.execute(
+            delete(VacancySkillLink).where(
+                VacancySkillLink.vacancy_id == vacancy_id
+            )
+        )
+
+        for skill in skills:
+            session.add(VacancySkillLink(vacancy_id=vacancy_id, **skill))
+
+    @staticmethod
+    async def get_skill_link_by_id(
+        session: AsyncSession, vacancy_id: UUID, link_id: UUID
+    ):
+        stmt = (
+            select(VacancySkillLink)
+            .options(selectinload(VacancySkillLink.skill))
+            .where(
+                VacancySkillLink.id == link_id,
+                VacancySkillLink.vacancy_id == vacancy_id,
+            )
+        )
+        record = await session.scalar(stmt)
+        if not record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Vacancy skill link not found",
+            )
+        return record
+
+    @staticmethod
+    async def create_skill_link(
+        session: AsyncSession,
+        user_id: UUID,
+        vacancy_id: UUID,
+        values: dict,
+    ):
+        vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
+        await CompaniesRepository.ensure_member(
+            session,
+            user_id,
+            vacancy.company_id,
+            (CompanyMemberRole.owner, CompanyMemberRole.recruiter),
+        )
+
+        try:
+            record = VacancySkillLink(vacancy_id=vacancy_id, **values)
+            session.add(record)
+            await session.flush()
+            return await VacanciesRepository.get_skill_link_by_id(
+                session, vacancy_id, record.id
+            )
+        except HTTPException:
+            raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(
+                f"[VacanciesRepository] create_skill_link integrity: {e}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Vacancy skill already exists or references invalid skill",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[VacanciesRepository] create_skill_link: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while creating vacancy skill",
+            )
+
+    @staticmethod
+    async def update_skill_link(
+        session: AsyncSession,
+        user_id: UUID,
+        vacancy_id: UUID,
+        link_id: UUID,
+        values: dict,
+    ):
+        vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
+        await CompaniesRepository.ensure_member(
+            session,
+            user_id,
+            vacancy.company_id,
+            (CompanyMemberRole.owner, CompanyMemberRole.recruiter),
+        )
+        await VacanciesRepository.get_skill_link_by_id(
+            session, vacancy_id, link_id
+        )
+
+        try:
+            if values:
+                stmt = (
+                    update(VacancySkillLink)
+                    .where(
+                        VacancySkillLink.id == link_id,
+                        VacancySkillLink.vacancy_id == vacancy_id,
+                    )
+                    .values(values)
+                    .returning(VacancySkillLink.id)
+                )
+                await session.scalar(stmt)
+                await session.flush()
+
+            return await VacanciesRepository.get_skill_link_by_id(
+                session, vacancy_id, link_id
+            )
+        except HTTPException:
+            raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(
+                f"[VacanciesRepository] update_skill_link integrity: {e}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid vacancy skill data",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[VacanciesRepository] update_skill_link: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while updating vacancy skill",
+            )
+
+    @staticmethod
+    async def delete_skill_link(
+        session: AsyncSession,
+        user_id: UUID,
+        vacancy_id: UUID,
+        link_id: UUID,
+    ):
+        vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
+        await CompaniesRepository.ensure_member(
+            session,
+            user_id,
+            vacancy.company_id,
+            (CompanyMemberRole.owner, CompanyMemberRole.recruiter),
+        )
+
+        try:
+            stmt = (
+                delete(VacancySkillLink)
+                .where(
+                    VacancySkillLink.id == link_id,
+                    VacancySkillLink.vacancy_id == vacancy_id,
+                )
+                .returning(VacancySkillLink.id)
+            )
+            deleted_id = await session.scalar(stmt)
+            if not deleted_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Vacancy skill link not found",
+                )
+            await session.flush()
+        except HTTPException:
+            raise
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[VacanciesRepository] delete_skill_link: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while deleting vacancy skill",
+            )
 
     @staticmethod
     async def get_applications(
@@ -291,38 +563,168 @@ class VacanciesRepository:
             )
             .where(ApplicationModel.id == id)
         )
-        return (await session.execute(stmt)).scalar_one()
+        record = await session.scalar(stmt)
+        if not record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Application not found",
+            )
+        return record
 
     @staticmethod
     async def apply_to_vacancy(
         session: AsyncSession, applicant_id: UUID, data: dict
     ) -> ApplicationModel:
-        application = ApplicationModel(applicant_id=applicant_id, **data)
-        session.add(application)
-        await session.commit()
-        await session.refresh(application)
-        return application
+        vacancy = await VacanciesRepository.get_by_id(
+            session, data["vacancy_id"]
+        )
+        if vacancy.status != VacancyStatus.open:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Vacancy is not open for applications",
+            )
+
+        resume_id = data.get("resume_id")
+        if resume_id:
+            resume_stmt = select(ResumeModel.id).where(
+                ResumeModel.id == resume_id,
+                ResumeModel.user_id == applicant_id,
+            )
+            resume_exists = await session.scalar(resume_stmt)
+            if not resume_exists:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Resume not found",
+                )
+
+        try:
+            application = ApplicationModel(applicant_id=applicant_id, **data)
+            session.add(application)
+            await session.flush()
+            return await VacanciesRepository.get_application_by_id(
+                session, application.id
+            )
+        except HTTPException:
+            raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(
+                f"[VacanciesRepository] apply_to_vacancy integrity: {e}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Application already exists or references invalid data",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[VacanciesRepository] apply_to_vacancy: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while applying to vacancy",
+            )
 
     @staticmethod
     async def update_application_status(
         session: AsyncSession,
         application_id: UUID,
-        status: ApplicationStatus,
+        application_status: ApplicationStatus,
         recruiter_note: str | None = None,
+        user_id: UUID | None = None,
     ) -> ApplicationModel | None:
         application = await VacanciesRepository.get_application_by_id(
             session, application_id
         )
-        if not application:
-            return None
+        if user_id:
+            await CompaniesRepository.ensure_member(
+                session,
+                user_id,
+                application.vacancy.company_id,
+                (CompanyMemberRole.owner, CompanyMemberRole.recruiter),
+            )
 
-        application.status = status
-        if recruiter_note is not None:
-            application.recruiter_note = recruiter_note
+        try:
+            values: dict = {"status": application_status}
+            if recruiter_note is not None:
+                values["recruiter_note"] = recruiter_note
 
-        await session.commit()
-        await session.refresh(application)
-        return application
+            stmt = (
+                update(ApplicationModel)
+                .where(ApplicationModel.id == application_id)
+                .values(values)
+                .returning(ApplicationModel.id)
+            )
+            await session.scalar(stmt)
+            await session.flush()
+            return await VacanciesRepository.get_application_by_id(
+                session, application_id
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            await session.rollback()
+            logger.error(
+                f"[VacanciesRepository] update_application_status: {e}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while updating application",
+            )
+
+    @staticmethod
+    async def save_vacancy(
+        session: AsyncSession, user_id: UUID, vacancy_id: UUID
+    ):
+        await VacanciesRepository.get_by_id(session, vacancy_id)
+
+        try:
+            record = SavedVacancyModel(user_id=user_id, vacancy_id=vacancy_id)
+            session.add(record)
+            await session.flush()
+            return record
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[VacanciesRepository] save_vacancy integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Vacancy already saved",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[VacanciesRepository] save_vacancy: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while saving vacancy",
+            )
+
+    @staticmethod
+    async def unsave_vacancy(
+        session: AsyncSession, user_id: UUID, vacancy_id: UUID
+    ):
+        try:
+            stmt = (
+                delete(SavedVacancyModel)
+                .where(
+                    SavedVacancyModel.user_id == user_id,
+                    SavedVacancyModel.vacancy_id == vacancy_id,
+                )
+                .returning(SavedVacancyModel.id)
+            )
+            deleted_id = await session.scalar(stmt)
+            if not deleted_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Saved vacancy not found",
+                )
+            await session.flush()
+        except HTTPException:
+            raise
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[VacanciesRepository] unsave_vacancy: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while unsaving vacancy",
+            )
 
     @staticmethod
     async def get_stats(session: AsyncSession):
