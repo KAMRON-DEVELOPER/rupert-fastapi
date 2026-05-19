@@ -1,4 +1,5 @@
 {
   "basedpyright.importStrategy": "fromEnvironment",
-  "basedpyright.analysis.diagnosticMode": "workspace"
+  "basedpyright.analysis.diagnosticMode": "workspace",
+  "python.analysis.typeCheckingMode": "off"
 }
