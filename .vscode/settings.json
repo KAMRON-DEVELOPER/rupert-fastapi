@@ -1,5 +1,9 @@
 {
   "basedpyright.importStrategy": "fromEnvironment",
   "basedpyright.analysis.diagnosticMode": "workspace",
-  "python.analysis.typeCheckingMode": "off"
+  "python.analysis.typeCheckingMode": "off",
+  "editor.rulers": [
+    { "column": 80, "color": "#ffffff15" },
+    { "column": 120, "color": "#ffffff15" }
+  ]
 }

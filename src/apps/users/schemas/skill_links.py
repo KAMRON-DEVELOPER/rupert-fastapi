@@ -1,13 +1,22 @@
 from datetime import date
 from uuid import UUID
 
-from src.apps.shared.schemas import BaseModelResponse, RequestSchema, SkillResponse
+from src.apps.shared.schemas import (
+    BaseModelResponse,
+    RequestSchema,
+    SkillResponse,
+)
 from src.apps.shared.schemas.enums import ProficiencyLevel
 
 
 class ResumeSkillLinkRequest(RequestSchema):
     skill_id: UUID
     proficiency: ProficiencyLevel
+    last_used_at: date | None = None
+
+
+class ResumeSkillLinkUpdateRequest(RequestSchema):
+    proficiency: ProficiencyLevel | None = None
     last_used_at: date | None = None
 
 
@@ -21,6 +30,11 @@ class ResumeSkillLinkResponse(BaseModelResponse):
 class UserSkillLinkRequest(RequestSchema):
     skill_id: UUID
     proficiency: ProficiencyLevel
+    last_used_at: date | None = None
+
+
+class UserSkillLinkUpdateRequest(RequestSchema):
+    proficiency: ProficiencyLevel | None = None
     last_used_at: date | None = None
 
 

@@ -1,4 +1,5 @@
 from aiohttp import ClientSession
+from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.core.logger import logger
@@ -41,7 +42,7 @@ class Mailtrap:
     URL = "https://send.api.mailtrap.io/api/send"
 
     @staticmethod
-    async def send(api_key: str, payload: Payload) -> None:
+    async def send(api_key: str, payload: Payload, source: str) -> None:
         """Helper method to handle the shared HTTP request logic."""
 
         json = payload.model_dump(by_alias=True)
@@ -52,21 +53,32 @@ class Mailtrap:
         }
 
         async with ClientSession() as session:
-            async with session.post(Mailtrap.URL, json=json, headers=headers) as res:
-                status = res.status
-                data = await res.json()
+            try:
+                async with session.post(
+                    Mailtrap.URL, json=json, headers=headers
+                ) as res:
+                    status = res.status
+                    data = await res.json()
 
-                if status == 200:
-                    response = SuccessResponse(**data)
-                    logger.debug(f"Mailtrap success: {response}")
-                    return
+                    if status == 200:
+                        response = SuccessResponse(**data)
+                        logger.debug(f"[Mailtrap] success: {response}")
+                        return
 
-                response = ErrorResponse(**data)
-                logger.error(f"Mailtrap error: {response}")
-                raise MailtrapError(response)
+                    response = ErrorResponse(**data)
+                    logger.error(f"[Mailtrap] error: {response}")
+                    raise MailtrapError(response)
+            except Exception as e:
+                logger.error(f"[MailtrapError] send: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Could not send {source} email",
+                )
 
     @classmethod
-    async def send_email_verification_link(cls, to_name: str, to_email: str, link: str, cfg: MailtrapConfig) -> None:
+    async def send_email_verification_link(
+        cls, to_name: str, to_email: str, link: str, cfg: MailtrapConfig
+    ) -> None:
         template = cfg.verification
 
         payload = Payload(
@@ -76,7 +88,7 @@ class Mailtrap:
             template_variables={"link": link},
         )
 
-        await cls.send(cfg.api_key, payload)
+        await cls.send(cfg.api_key, payload, "verification")
 
     @classmethod
     async def send_password_setup_link(
@@ -105,7 +117,7 @@ class Mailtrap:
             },
         )
 
-        await cls.send(cfg.api_key, payload)
+        await cls.send(cfg.api_key, payload, "password setup")
 
     @classmethod
     async def send_feedback_confirmation(
@@ -135,4 +147,4 @@ class Mailtrap:
             },
         )
 
-        await cls.send(cfg.api_key, payload)
+        await cls.send(cfg.api_key, payload, "feedback confirmation")

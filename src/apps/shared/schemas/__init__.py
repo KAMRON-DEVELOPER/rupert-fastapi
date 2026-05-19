@@ -1,6 +1,10 @@
 from . import enums
 from .base import BaseModelResponse, RequestSchema, ResponseSchema
-from .location import BaseLocationModelResponse, BaseNullableLocationModelResponse, LocationRequest
+from .location import (
+    BaseLocationModelResponse,
+    BaseNullableLocationModelResponse,
+    LocationRequest,
+)
 from .message import MessageResponse
 from .pagination import PaginatedResponse, PaginationQuery, paginationDep
 from .skill import SkillRequest, SkillResponse

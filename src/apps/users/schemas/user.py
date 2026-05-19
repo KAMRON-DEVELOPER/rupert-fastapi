@@ -1,9 +1,18 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
+from typing import Annotated
 
+from dateutil.relativedelta import relativedelta
+from fastapi import Form
 from pydantic import Field, field_validator
 
 from src.apps.shared.schemas import BaseNullableLocationModelResponse
-from src.apps.shared.schemas.enums import FollowPolicy, JobSearchStatus, Specialization, UserRole, UserStatus
+from src.apps.shared.schemas.enums import (
+    FollowPolicy,
+    JobSearchStatus,
+    Specialization,
+    UserRole,
+    UserStatus,
+)
 from src.apps.shared.schemas.location import NullableLocationRequest
 from src.apps.users.schemas.resume import ResumeSummary
 from src.apps.users.schemas.skill_links import UserSkillLinkResponse
@@ -23,29 +32,88 @@ class UserUpdateRequest(NullableLocationRequest):
     telegram_username: str | None = None
     follow_policy: FollowPolicy | None = None
     job_search_status: JobSearchStatus | None = None
+    delete_avatar: bool | None = None
+    delete_banner: bool | None = None
 
     @field_validator("birthdate")
-    def validate_birthdate(cls, value: datetime | None):
-        if value is not None:
-            min_age_date = datetime.now(timezone.utc) - timedelta(days=12 * 365)
-            max_age_date = datetime.now(timezone.utc) - timedelta(days=100 * 365)
-            if not (max_age_date <= value <= min_age_date):
-                raise ValidationException(detail="Birthdate must be between 12 and 100 years ago.")
+    def validate_birthdate(cls, value: date | None):
+        if value is None:
+            return value
+
+        today = date.today()
+        min_birthdate = today - relativedelta(years=100)
+        max_birthdate = today - relativedelta(years=12)
+
+        if not (min_birthdate <= value <= max_birthdate):
+            raise ValidationException(
+                detail="Birthdate must be between 12 and 100 years ago."
+            )
+
         return value
 
+    @classmethod
+    def as_form(
+        cls,
+        first_name: Annotated[str | None, Form(alias="firstName")] = None,
+        last_name: Annotated[str | None, Form(alias="lastName")] = None,
+        country: Annotated[str | None, Form()] = None,
+        city: Annotated[str | None, Form()] = None,
+        headline: Annotated[str | None, Form()] = None,
+        birthdate: Annotated[date | None, Form()] = None,
+        bio: Annotated[str | None, Form()] = None,
+        specialization: Annotated[Specialization | None, Form()] = None,
+        phone_number: Annotated[str | None, Form(alias="phoneNumber")] = None,
+        github_url: Annotated[str | None, Form(alias="githubUrl")] = None,
+        telegram_username: Annotated[
+            str | None, Form(alias="telegramUsername")
+        ] = None,
+        follow_policy: Annotated[
+            FollowPolicy | None, Form(alias="followPolicy")
+        ] = None,
+        job_search_status: Annotated[
+            JobSearchStatus | None,
+            Form(alias="jobSearchStatus"),
+        ] = None,
+        delete_avatar: Annotated[
+            bool | None, Form(alias="deleteAvatar")
+        ] = None,
+        delete_banner: Annotated[
+            bool | None, Form(alias="deleteBanner")
+        ] = None,
+    ):
+        return cls(
+            first_name=first_name,
+            last_name=last_name,
+            country=country,
+            city=city,
+            headline=headline,
+            birthdate=birthdate,
+            bio=bio,
+            specialization=specialization,
+            phone_number=phone_number,
+            github_url=github_url,
+            telegram_username=telegram_username,
+            follow_policy=follow_policy,
+            job_search_status=job_search_status,
+            delete_avatar=delete_avatar,
+            delete_banner=delete_banner,
+        )
 
-class UserSummary(BaseNullableLocationModelResponse):
+
+class UserSummaryResponse(BaseNullableLocationModelResponse):
     first_name: str
     last_name: str | None
     headline: str | None
     avatar_url: str | None
     specialization: Specialization | None
     job_search_status: JobSearchStatus
+
+    # Computed
     followers_count: int
     followings_count: int
 
 
-class UserDetail(BaseNullableLocationModelResponse):
+class UserDetailResponse(BaseNullableLocationModelResponse):
     email: str
     email_verified: bool
     first_name: str
@@ -66,7 +134,7 @@ class UserDetail(BaseNullableLocationModelResponse):
 
     # Relationships
     resumes: list[ResumeSummary]
-    skills: list[UserSkillLinkResponse]
+    skills: list[UserSkillLinkResponse] = Field(validation_alias="skill_links")
     work_experiences: list[WorkExperienceResponse]
 
     # Computed

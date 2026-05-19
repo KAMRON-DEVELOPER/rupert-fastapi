@@ -18,22 +18,32 @@ class ChatMessageModel(BaseMessageModel):
     __tablename__ = "chat_messages"
 
     chat_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey(column="chats.id", ondelete="CASCADE"), index=True
+        PG_UUID(as_uuid=True),
+        ForeignKey(column="chats.id", ondelete="CASCADE"),
+        index=True,
     )
 
     # Relationships
-    chat: Mapped[ChatModel] = relationship(back_populates="messages", passive_deletes=True)
-    sender: Mapped[UserModel] = relationship(back_populates="chat_messages", passive_deletes=True)
+    chat: Mapped[ChatModel] = relationship(
+        back_populates="messages", passive_deletes=True
+    )
+    sender: Mapped[UserModel] = relationship(
+        back_populates="chat_messages", passive_deletes=True
+    )
 
 
 class ChatParticipantModel(BaseModel):
     __tablename__ = "chat_participants"
 
     user_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE"), primary_key=True
+        PG_UUID(as_uuid=True),
+        ForeignKey(column="users.id", ondelete="CASCADE"),
+        primary_key=True,
     )
     chat_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey(column="chats.id", ondelete="CASCADE"), primary_key=True
+        PG_UUID(as_uuid=True),
+        ForeignKey(column="chats.id", ondelete="CASCADE"),
+        primary_key=True,
     )
     background_url: Mapped[str | None] = mapped_column(Text)
 
@@ -48,12 +58,20 @@ class ChatParticipantModel(BaseModel):
 class ChatModel(BaseModel):
     __tablename__ = "chats"
 
-    last_message_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    last_message_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
 
     # Relationships
-    users: Mapped[list[UserModel]] = relationship(secondary="chat_participants", back_populates="chats", viewonly=True)
-    messages: Mapped[list[ChatMessageModel]] = relationship(back_populates="chat", cascade="all, delete-orphan")
-    participants: Mapped[list[ChatParticipantModel]] = relationship(back_populates="chat", cascade="all, delete-orphan")
+    users: Mapped[list[UserModel]] = relationship(
+        secondary="chat_participants", back_populates="chats", viewonly=True
+    )
+    messages: Mapped[list[ChatMessageModel]] = relationship(
+        back_populates="chat", cascade="all, delete-orphan"
+    )
+    participants: Mapped[list[ChatParticipantModel]] = relationship(
+        back_populates="chat", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return "<ChatModel>"

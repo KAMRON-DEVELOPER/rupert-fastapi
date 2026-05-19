@@ -22,7 +22,11 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
-from src.apps.shared.models import BaseLocationModel, BaseModel, BaseNullableLocationModel
+from src.apps.shared.models import (
+    BaseLocationModel,
+    BaseModel,
+    BaseNullableLocationModel,
+)
 from src.apps.shared.schemas.enums import (
     EmploymentType,
     FollowPolicy,
@@ -38,28 +42,52 @@ from src.apps.shared.schemas.enums import (
 )
 
 if TYPE_CHECKING:
-    from src.apps.chats.models import ChatMessageModel, ChatModel, ChatParticipantModel
+    from src.apps.chats.models import (
+        ChatMessageModel,
+        ChatModel,
+        ChatParticipantModel,
+    )
     from src.apps.companies.models import CompanyMemberModel
     from src.apps.feeds.models import FeedEngagementModel, FeedModel
-    from src.apps.groups.models import GroupMessageModel, GroupModel, GroupParticipantModel
-    from src.apps.posts.models import PostCommentModel, PostEngagementModel, PostModel
+    from src.apps.groups.models import (
+        GroupMessageModel,
+        GroupModel,
+        GroupParticipantModel,
+    )
+    from src.apps.posts.models import (
+        PostCommentModel,
+        PostEngagementModel,
+        PostModel,
+    )
     from src.apps.shared.models import SkillModel
     from src.apps.vacancies.models import ApplicationModel, SavedVacancyModel
 
 
 class FollowModel(BaseModel):
     __tablename__ = "follows"
-    __table_args__ = (UniqueConstraint("follower_id", "following_id", name="uq_follower_following"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "follower_id", "following_id", name="uq_follower_following"
+        ),
+    )
 
-    follower_id: Mapped[UUID] = mapped_column(ForeignKey(column="users.id", ondelete="CASCADE"))
-    following_id: Mapped[UUID] = mapped_column(ForeignKey(column="users.id", ondelete="CASCADE"))
+    follower_id: Mapped[UUID] = mapped_column(
+        ForeignKey(column="users.id", ondelete="CASCADE")
+    )
+    following_id: Mapped[UUID] = mapped_column(
+        ForeignKey(column="users.id", ondelete="CASCADE")
+    )
     status: Mapped[FollowStatus] = mapped_column(
         Enum(FollowStatus, name="follow_status"), default=FollowStatus.accepted
     )
 
     # Relationships
-    follower: Mapped[UserModel] = relationship(back_populates="following_links", foreign_keys=[follower_id])
-    following: Mapped[UserModel] = relationship(back_populates="follower_links", foreign_keys=[following_id])
+    follower: Mapped[UserModel] = relationship(
+        back_populates="following_links", foreign_keys=[follower_id]
+    )
+    following: Mapped[UserModel] = relationship(
+        back_populates="follower_links", foreign_keys=[following_id]
+    )
 
     def __repr__(self):
         return "<FollowModel>"
@@ -67,11 +95,19 @@ class FollowModel(BaseModel):
 
 class ResumeSkillLink(BaseModel):
     __tablename__ = "resume_skill_links"
-    __table_args__ = (UniqueConstraint("resume_id", "skill_id", name="uq_resume_skill"),)
+    __table_args__ = (
+        UniqueConstraint("resume_id", "skill_id", name="uq_resume_skill"),
+    )
 
-    resume_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="CASCADE"))
-    skill_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"))
-    proficiency: Mapped[ProficiencyLevel] = mapped_column(Enum(ProficiencyLevel, name="proficiency_level"))
+    resume_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("resumes.id", ondelete="CASCADE")
+    )
+    skill_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE")
+    )
+    proficiency: Mapped[ProficiencyLevel] = mapped_column(
+        Enum(ProficiencyLevel, name="proficiency_level")
+    )
     last_used_at: Mapped[date | None] = mapped_column(Date)
 
     # Relationships
@@ -91,25 +127,41 @@ class ResumeModel(BaseLocationModel):
         ),
     )
 
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
     title: Mapped[str] = mapped_column(String(128))
     summary: Mapped[str | None] = mapped_column(Text)
-    specialization: Mapped[Specialization] = mapped_column(Enum(Specialization, name="specialization"), index=True)
-    salary_expectation_min: Mapped[int | None] = mapped_column(Integer, index=True)
-    salary_expectation_max: Mapped[int | None] = mapped_column(Integer, index=True)
-    salary_currency: Mapped[SalaryCurrency | None] = mapped_column(Enum(SalaryCurrency, name="salary_currency"))
-    work_format: Mapped[WorkFormat | None] = mapped_column(Enum(WorkFormat, name="work_format"))
+    specialization: Mapped[Specialization] = mapped_column(
+        Enum(Specialization, name="specialization"), index=True
+    )
+    salary_expectation_min: Mapped[int | None] = mapped_column(
+        Integer, index=True
+    )
+    salary_expectation_max: Mapped[int | None] = mapped_column(
+        Integer, index=True
+    )
+    salary_currency: Mapped[SalaryCurrency | None] = mapped_column(
+        Enum(SalaryCurrency, name="salary_currency")
+    )
+    work_format: Mapped[WorkFormat | None] = mapped_column(
+        Enum(WorkFormat, name="work_format")
+    )
     employment_type: Mapped[EmploymentType | None] = mapped_column(
         Enum(EmploymentType, name="employment_type"), index=True
     )
 
     # Relationships
     user: Mapped[UserModel] = relationship(back_populates="resumes")
-    skill_links: Mapped[list[ResumeSkillLink]] = relationship(back_populates="resume", cascade="all, delete-orphan")
+    skill_links: Mapped[list[ResumeSkillLink]] = relationship(
+        back_populates="resume", cascade="all, delete-orphan"
+    )
     skills: Mapped[list[SkillModel]] = relationship(
         secondary="resume_skill_links", back_populates="resumes", viewonly=True
     )
-    applications: Mapped[list[ApplicationModel]] = relationship(back_populates="resume")
+    applications: Mapped[list[ApplicationModel]] = relationship(
+        back_populates="resume"
+    )
 
     def __repr__(self):
         return f"<ResumeModel {self.title}>"
@@ -117,11 +169,19 @@ class ResumeModel(BaseLocationModel):
 
 class UserSkillLink(BaseModel):
     __tablename__ = "user_skill_links"
-    __table_args__ = (UniqueConstraint("user_id", "skill_id", name="uq_user_skill"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "skill_id", name="uq_user_skill"),
+    )
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    skill_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE"))
-    proficiency: Mapped[ProficiencyLevel] = mapped_column(Enum(ProficiencyLevel, name="proficiency_level"))
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
+    skill_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("skills.id", ondelete="CASCADE")
+    )
+    proficiency: Mapped[ProficiencyLevel] = mapped_column(
+        Enum(ProficiencyLevel, name="proficiency_level")
+    )
     last_used_at: Mapped[date | None] = mapped_column(Date)
 
     # Relationships
@@ -135,10 +195,15 @@ class UserSkillLink(BaseModel):
 class WorkExperienceModel(BaseModel):
     __tablename__ = "work_experiences"
     __table_args__ = (
-        CheckConstraint("ended_at IS NULL OR started_at <= ended_at", name="chk_work_experience_date_range"),
+        CheckConstraint(
+            "ended_at IS NULL OR started_at <= ended_at",
+            name="chk_work_experience_date_range",
+        ),
     )
 
-    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
     company_name: Mapped[str] = mapped_column(String(128))
     location: Mapped[str | None] = mapped_column(String(128))
     position: Mapped[str] = mapped_column(String(128))
@@ -155,10 +220,14 @@ class WorkExperienceModel(BaseModel):
 
 class OAuthUserModel(BaseModel):
     __tablename__ = "oauth_users"
-    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_oauth_user_provider"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider", name="uq_oauth_user_provider"),
+    )
 
     provider_id: Mapped[str] = mapped_column(String(255), primary_key=True)
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
     provider: Mapped[Provider] = mapped_column(Enum(Provider, name="provider"))
     username: Mapped[str | None] = mapped_column(String(128))
     email: Mapped[str | None] = mapped_column(String(128))
@@ -190,27 +259,44 @@ class UserModel(BaseNullableLocationModel):
     phone_number: Mapped[str | None] = mapped_column(String(32))
     github_url: Mapped[str | None] = mapped_column(Text)
     telegram_username: Mapped[str | None] = mapped_column(String(32))
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), default=UserRole.user)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, name="user_role"), default=UserRole.user
+    )
     status: Mapped[UserStatus] = mapped_column(
-        Enum(UserStatus, name="user_status"), default=UserStatus.pending_verification
+        Enum(UserStatus, name="user_status"),
+        default=UserStatus.pending_verification,
     )
     follow_policy: Mapped[FollowPolicy] = mapped_column(
-        Enum(FollowPolicy, name="follow_policy"), default=FollowPolicy.auto_accept
+        Enum(FollowPolicy, name="follow_policy"),
+        default=FollowPolicy.auto_accept,
     )
     job_search_status: Mapped[JobSearchStatus] = mapped_column(
-        Enum(JobSearchStatus, name="job_search_status"), default=JobSearchStatus.not_looking
+        Enum(JobSearchStatus, name="job_search_status"),
+        default=JobSearchStatus.not_looking,
     )
 
     # Relationships
-    oauth_users: Mapped[list[OAuthUserModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    resumes: Mapped[list[ResumeModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    skill_links: Mapped[list[UserSkillLink]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    skills: Mapped[list[SkillModel]] = relationship(secondary="user_skill_links", back_populates="users", viewonly=True)
+    oauth_users: Mapped[list[OAuthUserModel]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    resumes: Mapped[list[ResumeModel]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    skill_links: Mapped[list[UserSkillLink]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    skills: Mapped[list[SkillModel]] = relationship(
+        secondary="user_skill_links", back_populates="users", viewonly=True
+    )
     work_experiences: Mapped[list[WorkExperienceModel]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    sessions: Mapped[list[SessionModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    activities: Mapped[list[ActivityModel]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    sessions: Mapped[list[SessionModel]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    activities: Mapped[list[ActivityModel]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
     # Following
     follower_links: Mapped[list[FollowModel]] = relationship(
@@ -225,30 +311,56 @@ class UserModel(BaseNullableLocationModel):
     )
 
     # Jobs
-    applications: Mapped[list[ApplicationModel]] = relationship(back_populates="applicant", passive_deletes=True)
-    saved_vacancies: Mapped[list[SavedVacancyModel]] = relationship(back_populates="user", passive_deletes=True)
-    company_memberships: Mapped[list[CompanyMemberModel]] = relationship(back_populates="user", passive_deletes=True)
+    applications: Mapped[list[ApplicationModel]] = relationship(
+        back_populates="applicant", passive_deletes=True
+    )
+    saved_vacancies: Mapped[list[SavedVacancyModel]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
+    company_memberships: Mapped[list[CompanyMemberModel]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
 
     # Feeds
-    feeds: Mapped[list[FeedModel]] = relationship(back_populates="author", passive_deletes=True)
-    feed_engagements: Mapped[list[FeedEngagementModel]] = relationship(back_populates="user", passive_deletes=True)
+    feeds: Mapped[list[FeedModel]] = relationship(
+        back_populates="author", passive_deletes=True
+    )
+    feed_engagements: Mapped[list[FeedEngagementModel]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
 
     # Posts
-    posts: Mapped[list[PostModel]] = relationship(back_populates="author", passive_deletes=True)
-    post_engagements: Mapped[list[PostEngagementModel]] = relationship(back_populates="user", passive_deletes=True)
-    post_comments: Mapped[list[PostCommentModel]] = relationship(back_populates="user", passive_deletes=True)
+    posts: Mapped[list[PostModel]] = relationship(
+        back_populates="author", passive_deletes=True
+    )
+    post_engagements: Mapped[list[PostEngagementModel]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
+    post_comments: Mapped[list[PostCommentModel]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
 
     # Groups
     groups: Mapped[list[GroupModel]] = relationship(
         secondary="group_participants", back_populates="users", viewonly=True
     )
-    group_messages: Mapped[list[GroupMessageModel]] = relationship(back_populates="sender")
-    group_participants: Mapped[list[GroupParticipantModel]] = relationship(back_populates="user", passive_deletes=True)
+    group_messages: Mapped[list[GroupMessageModel]] = relationship(
+        back_populates="sender"
+    )
+    group_participants: Mapped[list[GroupParticipantModel]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
 
     # Chats
-    chats: Mapped[list[ChatModel]] = relationship(secondary="chat_participants", back_populates="users", viewonly=True)
-    chat_messages: Mapped[list[ChatMessageModel]] = relationship(back_populates="sender")
-    chat_participants: Mapped[list[ChatParticipantModel]] = relationship(back_populates="user", passive_deletes=True)
+    chats: Mapped[list[ChatModel]] = relationship(
+        secondary="chat_participants", back_populates="users", viewonly=True
+    )
+    chat_messages: Mapped[list[ChatMessageModel]] = relationship(
+        back_populates="sender"
+    )
+    chat_participants: Mapped[list[ChatParticipantModel]] = relationship(
+        back_populates="user", passive_deletes=True
+    )
 
     # Computed
     followers_count: Mapped[int] = column_property(
@@ -275,13 +387,17 @@ class UserModel(BaseNullableLocationModel):
 class SessionModel(BaseModel):
     __tablename__ = "sessions"
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
+    )
     user_agent: Mapped[str | None] = mapped_column(Text)
     ip_addr: Mapped[str | None] = mapped_column(String(45))
     device_name: Mapped[str | None] = mapped_column(String(128))
     refresh_token: Mapped[str] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    last_activity_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now())
+    last_activity_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), default=func.now()
+    )
 
     # Relationships
     user: Mapped[UserModel] = relationship(back_populates="sessions")
@@ -292,11 +408,21 @@ class SessionModel(BaseModel):
 
 class ActivityModel(BaseModel):
     __tablename__ = "activities"
-    __table_args__ = (UniqueConstraint("user_id", "activity_date", name="uq_user_activity_date"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "activity_date", name="uq_user_activity_date"
+        ),
+    )
 
-    user_id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        index=True,
+    )
     activity_date: Mapped[date] = mapped_column(Date, index=True)
-    last_activity_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), default=func.now())
+    last_activity_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), default=func.now()
+    )
 
     # Relationships
     user: Mapped[UserModel] = relationship(back_populates="activities")

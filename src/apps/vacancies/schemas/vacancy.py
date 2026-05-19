@@ -2,10 +2,14 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Query
-from pydantic import AnyUrl, Field, field_validator
+from pydantic import AnyUrl, Field, ValidationInfo, field_validator
 
 from src.apps.companies.schemas.company import CompanySummary
-from src.apps.shared.schemas import BaseModelResponse, LocationRequest, RequestSchema
+from src.apps.shared.schemas import (
+    BaseModelResponse,
+    LocationRequest,
+    RequestSchema,
+)
 from src.apps.shared.schemas.enums import (
     EmploymentType,
     PaymentFrequency,
@@ -15,7 +19,10 @@ from src.apps.shared.schemas.enums import (
     VacancyStatus,
     WorkFormat,
 )
-from src.apps.vacancies.schemas.skill_links import VacancySkillLinkRequest, VacancySkillLinkResponse
+from src.apps.vacancies.schemas.skill_links import (
+    VacancySkillLinkRequest,
+    VacancySkillLinkResponse,
+)
 
 
 class VacancyCreateRequest(LocationRequest):
@@ -37,7 +44,7 @@ class VacancyCreateRequest(LocationRequest):
 
     @field_validator("salary_max")
     @classmethod
-    def max_gte_min(cls, v: int | None, info) -> int | None:
+    def max_gte_min(cls, v: int | None, info: ValidationInfo) -> int | None:
         min_ = info.data.get("salary_min")
         if v is not None and min_ is not None and v < min_:
             raise ValueError("salary_max must be >= salary_min")
@@ -50,18 +57,26 @@ class VacancyUpdateRequest(RequestSchema):
     external_apply_url: AnyUrl | None = None
     submission_type: SubmissionType | None = None
     specialization: Specialization | None = None
-    salary_min: int | None = None
-    salary_max: int | None = None
+    salary_min: int | None = Field(default=None, ge=0)
+    salary_max: int | None = Field(default=None, ge=0)
     salary_currency: SalaryCurrency | None = None
     payment_frequency: PaymentFrequency | None = None
-    years_of_experience_min: float | None = None
+    years_of_experience_min: float | None = Field(default=None, ge=0)
     work_format: WorkFormat | None = None
-    work_hours_per_week: int | None = None
+    work_hours_per_week: int | None = Field(default=None, ge=1, le=168)
     employment_type: EmploymentType | None = None
     country: str | None = Field(default=None, max_length=64)
     city: str | None = Field(default=None, max_length=64)
     status: VacancyStatus | None = None
-    skills: list[VacancySkillLinkRequest] | None
+    skills: list[VacancySkillLinkRequest] | None = None
+
+    @field_validator("salary_max")
+    @classmethod
+    def max_gte_min(cls, v: int | None, info: ValidationInfo) -> int | None:
+        min_ = info.data.get("salary_min")
+        if v is not None and min_ is not None and v < min_:
+            raise ValueError("salary_max must be >= salary_min")
+        return v
 
 
 class VacancyListParams(RequestSchema):

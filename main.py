@@ -13,7 +13,7 @@ from src.apps.stats.routes import stats_router
 from src.apps.users.routes import users_router
 from src.apps.vacancies.routes import vacancies_router
 from src.core.boto3 import initialize_boto3
-from src.core.database import async_engine, initialize_db
+from src.core.database import engine
 from src.core.exceptions import ApiException
 from src.core.logger import logger
 from src.core.settings import get_settings
@@ -22,22 +22,16 @@ settings = get_settings()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.warning("🚀 Starting app_lifespan...")
+async def lifespan(_: FastAPI):
+    logger.info("🚀 Startup")
 
-    try:
-        await initialize_db()
-    except Exception as e:
-        logger.exception(f"DB initialization exception, e: {e}")
+    await initialize_boto3()
 
-    try:
-        await initialize_boto3()
-    except Exception as e:
-        logger.exception(f"initialization exception startup, e: {e}")
     try:
         yield
     finally:
-        await async_engine.dispose()
+        logger.info("⚠️ Shutdown")
+        await engine.dispose()
 
 
 app: FastAPI = FastAPI(lifespan=lifespan)
@@ -56,8 +50,12 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 app.include_router(router=stats_router, prefix="/api/v1/stats", tags=["stats"])
 app.include_router(router=users_router, prefix="/api/v1/users", tags=["users"])
-app.include_router(router=companies_router, prefix="/api/v1/companies", tags=["companies"])
-app.include_router(router=vacancies_router, prefix="/api/v1/vacancies", tags=["vacancies"])
+app.include_router(
+    router=companies_router, prefix="/api/v1/companies", tags=["companies"]
+)
+app.include_router(
+    router=vacancies_router, prefix="/api/v1/vacancies", tags=["vacancies"]
+)
 
 
 @app.get(path="/", tags=["root"])
@@ -67,12 +65,16 @@ async def root() -> dict:
 
 @app.get("/docs/scalar", include_in_schema=False)
 async def scalar_html():
-    return get_scalar_api_reference(openapi_url=app.openapi_url, scalar_proxy_url="https://proxy.scalar.com")
+    return get_scalar_api_reference(
+        openapi_url=app.openapi_url, scalar_proxy_url="https://proxy.scalar.com"
+    )
 
 
 @app.exception_handler(ApiException)
 async def api_exception_handler(request: Request, exception: ApiException):
-    logger.exception(f"HTTP {exception.status_code} error {request.url.path} detail: {exception.detail}")
+    logger.exception(
+        f"HTTP {exception.status_code} error {request.url.path} detail: {exception.detail}"
+    )
     return JSONResponse(
         status_code=exception.status_code,
         content={"details": exception.detail},
@@ -81,7 +83,9 @@ async def api_exception_handler(request: Request, exception: ApiException):
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exception: RequestValidationError):
+async def validation_exception_handler(
+    request: Request, exception: RequestValidationError
+):
     details = []
 
     for error in exception.errors():
@@ -96,8 +100,13 @@ async def validation_exception_handler(request: Request, exception: RequestValid
                 field = str(loc[1]).capitalize()
                 details.append(f"{field} {msg.lower()}")
 
-    logger.warning(f"HTTP validation error during {request.method} {request.url.path}, details: {details}")
-    return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content={"details": details})
+    logger.warning(
+        f"HTTP validation error during {request.method} {request.url.path}, details: {details}"
+    )
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content={"details": details},
+    )
 
 
 class MetricsFilter(Filter):

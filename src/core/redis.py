@@ -7,7 +7,12 @@ from uuid import UUID, uuid4
 from redis.asyncio import ConnectionPool, Redis
 from redis.asyncio.client import PubSub
 
-from src.apps.chats.schemas import ChatMessageSchema, ChatResponseSchema, ChatSchema, ParticipantSchema
+from src.apps.chats.schemas import (
+    ChatMessageSchema,
+    ChatResponseSchema,
+    ChatSchema,
+    ParticipantSchema,
+)
 from src.core.logger import logger
 from src.core.settings import get_settings
 
@@ -61,14 +66,23 @@ class ChatCacheManager:
     def __init__(self, client: Redis):
         self.client = client
 
-    async def create_chat(self, user_id: str, participant_id: str, chat_id: str, mapping: dict):
+    async def create_chat(
+        self, user_id: str, participant_id: str, chat_id: str, mapping: dict
+    ):
         last_message: dict = mapping.pop("last_message")
         now_timestamp = datetime.now(UTC).timestamp()
         async with self.client.pipeline() as pipe:
-            pipe.zadd(name=f"users:{user_id}:chats", mapping={chat_id: now_timestamp})
-            pipe.zadd(name=f"users:{participant_id}:chats", mapping={chat_id: now_timestamp})
+            pipe.zadd(
+                name=f"users:{user_id}:chats", mapping={chat_id: now_timestamp}
+            )
+            pipe.zadd(
+                name=f"users:{participant_id}:chats",
+                mapping={chat_id: now_timestamp},
+            )
             pipe.hset(name=f"chats:{chat_id}:meta", mapping=mapping)
-            pipe.hset(name=f"chats:{chat_id}:last_message", mapping=last_message)
+            pipe.hset(
+                name=f"chats:{chat_id}:last_message", mapping=last_message
+            )
             pipe.sadd(f"chats:{chat_id}:participants", user_id, participant_id)
             await pipe.execute()
 
@@ -81,21 +95,33 @@ class ChatCacheManager:
             pipe.srem(f"chats:{chat_id}:participants", *participants)
             await pipe.execute()
 
-    async def get_chats(self, user_id: str, start: int = 0, end: int = 20) -> ChatResponseSchema:
-        chat_ids: list[str] = await self.client.zrevrange(name=f"users:{user_id}:chats", start=start, end=end)
+    async def get_chats(
+        self, user_id: str, start: int = 0, end: int = 20
+    ) -> ChatResponseSchema:
+        chat_ids: list[str] = await self.client.zrevrange(
+            name=f"users:{user_id}:chats", start=start, end=end
+        )
         if not chat_ids:
             return ChatResponseSchema(chats=[], end=0)
 
         async with self.client.pipeline() as pipe:
             for chat_id in chat_ids:
                 pipe.hgetall(f"chats:{chat_id}:meta")  # index 0, 3, 6...
-                pipe.hgetall(f"chats:{chat_id}:last_message")  # index 1, 4, 7...
-                pipe.smembers(f"chats:{chat_id}:participants")  # index 2, 5, 8...
+                pipe.hgetall(
+                    f"chats:{chat_id}:last_message"
+                )  # index 1, 4, 7...
+                pipe.smembers(
+                    f"chats:{chat_id}:participants"
+                )  # index 2, 5, 8...
             results = await pipe.execute()
 
         chats: list[dict] = results[::3]  # Every 3rd element starting at 0
-        last_messages: list[dict] = results[1::3]  # Every 3rd element starting at 1
-        participant_sets: list[set[str]] = results[2::3]  # Every 3rd element starting at 2
+        last_messages: list[dict] = results[
+            1::3
+        ]  # Every 3rd element starting at 1
+        participant_sets: list[set[str]] = results[
+            2::3
+        ]  # Every 3rd element starting at 2
 
         participant_ids: list[str] = []
         for participant_set in participant_sets:
@@ -129,18 +155,26 @@ class ChatCacheManager:
                     name=profile.get("name", ""),
                     username=profile.get("username", ""),
                     avatar_url=profile.get("avatar_url"),
-                    last_seen_at=datetime.fromtimestamp(int(profile.get("last_seen_at", 0)))
-                    if "last_seen_at" in profile
-                    else None,
+                    last_seen_at=(
+                        datetime.fromtimestamp(
+                            int(profile.get("last_seen_at", 0))
+                        )
+                        if "last_seen_at" in profile
+                        else None
+                    ),
                     is_online=is_online,
                 ),
-                last_activity_at=datetime.fromtimestamp(float(chat_meta.get("last_activity_at", time()))),
+                last_activity_at=datetime.fromtimestamp(
+                    float(chat_meta.get("last_activity_at", time()))
+                ),
                 last_message=ChatMessageSchema(
                     id=UUID(hex=last_msg.get("id", "")),
                     sender_id=UUID(hex=last_msg.get("sender_id", "")),
                     chat_id=UUID(hex=last_msg.get("chat_id", "")),
                     message=last_msg.get("message", ""),
-                    created_at=datetime.fromtimestamp(float(last_msg.get("created_at", time()))),
+                    created_at=datetime.fromtimestamp(
+                        float(last_msg.get("created_at", time()))
+                    ),
                 ),
             )
             chat_list.append(chat)
@@ -148,20 +182,30 @@ class ChatCacheManager:
         return ChatResponseSchema(chats=chat_list, end=len(chat_ids) - 1)
 
     async def is_user_chat_owner(self, user_id: str, chat_id: str) -> bool:
-        score: float | None = await self.client.zscore(name=f"users:{user_id}:chats", value=chat_id)
+        score: float | None = await self.client.zscore(
+            name=f"users:{user_id}:chats", value=chat_id
+        )
         logger.warning(f"user_id: {user_id}")
         logger.warning(f"chat_id: {chat_id}")
         logger.warning(f"score: {score}")
         return False if score is None else True
 
     async def is_online(self, participant_id: str) -> bool:
-        is_member = self.client.sismember(name="chats:online", value=participant_id)
-        return bool(await is_member) if isawaitable(is_member) else bool(is_member)
+        is_member = self.client.sismember(
+            name="chats:online", value=participant_id
+        )
+        return (
+            bool(await is_member) if isawaitable(is_member) else bool(is_member)
+        )
 
     """ ****************************************** EVENTS ****************************************** """
 
-    async def add_user_to_chats(self, user_id: str) -> tuple[set[str], set[str]]:
-        chat_ids: list[str] = await self.client.zrevrange(name=f"users:{user_id}:chats", start=0, end=-1)
+    async def add_user_to_chats(
+        self, user_id: str
+    ) -> tuple[set[str], set[str]]:
+        chat_ids: list[str] = await self.client.zrevrange(
+            name=f"users:{user_id}:chats", start=0, end=-1
+        )
 
         async with self.client.pipeline() as pipe:
             pipe.sadd("chats:online", user_id)
@@ -173,20 +217,32 @@ class ChatCacheManager:
         chat_ids_with_online: set[str] = set()
         online_users_per_chat_results: list[set[str]] = results[1:]
 
-        for chat_id, online_in_chat in zip(chat_ids, online_users_per_chat_results):
-            other_online_users = {pid for pid in online_in_chat if pid != user_id}
+        for chat_id, online_in_chat in zip(
+            chat_ids, online_users_per_chat_results
+        ):
+            other_online_users = {
+                pid for pid in online_in_chat if pid != user_id
+            }
             if other_online_users:
                 chat_ids_with_online.add(chat_id)
                 online_participants.update(other_online_users)
 
         return chat_ids_with_online, online_participants
 
-    async def remove_user_from_chats(self, user_id: str) -> tuple[set[str], set[str]]:
-        chat_ids: list[str] = await self.client.zrevrange(name=f"users:{user_id}:chats", start=0, end=-1)
+    async def remove_user_from_chats(
+        self, user_id: str
+    ) -> tuple[set[str], set[str]]:
+        chat_ids: list[str] = await self.client.zrevrange(
+            name=f"users:{user_id}:chats", start=0, end=-1
+        )
 
         async with self.client.pipeline() as pipe:
             pipe.srem("chats:online", user_id)
-            pipe.hset(f"users:{user_id}:profile", key="last_seen_at", value=str(datetime.now(UTC).timestamp()))
+            pipe.hset(
+                f"users:{user_id}:profile",
+                key="last_seen_at",
+                value=str(datetime.now(UTC).timestamp()),
+            )
             for chat_id in chat_ids:
                 pipe.sinter([f"chats:{chat_id}:participants", "chats:online"])
             results = await pipe.execute()
@@ -195,18 +251,30 @@ class ChatCacheManager:
         chat_ids_with_online: set[str] = set()
         online_users_per_chat_results: list[set[str]] = results[2:]
 
-        for chat_id, online_in_chat in zip(chat_ids, online_users_per_chat_results):
-            other_online_users = {pid for pid in online_in_chat if pid != user_id}
+        for chat_id, online_in_chat in zip(
+            chat_ids, online_users_per_chat_results
+        ):
+            other_online_users = {
+                pid for pid in online_in_chat if pid != user_id
+            }
             if other_online_users:
                 chat_ids_with_online.add(chat_id)
                 online_participants.update(other_online_users)
 
         return chat_ids_with_online, online_participants
 
-    async def get_chat_participants(self, chat_id: str, user_id: str | None = None, online: bool = False) -> set[str]:
+    async def get_chat_participants(
+        self, chat_id: str, user_id: str | None = None, online: bool = False
+    ) -> set[str]:
         if online:
-            is_intersected = self.client.sinter([f"chats:{chat_id}:participants", "chats:online"])
-            participants = set(await is_intersected) if isawaitable(is_intersected) else set(is_intersected)
+            is_intersected = self.client.sinter(
+                [f"chats:{chat_id}:participants", "chats:online"]
+            )
+            participants = (
+                set(await is_intersected)
+                if isawaitable(is_intersected)
+                else set(is_intersected)
+            )
             if user_id:
                 participants.discard(user_id)
             return participants

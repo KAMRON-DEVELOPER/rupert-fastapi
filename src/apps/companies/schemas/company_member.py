@@ -2,7 +2,7 @@ from uuid import UUID
 
 from src.apps.shared.schemas import BaseModelResponse, RequestSchema
 from src.apps.shared.schemas.enums import CompanyMemberRole
-from src.apps.users.schemas.user import UserSummary
+from src.apps.users.schemas.user import UserSummaryResponse
 
 
 class CompanyMemberInviteRequest(RequestSchema):
@@ -15,6 +15,6 @@ class CompanyMemberRoleUpdateRequest(RequestSchema):
 
 
 class CompanyMemberResponse(BaseModelResponse):
-    user: UserSummary
+    user: UserSummaryResponse
     company_id: UUID
     role: CompanyMemberRole

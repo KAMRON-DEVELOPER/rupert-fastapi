@@ -10,14 +10,24 @@ from src.apps.shared.schemas import MessageResponse
 from src.apps.users.repositories.oauth_user import OAuthUsersRepository
 from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
-from src.apps.users.schemas.auth import AuthProbeResponse, EmailAuthRequest
+from src.apps.users.schemas.auth import (
+    AuthProbeResponse,
+    EmailAuthRequest,
+    EmailAuthResponse,
+)
 from src.apps.users.utils import finalize_session
-from src.core.database import DBSession
+from src.core.database import sessionDep
 from src.core.exceptions import ValidationException
 from src.core.logger import logger
 from src.core.settings import get_settings
-from src.dependencies.proactive_refresh import authDep, authProbeDep, create_token, decode_token
-from src.services.mailtrap import Mailtrap, MailtrapError
+from src.dependencies.proactive_refresh import (
+    authDep,
+    authProbeDep,
+    clear_auth_cookies,
+    create_token,
+    decode_token,
+)
+from src.services.mailtrap import Mailtrap
 
 from .router import users_router
 
@@ -31,52 +41,46 @@ async def auth_probe(auth: authProbeDep):
 
 
 @users_router.post(path="/auth/email")
-async def email_auth(req: Request, res: Response, schm: EmailAuthRequest, session: DBSession):
-    try:
-        user = await UsersRepository.find_by_email(schm.email, session)
-    except Exception as e:
-        logger.error(f"email_auth UsersRepository.find_by_email: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
+async def email_auth(
+    req: Request, res: Response, schm: EmailAuthRequest, session: sessionDep
+):
+    user = await UsersRepository.get_by_email(session, schm.email, False)
 
     if user:
         if user.password_hash:
-            is_valid = await asyncio.to_thread(checkpw, schm.password.encode(), user.password_hash.encode())
+            is_valid = await asyncio.to_thread(
+                checkpw, schm.password.encode(), user.password_hash.encode()
+            )
             if not is_valid:
                 raise ValidationException("password is not match.")
 
-            try:
-                await finalize_session(req, res, user, session)
-                await session.commit()
-            except Exception as e:
-                logger.error(f"email_auth finalize_session: {e}")
-                raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
-            return user
+            await finalize_session(req, res, session, user.id)
+            await session.commit()
+            return EmailAuthResponse.model_validate(user)
 
-        try:
-            providers = await OAuthUsersRepository.find_providers_by_user_id(user.id, session)
-        except Exception as e:
-            logger.error(f"email_auth OAuthUsersRepository.find_providers_by_user_id: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
+        # Password not set
+        providers = await OAuthUsersRepository.find_providers_by_user_id(
+            session, user.id
+        )
 
         if len(providers) == 0:
-            print(f"user has no password and no linked oauth provider, {user.id}")
+            logger.critical(
+                f"user has no password and no linked oauth provider, {user.id}"
+            )
             raise HTTPException(
-                status_code=500, detail="This account is missing a login method. Please contact support."
+                status_code=500,
+                detail="This account is missing a login method. Please contact support.",
             )
 
         token = create_token(user.id, "password_setup")
-        setup_link = f"{settings.frontend_endpoint}/auth/set-password?token={token}"
+        link = f"{settings.frontend_endpoint}/auth/set-password?token={token}"
 
-        try:
-            await Mailtrap.send_password_setup_link(
-                to_name=f"{user.first_name} {user.last_name}",
-                to_email=user.email,
-                link=setup_link,
-                cfg=settings.mailtrap,
-            )
-        except MailtrapError as e:
-            logger.error(f"email_auth MailtrapError: {e}")
-            raise HTTPException(status_code=500, detail="Could not send password setup link")
+        await Mailtrap.send_password_setup_link(
+            f"{user.first_name} {user.last_name}",
+            user.email,
+            link,
+            settings.mailtrap,
+        )
 
         providers_text = ", ".join(str(p.value) for p in providers)
         return MessageResponse(
@@ -86,51 +90,54 @@ async def email_auth(req: Request, res: Response, schm: EmailAuthRequest, sessio
     if not schm.first_name or not schm.last_name:
         return MessageResponse(message="new_user")
 
-    hash_password_bytes = await asyncio.to_thread(hashpw, schm.password.encode(), gensalt(rounds=8))
+    hash_password_bytes = await asyncio.to_thread(
+        hashpw, schm.password.encode(), gensalt(rounds=8)
+    )
     hash_password = hash_password_bytes.decode()
 
-    try:
-        user = await UsersRepository.create(schm.email, hash_password, schm.first_name, schm.last_name, session)
-    except Exception as e:
-        logger.error(f"email_auth UsersRepository.create: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
+    user = await UsersRepository.create(
+        session, schm.email, schm.first_name, schm.last_name, hash_password
+    )
+
+    await finalize_session(req, res, session, user.id)
 
     token = create_token(user.id, "email_verification")
-    verification_link = f"{settings.frontend_endpoint}/auth/verify?token={token}"
+    link = f"{settings.frontend_endpoint}/auth/verify?token={token}"
 
     try:
-        await finalize_session(req, res, user, session)
         await Mailtrap.send_email_verification_link(
-            to_name=f"{schm.first_name} {schm.last_name}",
-            to_email=schm.email,
-            link=verification_link,
-            cfg=settings.mailtrap,
+            f"{schm.first_name} {schm.last_name}",
+            schm.email,
+            link,
+            settings.mailtrap,
         )
-        await session.commit()
-    except MailtrapError as e:
-        logger.error(f"email_auth MailtrapError: {e}")
-        raise HTTPException(status_code=500, detail="Could not send email verification link")
-    except Exception as e:
-        logger.error(f"email_auth finalize_session: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
 
-    return user
+        await session.commit()
+    except HTTPException as e:
+        await session.rollback()
+        clear_auth_cookies(res)
+        raise e
+
+    return EmailAuthResponse.model_validate(user)
 
 
 @users_router.post("/auth/verify")
-async def verify(token: Annotated[str, Query()], auth: authProbeDep, session: DBSession):
+async def verify(
+    token: Annotated[str, Query()], auth: authProbeDep, session: sessionDep
+):
     claims = decode_token(token, "email_verification")
 
     if auth:
         if auth[0] != claims.sub:
-            content = MessageResponse(message="You are not the same person!").model_dump_json()
-            return Response(status_code=status.HTTP_400_BAD_REQUEST, content=content)
+            content = MessageResponse(
+                message="You are not the same person!"
+            ).model_dump_json()
+            return Response(
+                status_code=status.HTTP_400_BAD_REQUEST, content=content
+            )
 
-    try:
-        await UsersRepository.set_email_verified(claims.sub, session)
-    except Exception as e:
-        logger.error(f"logout SessionsRepository.delete: {e}")
-        raise HTTPException(status_code=500, detail="Something went wrong")
+    await UsersRepository.set_email_verified(session, claims.sub)
+    await session.commit()
 
     if auth:
         return MessageResponse(message="Your email verified successfully")
@@ -141,11 +148,12 @@ async def verify(token: Annotated[str, Query()], auth: authProbeDep, session: DB
 
 
 @users_router.post("/auth/logout")
-async def logout(auth: authDep, session: DBSession):
+async def logout(res: Response, auth: authDep, session: sessionDep):
     user_id, _, refresh_token = auth
 
-    try:
-        return await SessionsRepository.delete(user_id, refresh_token, session)
-    except Exception as e:
-        logger.error(f"logout SessionsRepository.delete: {e}")
-        raise HTTPException(status_code=500, detail="Something went wrong")
+    await SessionsRepository.delete(session, user_id, refresh_token)
+    await session.commit()
+
+    clear_auth_cookies(res)
+
+    return MessageResponse(message="You successfully logged out")

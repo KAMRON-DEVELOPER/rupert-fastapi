@@ -2,7 +2,12 @@ from functools import lru_cache
 from pathlib import Path
 
 from pydantic import BaseModel
-from pydantic_settings import BaseSettings, JsonConfigSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    JsonConfigSettingsSource,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
 from types_aiobotocore_s3.literals import BucketLocationConstraintType
 
 
@@ -29,7 +34,9 @@ class RedisParams(BaseModel):
 
 
 class RedisConfig(BaseModel):
-    url: str | None = "redis://localhost:6379/0?decode_responses=True&protocol=3"
+    url: str | None = (
+        "redis://localhost:6379/0?decode_responses=True&protocol=3"
+    )
     params: RedisParams | None = RedisParams()
     ssl: RedisSsl | None = None
 
@@ -72,7 +79,7 @@ class S3Config(BaseModel):
 class JwtConfig(BaseModel):
     secret_key: str = ""
     algorithm: str = "HS256"
-    domain: str | None = None
+    domain: str = "rupert.uz"
     access_token_expire_in_minutes: int = 60
     refresh_token_expire_in_days: int = 90
     email_verification_token_expire_in_hours: int = 24

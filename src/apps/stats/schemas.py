@@ -1,7 +1,12 @@
 from datetime import date
 
 from src.apps.shared.schemas import ResponseSchema
-from src.apps.shared.schemas.enums import CompanyType, JobSearchStatus, Specialization, VacancyStatus
+from src.apps.shared.schemas.enums import (
+    CompanyType,
+    JobSearchStatus,
+    Specialization,
+    VacancyStatus,
+)
 
 
 class BucketBase(ResponseSchema):

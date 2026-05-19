@@ -4,7 +4,12 @@ from uuid import UUID
 from fastapi import Depends, Query
 from pydantic import AnyUrl, EmailStr, Field
 
-from src.apps.shared.schemas import BaseLocationModelResponse, LocationRequest, RequestSchema
+from src.apps.companies.schemas.company_member import CompanyMemberResponse
+from src.apps.shared.schemas import (
+    BaseLocationModelResponse,
+    LocationRequest,
+    RequestSchema,
+)
 from src.apps.shared.schemas.enums import CompanyStatus, CompanyType
 from src.apps.shared.schemas.location import NullableLocationRequest
 
@@ -55,9 +60,10 @@ class CompanySummary(BaseLocationModelResponse):
     open_vacancies_count: int | None = None
 
 
-class CompanyDetail(BaseLocationModelResponse):
+class CompanyDetail(CompanySummary):
     description: str | None
     website_url: AnyUrl | None
     contact_email: str | None
     contact_phone: str | None
     member_count: int | None = None
+    members: list[CompanyMemberResponse] = Field(default_factory=list)

@@ -26,6 +26,7 @@ dependencies = [
     "types-aioboto3[s3]>=15.5.0",
     "uvicorn[standard]>=0.42.0",
     "scalar-fastapi>=1.8.2",
+    "faker>=40.18.0",
 ]
 
 [dependency-groups]
@@ -40,35 +41,32 @@ dev = [
     "ruff>=0.15.8",
 ]
 
-
-[tool.pyrefly]
-python-interpreter-path = ".venv/bin/python"
-
-[tool.pyright]
-exclude = [".venv", "deploy"]
-typeCheckingMode = "standard"
-venvPath = "."
-venv = ".venv"
+[tool.basedpyright]
 include = ["src", "tests", "main.py"]
+exclude = [".venv", "deploy", "**/__pycache__"]
+typeCheckingMode = "standard"
+reportUnusedParameter = "warning"
+reportUnusedVariable = "warning"
+reportUnusedExpression = "warning"
+reportUnusedCoroutine = "warning"
+reportUnusedImport = "warning"
 
 [tool.isort]
 profile = "black"
-line_length = 120
+line_length = 80
+extend_skip = ["alembic"]
 
 [tool.black]
-line-length = 120
+line-length = 80
+extend-exclude = "alembic"
 
 [tool.ruff]
-line-length = 120
+line-length = 80
+extend-exclude = ["alembic"]
 
 [tool.ruff.format]
 quote-style = "double"
+indent-style = "space"
 
 [tool.ruff.lint]
-select = ["I"]
-
-[tool.mypy]
-mypy_path = [".venv"]
-files = ["./", "./pod/"]
-strict = true
-ignore_missing_imports = false
+extend-select = ["I"]

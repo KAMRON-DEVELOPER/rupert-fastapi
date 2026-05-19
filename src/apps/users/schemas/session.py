@@ -1,10 +1,10 @@
 from datetime import datetime
 from uuid import UUID
 
-from src.apps.shared.schemas import ResponseSchema
+from src.apps.shared.schemas import BaseModelResponse
 
 
-class SessionResponse(ResponseSchema):
+class SessionResponse(BaseModelResponse):
     user_id: UUID
     user_agent: str | None
     ip_addr: str | None

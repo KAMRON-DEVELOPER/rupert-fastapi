@@ -1,20 +1,20 @@
 import asyncio
-from pprint import pprint
-from typing import Annotated
+from typing import Annotated, cast
+from urllib.parse import urljoin
 
 from bcrypt import gensalt, hashpw
-from dead_simple_oauth_fastapi import GithubUser, GoogleUser
-from fastapi import Depends, HTTPException, Query, Request, Response, status
+from faker import Faker
+from fastapi import HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import update
 
-from src.apps.shared.schemas.enums import UserStatus
+from src.apps.shared.schemas.enums import Provider
 from src.apps.users.models import UserModel
+from src.apps.users.repositories.oauth_user import OAuthUsersRepository
+from src.apps.users.repositories.user import UsersRepository
 from src.apps.users.schemas.auth import PasswordSetupRequest
 from src.apps.users.utils import finalize_session
-from src.core.database import DBSession
-from src.core.logger import logger
-from src.core.oauth import github, google
+from src.core.database import sessionDep
+from src.core.oauth import GithubUserDep, GoogleUserDep, github, google
 from src.core.settings import get_settings
 from src.dependencies.proactive_refresh import decode_token
 
@@ -30,28 +30,44 @@ async def google_oauth(req: Request):
 
 @users_router.get("/auth/google/callback")
 async def google_oauth_callback(
-    req: Request,
-    res: Response,
-    oauth_user: Annotated[GoogleUser, Depends(google.callback_dependency())],
-    session: DBSession,
+    req: Request, google_user: GoogleUserDep, session: sessionDep
 ):
-    try:
-        user = UserModel(
-            email=oauth_user.email,
-            email_verified=oauth_user.email_verified,
-            first_name=oauth_user.given_name,
-            last_name=oauth_user.family_name,
-            status=UserStatus.active,
-        )
-        session.add(user)
-        await session.flush()
+    oauth_user = await OAuthUsersRepository.get_by_provider_id(
+        session, google_user.sub, False
+    )
 
-        await finalize_session(req, res, user, session)
-        return RedirectResponse(settings.frontend_endpoint)
-    except Exception as e:
-        logger.error("google_oauth_callback [session.flush, finalize_session]")
-        pprint(e)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
+    if oauth_user:
+        user = await UsersRepository.get_summary_by_id(
+            session,
+            oauth_user.user_id,
+        )
+        user = cast(UserModel, user)
+    else:
+        if not google_user.email:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Email is not optional, we do not support that yet, reach contact support",
+            )
+
+        fake = Faker()
+        first_name = google_user.given_name or fake.first_name()
+        last_name = google_user.family_name or fake.last_name()
+
+        user = await UsersRepository.create(
+            session,
+            google_user.email,
+            first_name,
+            last_name,
+            email_verified=True,
+        )
+        await OAuthUsersRepository.create(
+            session, google_user.sub, user.id, Provider.google, google_user.name
+        )
+
+    redirect = RedirectResponse(settings.frontend_endpoint)
+    await finalize_session(req, redirect, session, user.id)
+    await session.commit()
+    return redirect
 
 
 @users_router.get("/auth/github")
@@ -61,41 +77,69 @@ async def github_oauth(request: Request):
 
 @users_router.get("/auth/github/callback")
 async def github_oauth_callback(
-    req: Request,
-    res: Response,
-    oauth_user: Annotated[GithubUser, Depends(github.callback_dependency())],
-    session: DBSession,
+    req: Request, github_user: GithubUserDep, session: sessionDep
 ):
-    try:
-        user = UserModel(
-            email=oauth_user.email,
-            email_verified=True,
-            first_name=oauth_user.name,
-            last_name=None,
-            status=UserStatus.active,
-        )
-        session.add(user)
-        await session.flush()
+    oauth_user = await OAuthUsersRepository.get_by_provider_id(
+        session, str(github_user.id), False
+    )
 
-        await finalize_session(req, res, user, session)
-        return RedirectResponse(settings.frontend_endpoint)
-    except Exception as e:
-        logger.error("google_oauth_callback [session.flush, finalize_session]")
-        pprint(e)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
+    if oauth_user:
+        user = await UsersRepository.get_summary_by_id(
+            session,
+            oauth_user.user_id,
+        )
+        user = cast(UserModel, user)
+    else:
+        if not github_user.email:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Email is not optional, we do not support that yet, reach contact support",
+            )
+
+        fake = Faker()
+        parts = (github_user.name or "").split(" ", maxsplit=1)
+        first_name = (parts[0] if len(parts) > 0 else None) or fake.first_name()
+        last_name = (parts[1] if len(parts) > 1 else None) or fake.last_name()
+
+        user = await UsersRepository.create(
+            session,
+            github_user.email,
+            first_name,
+            last_name,
+            email_verified=True,
+        )
+        await OAuthUsersRepository.create(
+            session,
+            str(github_user.id),
+            user.id,
+            Provider.google,
+            github_user.login,
+        )
+
+    redirect = RedirectResponse(settings.frontend_endpoint)
+    await finalize_session(req, redirect, session, user.id)
+    await session.commit()
+    return redirect
 
 
 @users_router.post("/auth/password-setup")
-async def password_setup(token: Annotated[str, Query], schm: PasswordSetupRequest, session: DBSession):
+async def password_setup(
+    token: Annotated[str, Query],
+    schm: PasswordSetupRequest,
+    session: sessionDep,
+):
     decoded = decode_token(token, "password_setup")
 
-    password_hash_bytes = await asyncio.to_thread(hashpw, schm.password.encode(), gensalt(rounds=8))
+    password_hash_bytes = await asyncio.to_thread(
+        hashpw, schm.password.encode(), gensalt(rounds=8)
+    )
     password_hash = password_hash_bytes.decode()
 
-    stmt = update(UserModel).where(UserModel.id == decoded.sub).values(password_hash=password_hash)
-    try:
-        await session.execute(stmt)
-    except Exception as e:
-        logger.error("password_setup session.execute")
-        pprint(e)
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Something went wrong")
+    await UsersRepository.update(
+        session, decoded.sub, {"password_hash": password_hash}
+    )
+    await session.commit()
+
+    base = settings.frontend_endpoint.rstrip("/")
+    url = urljoin(base, "auth")
+    return RedirectResponse(url)
