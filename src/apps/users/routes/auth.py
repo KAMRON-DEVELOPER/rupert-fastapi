@@ -102,7 +102,7 @@ async def email_auth(
     await finalize_session(req, res, session, user.id)
 
     token = create_token(user.id, "email_verification")
-    link = f"{settings.frontend_endpoint}/auth/verify?token={token}"
+    link = f"{settings.frontend_endpoint}/auth/verify?token={token}/"
 
     try:
         await Mailtrap.send_email_verification_link(
