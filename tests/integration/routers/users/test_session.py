@@ -48,6 +48,53 @@ async def test_session_listing_and_single_revocation(
 
 
 @pytest.mark.integration
+async def test_session_revoking_current_session_clears_auth_cookies(
+    client: AsyncClient,
+    session: AsyncSession,
+    make_user: Callable[..., Awaitable[UserModel]],
+):
+    user = await make_user()
+    current_session = await session.scalar(
+        select(SessionModel).where(SessionModel.user_id == user.id)
+    )
+    assert current_session is not None
+
+    revoke_res = await client.delete(
+        f"/api/v1/users/sessions/{current_session.id}"
+    )
+    set_cookie_headers = revoke_res.headers.get_list("set-cookie")
+
+    assert revoke_res.status_code == 200
+    assert "access_token" not in client.cookies
+    assert "refresh_token" not in client.cookies
+    assert any(h.startswith("access_token=") for h in set_cookie_headers)
+    assert any(h.startswith("refresh_token=") for h in set_cookie_headers)
+
+
+@pytest.mark.integration
+async def test_session_revocation_invalidates_existing_access_token(
+    client: AsyncClient,
+    session: AsyncSession,
+    make_user: Callable[..., Awaitable[UserModel]],
+):
+    user = await make_user()
+    current_session = await session.scalar(
+        select(SessionModel).where(SessionModel.user_id == user.id)
+    )
+    assert current_session is not None
+
+    await SessionsRepository.delete_by_id(session, user.id, current_session.id)
+    await session.flush()
+
+    probe_res = await client.get("/api/v1/users/auth/probe")
+
+    assert probe_res.status_code == 200
+    assert probe_res.json() == {"isAuthenticated": False}
+    assert "access_token" not in client.cookies
+    assert "refresh_token" not in client.cookies
+
+
+@pytest.mark.integration
 async def test_session_rejects_revoking_another_users_session(
     client: AsyncClient,
     session: AsyncSession,

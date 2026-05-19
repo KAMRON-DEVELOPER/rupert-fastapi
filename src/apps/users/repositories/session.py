@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.users.models import SessionModel
@@ -95,7 +95,7 @@ class SessionsRepository:
     @staticmethod
     async def delete_by_id(
         session: AsyncSession, user_id: UUID, session_id: UUID
-    ) -> None:
+    ) -> str:
         stmt = (
             delete(SessionModel)
             .where(
@@ -103,19 +103,20 @@ class SessionsRepository:
                 SessionModel.user_id == user_id,
                 SessionModel.is_active.is_(True),
             )
-            .returning(SessionModel.id)
+            .returning(SessionModel.refresh_token)
         )
 
         try:
-            deleted_id = await session.scalar(stmt)
+            deleted_refresh_token = await session.scalar(stmt)
 
-            if not deleted_id:
+            if not deleted_refresh_token:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Session not found",
                 )
 
             await session.flush()
+            return deleted_refresh_token
         except HTTPException as e:
             raise e
         except Exception as e:
@@ -154,6 +155,44 @@ class SessionsRepository:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while deleting sessions",
+            )
+
+    @staticmethod
+    async def replace_refresh_token(
+        session: AsyncSession,
+        user_id: UUID,
+        old_refresh_token: str,
+        new_refresh_token: str,
+    ) -> None:
+        stmt = (
+            update(SessionModel)
+            .where(
+                SessionModel.user_id == user_id,
+                SessionModel.refresh_token == old_refresh_token,
+                SessionModel.is_active.is_(True),
+            )
+            .values(refresh_token=new_refresh_token)
+            .returning(SessionModel.id)
+        )
+
+        try:
+            updated_id = await session.scalar(stmt)
+
+            if not updated_id:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Session not found or expired",
+                )
+
+            await session.flush()
+        except HTTPException:
+            raise
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[SessionsRepository] replace_refresh_token: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while refreshing session",
             )
 
     @staticmethod

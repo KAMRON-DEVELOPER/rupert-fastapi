@@ -12,6 +12,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.users.models import ActivityModel
+from src.apps.users.repositories.session import SessionsRepository
 from src.core.database import sessionDep
 from src.core.logger import logger
 from src.core.settings import get_settings
@@ -210,6 +211,16 @@ class ProactiveRefresh:
         refresh_token = auth_cookies.refresh_token
         dau = auth_cookies.dau
         user_id: UUID | None = None
+        session_verified = False
+
+        def unauthenticated():
+            clear_auth_cookies(res)
+            if self.required:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Session not found or expired",
+                )
+            return None
 
         if access_token:
             access_needs_refresh, access_claims, expired = handle_decode(
@@ -239,6 +250,13 @@ class ProactiveRefresh:
                 refresh_token, "refresh"
             )
 
+            current_session = await SessionsRepository.get_by_user_id_and_token(
+                session, refresh_claims.sub, refresh_token, required=False
+            )
+            if not current_session:
+                return unauthenticated()
+            session_verified = True
+
             new_access_token = create_token(
                 user_id=refresh_claims.sub, type="access"
             )
@@ -251,9 +269,17 @@ class ProactiveRefresh:
             )
 
             if refresh_needs_refresh:
+                old_refresh_token = refresh_token
                 new_refresh_token = create_token(
                     user_id=refresh_claims.sub, type="refresh"
                 )
+                await SessionsRepository.replace_refresh_token(
+                    session,
+                    refresh_claims.sub,
+                    old_refresh_token,
+                    new_refresh_token,
+                )
+                await session.commit()
                 refresh_token = new_refresh_token
                 set_cookie(
                     res,
@@ -268,6 +294,13 @@ class ProactiveRefresh:
             if self.required:
                 raise HTTPException(status_code=401, detail="Not authenticated")
             return None
+
+        if refresh_token and not session_verified:
+            current_session = await SessionsRepository.get_by_user_id_and_token(
+                session, user_id, refresh_token, required=False
+            )
+            if not current_session:
+                return unauthenticated()
 
         now = datetime.now(UTC)
         today = now.date()

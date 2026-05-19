@@ -1,12 +1,12 @@
 from uuid import UUID
 
-from fastapi import Query
+from fastapi import Query, Response
 
 from src.apps.shared.schemas import MessageResponse
 from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.schemas.session import SessionResponse
 from src.core.database import sessionDep
-from src.dependencies.proactive_refresh import authDep
+from src.dependencies.proactive_refresh import authDep, clear_auth_cookies
 
 from .router import users_router
 
@@ -19,15 +19,24 @@ async def list_sessions(auth: authDep, session: sessionDep):
 
 
 @users_router.delete("/sessions/{session_id}", response_model=MessageResponse)
-async def revoke_session(auth: authDep, session: sessionDep, session_id: UUID):
-    user_id, _, _ = auth
-    await SessionsRepository.delete_by_id(session, user_id, session_id)
+async def revoke_session(
+    res: Response, auth: authDep, session: sessionDep, session_id: UUID
+):
+    user_id, _, refresh_token = auth
+    deleted_refresh_token = await SessionsRepository.delete_by_id(
+        session, user_id, session_id
+    )
     await session.commit()
+
+    if deleted_refresh_token == refresh_token:
+        clear_auth_cookies(res)
+
     return MessageResponse(message="Session revoked successfully")
 
 
 @users_router.delete("/sessions", response_model=MessageResponse)
 async def revoke_sessions(
+    res: Response,
     auth: authDep,
     session: sessionDep,
     include_current: bool = Query(default=False),
@@ -38,4 +47,8 @@ async def revoke_sessions(
         session, user_id, except_refresh_token=except_refresh_token
     )
     await session.commit()
+
+    if include_current:
+        clear_auth_cookies(res)
+
     return MessageResponse(message=f"Revoked {deleted_count} sessions")
