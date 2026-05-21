@@ -67,8 +67,8 @@ class UsersRepository:
                 )
 
             await session.flush()
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             await session.rollback()
             logger.error(f"[UsersRepository] update: {e}")
@@ -88,13 +88,11 @@ class UsersRepository:
 
             if not deleted_id:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="User not found to delete",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found",
                 )
-
-            await session.flush()
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             await session.rollback()
             logger.error(f"[UsersRepository] delete: {e}")
@@ -122,8 +120,8 @@ class UsersRepository:
                 )
 
             await session.flush()
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             await session.rollback()
             logger.error(f"[UsersRepository] delete: {e}")
@@ -146,8 +144,8 @@ class UsersRepository:
                 )
 
             return record
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"[UsersRepository] get_by_email: {e}")
             raise HTTPException(
@@ -156,7 +154,7 @@ class UsersRepository:
             )
 
     @staticmethod
-    async def get_summary_by_id(session: AsyncSession, id: UUID, required=True):
+    async def get_summary(session: AsyncSession, id: UUID, required=True):
         stmt = select(UserModel).where(UserModel.id == id)
 
         try:
@@ -169,8 +167,8 @@ class UsersRepository:
                 )
 
             return record
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"[UsersRepository] get_summary_by_id: {e}")
             raise HTTPException(
@@ -179,7 +177,7 @@ class UsersRepository:
             )
 
     @staticmethod
-    async def get_detail_by_id(session: AsyncSession, id: UUID, required=True):
+    async def get_detail(session: AsyncSession, id: UUID, required=True):
         stmt = (
             select(UserModel)
             .options(
@@ -202,8 +200,8 @@ class UsersRepository:
                 )
 
             return record
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"[UsersRepository] get_detail_by_id: {e}")
             raise HTTPException(

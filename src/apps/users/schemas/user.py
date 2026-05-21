@@ -1,5 +1,6 @@
 from datetime import date
 from typing import Annotated
+from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
 from fastapi import Form
@@ -56,8 +57,8 @@ class UserUpdateRequest(NullableLocationRequest):
         cls,
         first_name: Annotated[str | None, Form(alias="firstName")] = None,
         last_name: Annotated[str | None, Form(alias="lastName")] = None,
-        country: Annotated[str | None, Form()] = None,
-        city: Annotated[str | None, Form()] = None,
+        country_id: Annotated[UUID | None, Form()] = None,
+        city_id: Annotated[UUID | None, Form()] = None,
         headline: Annotated[str | None, Form()] = None,
         birthdate: Annotated[date | None, Form()] = None,
         bio: Annotated[str | None, Form()] = None,
@@ -84,8 +85,8 @@ class UserUpdateRequest(NullableLocationRequest):
         return cls(
             first_name=first_name,
             last_name=last_name,
-            country=country,
-            city=city,
+            country_id=country_id,
+            city_id=city_id,
             headline=headline,
             birthdate=birthdate,
             bio=bio,

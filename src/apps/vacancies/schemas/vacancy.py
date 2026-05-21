@@ -91,8 +91,8 @@ class VacancyListParams(RequestSchema):
     work_format: WorkFormat | None = None
     employment_type: EmploymentType | None = None
     status: VacancyStatus | None = None
-    country: str | None = None
-    city: str | None = None
+    country_id: UUID | None = None
+    city_id: UUID | None = None
     skill_ids: list[UUID] | None = Query(None)
 
 

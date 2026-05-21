@@ -51,10 +51,10 @@ class CompaniesRepository:
                 stmt = stmt.where(CompanyModel.type == filters.type)
             if filters.status:
                 stmt = stmt.where(CompanyModel.status == filters.status)
-            if filters.country:
-                stmt = stmt.where(CompanyModel.country == filters.country)
-            if filters.city:
-                stmt = stmt.where(CompanyModel.city == filters.city)
+            if filters.country_id:
+                stmt = stmt.where(CompanyModel.country_id == filters.country_id)
+            if filters.city_id:
+                stmt = stmt.where(CompanyModel.city_id == filters.city_id)
             if filters.has_open_vacancies is not None:
                 open_vacancy_exists = exists().where(
                     VacancyModel.company_id == CompanyModel.id,
@@ -246,8 +246,6 @@ class CompaniesRepository:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Company not found",
                 )
-
-            await session.flush()
         except HTTPException:
             raise
         except Exception as e:

@@ -1,3 +1,4 @@
-from fastapi import APIRouter
+from . import chats, ws
+from .router import chats_router
 
-chats_router = APIRouter()
+__all__ = ["chats_router", "chats", "ws"]

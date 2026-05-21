@@ -123,8 +123,6 @@ class ResumesRepository:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Resume not found",
                 )
-
-            await session.flush()
         except HTTPException:
             raise
         except Exception as e:

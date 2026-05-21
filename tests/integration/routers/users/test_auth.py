@@ -159,7 +159,7 @@ async def test_verify_email_message_response(
     assert res.status_code == 200
     assert "message" in res.json()
 
-    user = await UsersRepository.get_summary_by_id(session, user.id)
+    user = await UsersRepository.get_summary(session, user.id)
     assert user is not None
     assert user.email_verified
 

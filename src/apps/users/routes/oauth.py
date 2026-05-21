@@ -37,7 +37,7 @@ async def google_oauth_callback(
     )
 
     if oauth_user:
-        user = await UsersRepository.get_summary_by_id(
+        user = await UsersRepository.get_summary(
             session,
             oauth_user.user_id,
         )
@@ -84,7 +84,7 @@ async def github_oauth_callback(
     )
 
     if oauth_user:
-        user = await UsersRepository.get_summary_by_id(
+        user = await UsersRepository.get_summary(
             session,
             oauth_user.user_id,
         )

@@ -13,13 +13,21 @@ from .base import BaseModel
 class BaseMessageModel(BaseModel):
     __abstract__ = True
 
-    sender_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey(column="users.id", ondelete="CASCADE")
+    sender_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(column="users.id", ondelete="SET NULL"),
+        index=True,
     )
-    message: Mapped[str] = mapped_column(Text)
-    image_urls: Mapped[list[str]] = mapped_column(ARRAY(item_type=String))
-    video_urls: Mapped[list[str]] = mapped_column(ARRAY(item_type=String))
-    scheduled_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True))
+    message: Mapped[str | None] = mapped_column(Text)
+    image_urls: Mapped[list[str]] = mapped_column(
+        ARRAY(item_type=String), default=list, server_default="{}"
+    )
+    video_urls: Mapped[list[str]] = mapped_column(
+        ARRAY(item_type=String), default=list, server_default="{}"
+    )
+    scheduled_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True)
+    )
 
     def __repr__(self):
         return "<BaseMessageModel>"

@@ -146,12 +146,12 @@ class ResumeSkillsRepository:
                 .returning(ResumeSkillLink.id)
             )
             deleted_id = await session.scalar(stmt)
+
             if not deleted_id:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Resume skill link not found",
                 )
-            await session.flush()
         except HTTPException:
             raise
         except Exception as e:

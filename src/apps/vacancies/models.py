@@ -19,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.apps.shared.models import BaseLocationModel, BaseModel
+from src.apps.shared.models import BaseModel, BaseNullableLocationModel
 from src.apps.shared.schemas.enums import (
     ApplicationStatus,
     EmploymentType,
@@ -65,7 +65,7 @@ class VacancySkillLink(BaseModel):
         return "<VacancySkillLink>"
 
 
-class VacancyModel(BaseLocationModel):
+class VacancyModel(BaseNullableLocationModel):
     __tablename__ = "vacancies"
     __table_args__ = (
         CheckConstraint(

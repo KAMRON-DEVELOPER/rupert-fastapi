@@ -19,9 +19,10 @@ uv run uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
 ```bash
-ruff format .
-ruff format . --check
-ruff check . --fix
+uv run basedpyright
+uv run ruff format --check
+uv run ruff format
+uv run ruff check --fix
 isort . && black .
 black --check .
 black --diff .

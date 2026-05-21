@@ -98,6 +98,6 @@ async def test_update_user_uploads_avatar(
     assert calls[0]["data"] == avatar_bytes
     assert calls[0]["content_type"] == "image/png"
 
-    updated_user = await UsersRepository.get_summary_by_id(session, user.id)
+    updated_user = await UsersRepository.get_summary(session, user.id)
     updated_user = cast(UserModel, updated_user)
     assert updated_user.avatar_url == f"users/{user.id.hex}/avatar"

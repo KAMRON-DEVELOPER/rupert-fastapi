@@ -216,6 +216,15 @@ class ChatEvent(AutoName):
     typing_stop = auto()
     sent_message = auto()
     created_chat = auto()
+    ping = auto()
+
+
+class MessageKind(AutoName):
+    text = auto()
+    image = auto()
+    video = auto()
+    gif = auto()
+    media = auto()
 
 
 # --- Shared ---

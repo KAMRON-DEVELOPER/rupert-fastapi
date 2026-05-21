@@ -8,7 +8,11 @@ from fastapi.responses import JSONResponse
 from scalar_fastapi import get_scalar_api_reference
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
+from src.apps.admin.routes import admin_router
+from src.apps.chats.routes import chats_router
 from src.apps.companies.routes import companies_router
+from src.apps.locations.routes import locations_router
+from src.apps.skills.routes import skills_router
 from src.apps.stats.routes import stats_router
 from src.apps.users.routes import users_router
 from src.apps.vacancies.routes import vacancies_router
@@ -53,12 +57,20 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 app.include_router(router=stats_router, prefix="/api/v1/stats", tags=["stats"])
 app.include_router(router=users_router, prefix="/api/v1/users", tags=["users"])
+app.include_router(router=chats_router, prefix="/api/v1/chats", tags=["chats"])
 app.include_router(
     router=companies_router, prefix="/api/v1/companies", tags=["companies"]
 )
 app.include_router(
     router=vacancies_router, prefix="/api/v1/vacancies", tags=["vacancies"]
 )
+app.include_router(
+    router=skills_router, prefix="/api/v1/skills", tags=["skills"]
+)
+app.include_router(
+    router=locations_router, prefix="/api/v1/locations", tags=["locations"]
+)
+app.include_router(router=admin_router, prefix="/api/v1/admin", tags=["admin"])
 
 
 @app.get(path="/", tags=["root"])

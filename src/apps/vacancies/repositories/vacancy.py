@@ -97,10 +97,10 @@ class VacanciesRepository:
                     VacancySkillLink.skill_id.in_(filters.skill_ids),
                 )
                 stmt = stmt.where(skill_exists)
-            if filters.country:
-                stmt = stmt.where(VacancyModel.country == filters.country)
-            if filters.city:
-                stmt = stmt.where(VacancyModel.city == filters.city)
+            if filters.country_id:
+                stmt = stmt.where(VacancyModel.country_id == filters.country_id)
+            if filters.city_id:
+                stmt = stmt.where(VacancyModel.city_id == filters.city_id)
 
         # Count total BEFORE pagination (filters already applied above)
         # Sorting rows is computationally expensive for the database.
@@ -482,22 +482,23 @@ class VacanciesRepository:
             (CompanyMemberRole.owner, CompanyMemberRole.recruiter),
         )
 
-        try:
-            stmt = (
-                delete(VacancySkillLink)
-                .where(
-                    VacancySkillLink.id == link_id,
-                    VacancySkillLink.vacancy_id == vacancy_id,
-                )
-                .returning(VacancySkillLink.id)
+        stmt = (
+            delete(VacancySkillLink)
+            .where(
+                VacancySkillLink.id == link_id,
+                VacancySkillLink.vacancy_id == vacancy_id,
             )
+            .returning(VacancySkillLink.id)
+        )
+
+        try:
             deleted_id = await session.scalar(stmt)
+
             if not deleted_id:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Vacancy skill link not found",
                 )
-            await session.flush()
         except HTTPException:
             raise
         except Exception as e:
@@ -710,12 +711,12 @@ class VacanciesRepository:
                 .returning(SavedVacancyModel.id)
             )
             deleted_id = await session.scalar(stmt)
+
             if not deleted_id:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Saved vacancy not found",
                 )
-            await session.flush()
         except HTTPException:
             raise
         except Exception as e:

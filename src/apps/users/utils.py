@@ -42,8 +42,8 @@ async def finalize_session(
             value=new_refresh_token,
             max_age=settings.jwt.refresh_token_expire_in_days * 86400,
         )
-    except HTTPException as e:
-        raise e
+    except HTTPException:
+        raise
     except Exception as e:
         await session.rollback()
         logger.error(f"finalize_session: {e}")

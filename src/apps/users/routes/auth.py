@@ -42,7 +42,7 @@ async def auth_probe(auth: authProbeDep):
 
 @users_router.post(path="/auth/email")
 async def email_auth(
-    req: Request, res: Response, schm: EmailAuthRequest, session: sessionDep
+    req: Request, res: Response, session: sessionDep, schm: EmailAuthRequest
 ):
     user = await UsersRepository.get_by_email(session, schm.email, False)
 
@@ -113,17 +113,17 @@ async def email_auth(
         )
 
         await session.commit()
-    except HTTPException as e:
+    except HTTPException:
         await session.rollback()
         clear_auth_cookies(res)
-        raise e
+        raise
 
     return EmailAuthResponse.model_validate(user)
 
 
 @users_router.post("/auth/verify")
 async def verify(
-    token: Annotated[str, Query()], auth: authProbeDep, session: sessionDep
+    session: sessionDep, auth: authProbeDep, token: Annotated[str, Query()]
 ):
     claims = decode_token(token, "email_verification")
 

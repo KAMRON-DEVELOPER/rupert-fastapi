@@ -38,10 +38,10 @@ async def get_user(
     user_id, _, _ = auth
 
     if summary:
-        user = await UsersRepository.get_summary_by_id(session, user_id)
+        user = await UsersRepository.get_summary(session, user_id)
         return UserSummaryResponse.model_validate(user)
     else:
-        user = await UsersRepository.get_detail_by_id(session, user_id)
+        user = await UsersRepository.get_detail(session, user_id)
         return UserDetailResponse.model_validate(user)
 
 
@@ -86,7 +86,7 @@ async def read_validated_image(
 
 
 @users_router.patch("/")
-async def update_user_form(
+async def update_user(
     auth: authDep,
     session: sessionDep,
     schm: Annotated[UserUpdateRequest, Depends(UserUpdateRequest.as_form)],

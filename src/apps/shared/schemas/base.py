@@ -8,6 +8,7 @@ from pydantic.alias_generators import to_camel
 class RequestSchema(BaseModel):
     model_config = ConfigDict(
         alias_generator=AliasGenerator(validation_alias=to_camel),
+        extra="forbid",
     )
 
 

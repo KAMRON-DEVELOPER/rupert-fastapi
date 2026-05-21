@@ -23,7 +23,13 @@ from src.apps.posts.models import (
     PostModel,
     PostTagLink,
 )
-from src.apps.shared.models import Base, SkillModel, TagModel
+from src.apps.shared.models import (
+    Base,
+    CityModel,
+    CountryModel,
+    SkillModel,
+    TagModel,
+)
 from src.apps.users.models import (
     FollowModel,
     ResumeModel,
@@ -64,6 +70,8 @@ __all__ = [
     "SavedVacancyModel",
     "SkillModel",
     "TagModel",
+    "CityModel",
+    "CountryModel",
     "UserModel",
     "UserSkillLink",
     "VacancyModel",
