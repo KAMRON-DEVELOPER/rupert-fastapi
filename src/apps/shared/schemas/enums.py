@@ -210,13 +210,24 @@ class GroupMemberRole(AutoName):
 
 # --- Chats ---
 class ChatEvent(AutoName):
+    ping = auto()
+    error = auto()
     goes_online = auto()
     goes_offline = auto()
     typing_start = auto()
     typing_stop = auto()
     sent_message = auto()
     created_chat = auto()
+
+
+class EventType(AutoName):
     ping = auto()
+    pong = auto()
+
+    chat_message_send = auto()
+    chat_message_created = auto()
+    chat_message_read = auto()
+    error = auto()
 
 
 class MessageKind(AutoName):

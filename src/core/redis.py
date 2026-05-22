@@ -1,65 +1,55 @@
-# import json
-# from datetime import UTC, datetime
-# from inspect import isawaitable
-# from time import time
-# from uuid import UUID, uuid4
+import json
 
-# from redis.asyncio import ConnectionPool, Redis
-# from redis.asyncio.client import PubSub
+from redis.asyncio import ConnectionPool, Redis
+from redis.asyncio.client import PubSub
 
-# from src.apps.chats.schemas import (
-#     ChatMessageSchema,
-#     ChatResponseSchema,
-#     ChatSchema,
-#     ParticipantSchema,
-# )
-# from src.core.logger import logger
-# from src.core.settings import get_settings
+from src.core.settings import get_settings
 
-# settings = get_settings()
+settings = get_settings()
 
 
-# def create_redis():
-#     """Create redis client"""
+def create_redis():
+    """Create redis client"""
 
-#     if settings.redis.url:
-#         pool = ConnectionPool.from_url(settings.redis.url)
-#         return Redis.from_pool(pool)
-#     if settings.redis.params:
-#         return Redis(
-#             host=settings.redis.params.host,
-#             port=settings.redis.params.port,
-#             db=settings.redis.params.db,
-#             username=settings.redis.params.username,
-#             password=settings.redis.params.password,
-#             decode_responses=True,
-#             auto_close_connection_pool=True,
-#         )
+    if settings.redis.url:
+        pool = ConnectionPool.from_url(settings.redis.url)
+        return Redis.from_pool(pool)
+    elif settings.redis.params:
+        return Redis(
+            host=settings.redis.params.host,
+            port=settings.redis.params.port,
+            db=settings.redis.params.db,
+            username=settings.redis.params.username,
+            password=settings.redis.params.password,
+            decode_responses=True,
+            auto_close_connection_pool=True,
+            protocol=3,
+        )
+    else:
+        raise Exception("Redis url and params not set")
 
-#     raise Exception("Redis url and params not set")
 
+class RedisPubSubManager:
+    def __init__(self, client: Redis):
+        self.client = client
+        self.active_subscriptions: dict[str, PubSub] = {}
 
-# class RedisPubSubManager:
-#     def __init__(self, client: Redis):
-#         self.client = client
-#         self.active_subscriptions: dict[str, PubSub] = {}
+    async def publish(self, topic: str, data: dict):
+        await self.client.publish(channel=topic, message=json.dumps(data))
 
-#     async def publish(self, topic: str, data: dict):
-#         await self.client.publish(channel=topic, message=json.dumps(data))
+    async def subscribe(self, topic: str) -> PubSub:
+        pubsub = self.client.pubsub()
+        await pubsub.subscribe(topic)
+        self.active_subscriptions[topic] = pubsub
+        return pubsub
 
-#     async def subscribe(self, topic: str) -> PubSub:
-#         pubsub = self.client.pubsub()
-#         await pubsub.subscribe(topic)
-#         self.active_subscriptions[topic] = pubsub
-#         return pubsub
-
-#     async def unsubscribe(self, topic: str):
-#         if pubsub := self.active_subscriptions.get(topic):
-#             try:
-#                 await pubsub.unsubscribe(topic)
-#                 await pubsub.close()
-#             finally:
-#                 self.active_subscriptions.pop(topic, None)
+    async def unsubscribe(self, topic: str):
+        if pubsub := self.active_subscriptions.get(topic):
+            try:
+                await pubsub.unsubscribe(topic)
+                await pubsub.close()
+            finally:
+                self.active_subscriptions.pop(topic, None)
 
 
 # class ChatCacheManager:

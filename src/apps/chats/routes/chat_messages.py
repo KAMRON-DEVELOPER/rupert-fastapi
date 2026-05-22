@@ -5,10 +5,7 @@ from fastapi import Body, File, Path, Query, UploadFile, status
 
 from apps.chats.models import ChatMessageModel
 from src.apps.chats.repositories.chat_message import ChatMessageRepository
-from src.apps.chats.schemas.chat_message import (
-    ChatMessageCreateRequest,
-    ChatMessageResponse,
-)
+from src.apps.chats.schemas.chat_message import ChatMessageResponse
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
 from src.core.database import sessionDep
 from src.dependencies.proactive_refresh import authDep
@@ -24,19 +21,19 @@ from .router import chats_router
 async def create_chat_message(
     session: sessionDep,
     auth: authDep,
-    chat_id: Annotated[
-        UUID | None, Path(title="None means new chat should be created")
-    ],
-    participant_id: Annotated[
-        UUID | None,
-        Query(title="None means new chat participant should be created"),
-    ],
     message: Annotated[
         str | None, Body(min_length=1, max_length=10_000)
     ] = None,
     reply_id: Annotated[UUID | None, Body()] = None,
     images: Annotated[list[UploadFile] | None, File()] = None,
     videos: Annotated[list[UploadFile] | None, File()] = None,
+    chat_id: Annotated[
+        UUID | None, Path(title="None means new chat should be created")
+    ] = None,
+    participant_id: Annotated[
+        UUID | None,
+        Query(title="None means new chat participant should be created"),
+    ] = None,
 ):
     user_id, _, _ = auth
 

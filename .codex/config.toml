@@ -1,0 +1,3 @@
+project_doc_fallback_filenames = [".agents.md"]
+# 64 KiB (32 KiB by default)
+project_doc_max_bytes = 65536
