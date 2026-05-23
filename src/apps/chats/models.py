@@ -8,6 +8,7 @@ from sqlalchemy import (
     TIMESTAMP,
     Boolean,
     ForeignKey,
+    SmallInteger,
     Text,
     UniqueConstraint,
 )
@@ -15,9 +16,54 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.apps.shared.models import BaseMessageModel, BaseModel
+from src.apps.shared.models.attachment import AttachmentModel
 
 if TYPE_CHECKING:
     from src.apps.users.models import UserModel
+
+
+class ChatMessageAttachmentLink(BaseModel):
+    __tablename__ = "chat_message_attachment_links"
+    __table_args__ = (
+        UniqueConstraint(
+            "chat_message_id",
+            "attachment_id",
+            name="uq_chat_message_attachment",
+        ),
+        UniqueConstraint(
+            "chat_message_id",
+            "position",
+            name="uq_chat_message_attachment_position",
+        ),
+    )
+
+    chat_message_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(column="chat_messages.id", ondelete="CASCADE"),
+        index=True,
+    )
+    attachment_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(column="attachments.id", ondelete="CASCADE"),
+        index=True,
+    )
+    position: Mapped[int] = mapped_column(
+        SmallInteger, default=0, server_default="0"
+    )
+
+    # Relationships
+    chat_message: Mapped["ChatMessageModel"] = relationship(
+        back_populates="attachment_links"
+    )
+    attachment: Mapped["AttachmentModel"] = relationship(
+        back_populates="chat_message_links"
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<ChatMessageAttachmentLink "
+            f"chat_message_id={self.chat_message_id} position={self.position}>"
+        )
 
 
 class ChatMessageModel(BaseMessageModel):
@@ -35,9 +81,6 @@ class ChatMessageModel(BaseMessageModel):
     )
 
     # Relationships
-    sender: Mapped[UserModel] = relationship(
-        back_populates="chat_messages", passive_deletes=True
-    )
     chat: Mapped[ChatModel] = relationship(
         back_populates="messages", passive_deletes=True
     )
@@ -45,6 +88,16 @@ class ChatMessageModel(BaseMessageModel):
         remote_side="ChatMessageModel.id",
         foreign_keys=[reply_id],
     )
+
+    attachment_links: Mapped[list["ChatMessageAttachmentLink"]] = relationship(
+        back_populates="chat_message",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ChatMessageAttachmentLink.position",
+    )
+
+    def __repr__(self) -> str:
+        return f"<ChatMessageModel id={self.id}>"
 
 
 class ChatParticipantModel(BaseModel):

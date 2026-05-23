@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import Body, File, Path, Query, UploadFile, status
 
-from apps.chats.models import ChatMessageModel
+from src.apps.chats.models import ChatMessageModel
 from src.apps.chats.repositories.chat_message import ChatMessageRepository
 from src.apps.chats.schemas.chat_message import ChatMessageResponse
 from src.apps.shared.schemas import PaginatedResponse, paginationDep

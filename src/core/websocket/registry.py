@@ -1,4 +1,6 @@
+import asyncio
 from collections import defaultdict
+from typing import Any, ClassVar
 from uuid import uuid4
 
 from fastapi import WebSocket
@@ -8,26 +10,38 @@ from .types import Channel, ConnectionId, UserId
 
 class ConnectionRegistry:
     """
-    Stores live WebSocket connections and their indexes.
+    Singleton in-memory store for active connections.
 
-    Role:
-    - remember which sockets are alive
-    - remember which user owns which sockets
-    - remember which sockets are subscribed to which channels
-    - cleanup everything quickly on disconnect
+    Owns three indexes:
+        connection_id → WebSocket + outbound Queue
+        channel       → set[ConnectionId]
+        connection_id → set[Channel]
 
-    It does not accept WebSockets.
-    It does not send messages.
-    It does not parse JSON.
-    It does not know chat business logic.
+    The only place websocket.send_json() is ever called is WebSocketConnection._send_loop.
+    Everything here only enqueues.
     """
 
-    def __init__(self) -> None:
+    _instance: ClassVar[ConnectionRegistry | None] = None
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> ConnectionRegistry:
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self, *, queue_maxsize: int = 100) -> None:
+        if getattr(self, "_initialized", False):
+            return
+        self._initialized = True
+        self.queue_maxsize = queue_maxsize
+
         self._sockets: dict[ConnectionId, WebSocket] = {}
+        self._queues: dict[ConnectionId, asyncio.Queue[dict[str, Any]]] = {}
+
         self._connection_users: dict[ConnectionId, UserId] = {}
         self._user_connections: dict[UserId, set[ConnectionId]] = defaultdict(
             set
         )
+
         self._channel_connections: dict[Channel, set[ConnectionId]] = (
             defaultdict(set)
         )
@@ -35,21 +49,21 @@ class ConnectionRegistry:
             defaultdict(set)
         )
 
-    def add_connection(
-        self, *, websocket: WebSocket, user_id: UserId
-    ) -> ConnectionId:
+    def add(self, *, websocket: WebSocket, user_id: UserId) -> ConnectionId:
         connection_id = ConnectionId(uuid4().hex)
 
         self._sockets[connection_id] = websocket
+        self._queues[connection_id] = asyncio.Queue(maxsize=self.queue_maxsize)
+
         self._connection_users[connection_id] = user_id
         self._user_connections[user_id].add(connection_id)
 
         return connection_id
 
-    def remove_connection(
-        self, connection_id: ConnectionId
-    ) -> WebSocket | None:
+    # TODO Really need to store user id? seems not used
+    def remove(self, connection_id: ConnectionId) -> WebSocket | None:
         websocket = self._sockets.pop(connection_id, None)
+        self._queues.pop(connection_id, None)
 
         user_id = self._connection_users.pop(connection_id, None)
         if user_id is not None:
@@ -65,14 +79,16 @@ class ConnectionRegistry:
 
         return websocket
 
-    def subscribe(self, connection_id: ConnectionId, channel: Channel) -> None:
+    def join_channel(
+        self, connection_id: ConnectionId, channel: Channel
+    ) -> None:
         if connection_id not in self._sockets:
             return
 
         self._channel_connections[channel].add(connection_id)
         self._connection_channels[connection_id].add(channel)
 
-    def unsubscribe(
+    def leave_channel(
         self, connection_id: ConnectionId, channel: Channel
     ) -> None:
         self._channel_connections[channel].discard(connection_id)
@@ -80,23 +96,41 @@ class ConnectionRegistry:
 
         if not self._channel_connections[channel]:
             self._channel_connections.pop(channel, None)
-
         if not self._connection_channels[connection_id]:
             self._connection_channels.pop(connection_id, None)
 
-    def get_socket(self, connection_id: ConnectionId) -> WebSocket | None:
-        return self._sockets.get(connection_id)
+    async def next_event(self, connection_id: ConnectionId) -> dict[str, Any]:
+        """Awaited by WebSocketConnection._send_loop to drain a connection's queue."""
+        # TODO: queue.get() useage is correct
+        # If queue is empty, wait until an item is available.
+        # Raises QueueShutDown if the queue has been shut down and is empty, or if the queue has been shut down immediately.
+        return await self._queues[connection_id].get()
 
-    def get_channel_connections(self, channel: Channel) -> list[ConnectionId]:
-        return list(self._channel_connections.get(channel, set()))
+    async def enqueue(
+        self, connection_id: ConnectionId, event: dict[str, Any]
+    ) -> None:
+        queue = self._queues.get(connection_id)
+        if queue is None:
+            return
 
-    def get_user_connections(self, user_id: UserId) -> list[ConnectionId]:
-        return list(self._user_connections.get(user_id, set()))
+        try:
+            queue.put_nowait(event)
+        except asyncio.QueueFull:
+            # A connection whose queue is full is too slow to keep up.
+            # Drop it rather than blocking the broadcast.
+            self.remove(connection_id)
 
-    def get_connection_channels(
-        self, connection_id: ConnectionId
-    ) -> set[Channel]:
-        return set(self._connection_channels.get(connection_id, set()))
+    async def publish_local(
+        self,
+        channel: Channel,
+        event: dict[str, Any],
+        *,
+        exclude: ConnectionId | None = None,
+    ) -> None:
+        """Enqueue an event for every connection currently in the channel."""
+        for cid in list(self._channel_connections.get(channel, set())):
+            if cid != exclude:
+                await self.enqueue(cid, event)
 
 
 connection_registry = ConnectionRegistry()

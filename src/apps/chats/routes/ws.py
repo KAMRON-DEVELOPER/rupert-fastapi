@@ -7,11 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.apps.shared.schemas.enums import ChatEvent
 from src.core.database import sessionDep
 from src.core.logger import logger
+from src.core.websocket.broker import EventBroker, event_broker
 from src.core.websocket.channels import chat_channel, user_channel
 from src.core.websocket.connection import WebSocketConnection, WebSocketHandler
 from src.core.websocket.registry import connection_registry
-from src.core.websocket.transport.base import WebSocketTransport
-from src.core.websocket.transport.local import websocket_transport
 from src.core.websocket.types import ConnectionId, UserId
 from src.dependencies.proactive_refresh import authDep
 
@@ -25,24 +24,21 @@ async def chat_ws(
     auth: authDep,
     chat_id: UUID,
 ):
-    user_id, _, _ = auth
-    user_id = UserId(str(user_id))
+    raw_user_id, _, _ = auth
+    user_id = UserId(str(raw_user_id))
 
     try:
-        # TODO: authorize the user_id is participant of the chat_id
+        # TODO: assert user_id is a participant of chat_id
         pass
     except Exception as e:
-        logger.error(f"[chat_ws] authorization failed: {e}")
+        logger.error("[chat_ws] authorization failed: %s", e)
         raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION)
 
     websocket.state.session = session
     websocket.state.user_id = user_id
     websocket.state.chat_id = chat_id
 
-    channels = {
-        chat_channel(chat_id),
-        user_channel(user_id),
-    }
+    channels = {chat_channel(chat_id), user_channel(user_id)}
 
     handlers: dict[ChatEvent, WebSocketHandler] = {
         ChatEvent.ping: handle_ping,
@@ -58,7 +54,7 @@ async def chat_ws(
         channels=channels,
         handlers=handlers,
         registry=connection_registry,
-        transport=websocket_transport,
+        broker=event_broker,
         connect_handler=connect_handler,
         disconnect_handler=disconnect_handler,
     ) as conn:
@@ -68,16 +64,16 @@ async def chat_ws(
 async def connect_handler(
     websocket: WebSocket,
     connection_id: ConnectionId,
-    transport: WebSocketTransport,
-):
+    broker: EventBroker,
+) -> None:
     user_id: UserId = websocket.state.user_id
     chat_id: UUID = websocket.state.chat_id
 
-    await transport.publish(
+    await broker.publish(
         chat_channel(chat_id),
         {
             "type": ChatEvent.goes_online.value,
-            "user_id": str(user_id),
+            "user_id": user_id,
         },
         exclude=connection_id,
     )
@@ -86,16 +82,16 @@ async def connect_handler(
 async def disconnect_handler(
     websocket: WebSocket,
     connection_id: ConnectionId,
-    transport: WebSocketTransport,
-):
+    broker: EventBroker,
+) -> None:
     user_id: UserId = websocket.state.user_id
     chat_id: UUID = websocket.state.chat_id
 
-    await transport.publish(
+    await broker.publish(
         chat_channel(chat_id),
         {
             "type": ChatEvent.goes_offline.value,
-            "user_id": str(user_id),
+            "user_id": user_id,
         },
         exclude=connection_id,
     )
@@ -104,26 +100,26 @@ async def disconnect_handler(
 async def handle_ping(
     _websocket: WebSocket,
     connection_id: ConnectionId,
-    transport: WebSocketTransport,
+    broker: EventBroker,
     _payload: dict[str, Any],
 ) -> None:
-    await transport.send(connection_id, {"type": "pong"})
+    await broker.send(connection_id, {"type": "pong"})
 
 
 async def handle_typing_start(
     websocket: WebSocket,
     connection_id: ConnectionId,
-    transport: WebSocketTransport,
+    broker: EventBroker,
     _payload: dict[str, Any],
 ) -> None:
     user_id: UserId = websocket.state.user_id
     chat_id: UUID = websocket.state.chat_id
 
-    await transport.publish(
+    await broker.publish(
         chat_channel(chat_id),
         {
             "type": ChatEvent.typing_start.value,
-            "user_id": str(user_id),
+            "user_id": user_id,
         },
         exclude=connection_id,
     )
@@ -132,17 +128,17 @@ async def handle_typing_start(
 async def handle_typing_stop(
     websocket: WebSocket,
     connection_id: ConnectionId,
-    transport: WebSocketTransport,
+    broker: EventBroker,
     _payload: dict[str, Any],
 ) -> None:
     user_id: UserId = websocket.state.user_id
     chat_id: UUID = websocket.state.chat_id
 
-    await transport.publish(
+    await broker.publish(
         chat_channel(chat_id),
         {
             "type": ChatEvent.typing_stop.value,
-            "user_id": str(user_id),
+            "user_id": user_id,
         },
         exclude=connection_id,
     )
@@ -151,7 +147,7 @@ async def handle_typing_stop(
 async def handle_sent_message(
     websocket: WebSocket,
     connection_id: ConnectionId,
-    transport: WebSocketTransport,
+    broker: EventBroker,
     payload: dict[str, Any],
 ) -> None:
     _session: AsyncSession = websocket.state.session
@@ -159,40 +155,33 @@ async def handle_sent_message(
     user_id: UserId = websocket.state.user_id
 
     message = payload.get("message")
-    if not isinstance(message, str) or not message.strip():
-        await transport.send(
+    if not isinstance(message, str):
+        await broker.send(
             connection_id,
             {
                 "type": ChatEvent.error.value,
-                "detail": "message is required",
+                "detail": "message type must be string",
             },
         )
         return
 
-    # TODO:
-    # record = await create_chat_message(
-    #     session=session,
-    #     chat_id=chat_id,
-    #     sender_id=UUID(str(user_id)),
-    #     message=message.strip(),
-    # )
-    # await session.commit()
-    # await session.refresh(record)
+    # TODO: save message to DB here
 
-    event = {
-        "type": ChatEvent.sent_message.value,
-        "chat_id": str(chat_id),
-        "sender_id": str(user_id),
-        "message": message.strip(),
-    }
-
-    await transport.publish(chat_channel(chat_id), event)
+    await broker.publish(
+        chat_channel(chat_id),
+        {
+            "type": ChatEvent.sent_message.value,
+            "sender_id": user_id,
+            "message": message.strip(),
+            "chat_id": chat_id,
+        },
+    )
 
 
 async def handle_created_chat(
     websocket: WebSocket,
     connection_id: ConnectionId,
-    transport: WebSocketTransport,
+    broker: EventBroker,
     payload: dict[str, Any],
 ) -> None:
     _session: AsyncSession = websocket.state.session
@@ -200,31 +189,24 @@ async def handle_created_chat(
     user_id: UserId = websocket.state.user_id
 
     message = payload.get("message")
-    if not isinstance(message, str) or not message.strip():
-        await transport.send(
+    if not isinstance(message, str):
+        await broker.send(
             connection_id,
             {
                 "type": ChatEvent.error.value,
-                "detail": "message is required",
+                "detail": "message type must be string",
             },
         )
         return
 
-    # TODO:
-    # record = await create_chat_message(
-    #     session=session,
-    #     chat_id=chat_id,
-    #     sender_id=UUID(str(user_id)),
-    #     message=message.strip(),
-    # )
-    # await session.commit()
-    # await session.refresh(record)
+    # TODO: created chat event to DB here / save initial chat message
 
-    event = {
-        "type": ChatEvent.sent_message.value,
-        "chat_id": str(chat_id),
-        "sender_id": str(user_id),
-        "message": message.strip(),
-    }
-
-    await transport.publish(chat_channel(chat_id), event)
+    await broker.publish(
+        chat_channel(chat_id),
+        {
+            "type": ChatEvent.created_chat.value,
+            "sender_id": user_id,
+            "message": message.strip(),
+            "chat_id": chat_id,
+        },
+    )

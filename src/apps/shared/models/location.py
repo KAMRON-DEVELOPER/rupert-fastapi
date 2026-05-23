@@ -13,14 +13,10 @@ class BaseLocationModel(BaseModel):
     __abstract__ = True
 
     country_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("countries.id"),
-        index=True,
+        PG_UUID(as_uuid=True), ForeignKey("countries.id"), index=True
     )
     city_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("cities.id"),
-        index=True,
+        PG_UUID(as_uuid=True), ForeignKey("cities.id"), index=True
     )
 
 
@@ -28,14 +24,10 @@ class BaseNullableLocationModel(BaseModel):
     __abstract__ = True
 
     country_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("countries.id"),
-        index=True,
+        PG_UUID(as_uuid=True), ForeignKey("countries.id"), index=True
     )
     city_id: Mapped[UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("cities.id"),
-        index=True,
+        PG_UUID(as_uuid=True), ForeignKey("cities.id"), index=True
     )
 
 
@@ -56,9 +48,7 @@ class CityModel(BaseModel):
     )
 
     country_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("countries.id"),
-        index=True,
+        PG_UUID(as_uuid=True), ForeignKey("countries.id"), index=True
     )
     name: Mapped[str] = mapped_column(String(168), index=True)
 

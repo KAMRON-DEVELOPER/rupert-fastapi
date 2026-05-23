@@ -1,3 +1,4 @@
+import asyncio
 import json
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -8,37 +9,37 @@ from fastapi.websockets import WebSocketState
 from src.apps.shared.schemas.enums import ChatEvent
 from src.core.logger import logger
 
-from .registry import ConnectionRegistry
-from .transport.base import WebSocketTransport
+from .broker import EventBroker, event_broker
+from .registry import ConnectionRegistry, connection_registry
 from .types import Channel, ConnectionId, UserId
 
 WebSocketHandler = Callable[
-    [WebSocket, ConnectionId, WebSocketTransport, dict[str, Any]],
+    [WebSocket, ConnectionId, EventBroker, dict[str, Any]],
     Awaitable[None],
 ]
 
 WebSocketLifecycleHandler = Callable[
-    [WebSocket, ConnectionId, WebSocketTransport], Awaitable[None]
+    [WebSocket, ConnectionId, EventBroker],
+    Awaitable[None],
 ]
 
 
 class WebSocketConnection:
     """
-    Boss of one live WebSocket connection.
+    Manages the full lifecycle of one WebSocket connection.
 
-    Role:
-    - accept socket
-    - register connection
-    - subscribe initial channels
-    - call connect handler
-    - run receive loop
-    - parse JSON
-    - dispatch handlers
-    - call disconnect handler
-    - cleanup registry
-    - close socket
+    On enter:
+      - accepts the socket
+      - registers the connection and joins it to its channels
+      - spawns a background send loop that drains the connection's queue
 
-    This is the top-level WebSocket engine.
+    On exit:
+      - cancels the send loop
+      - removes the connection from the registry
+      - closes the socket if still open
+
+    The receive loop (run_until_disconnect) and the send loop run concurrently.
+    Only the send loop calls websocket.send_json(); no other code should.
     """
 
     def __init__(
@@ -48,50 +49,58 @@ class WebSocketConnection:
         user_id: UserId,
         channels: set[Channel],
         handlers: dict[ChatEvent, WebSocketHandler],
-        registry: ConnectionRegistry,
-        transport: WebSocketTransport,
+        registry: ConnectionRegistry = connection_registry,
+        broker: EventBroker = event_broker,
         connect_handler: WebSocketLifecycleHandler | None = None,
         disconnect_handler: WebSocketLifecycleHandler | None = None,
     ) -> None:
-        self.websocket = websocket
-        self.user_id = user_id
-        self.channels = channels
-        self.handlers = handlers
-        self.registry = registry
-        self.transport = transport
-        self.connect_handler = connect_handler
-        self.disconnect_handler = disconnect_handler
+        self._websocket = websocket
+        self._user_id = user_id
+        self._channels = channels
+        self._handlers = handlers
+        self._registry = registry
+        self._broker = broker
+        self._connect_handler = connect_handler
+        self._disconnect_handler = disconnect_handler
 
         self.connection_id: ConnectionId | None = None
+        self._send_task: asyncio.Task | None = None
 
     async def __aenter__(self) -> "WebSocketConnection":
-        await self.websocket.accept()
+        await self._websocket.accept()
 
-        self.connection_id = self.registry.add_connection(
-            websocket=self.websocket, user_id=self.user_id
+        # TODO really need to pass user id?
+        self.connection_id = self._registry.add(
+            websocket=self._websocket, user_id=self._user_id
         )
 
-        for channel in self.channels:
-            self.registry.subscribe(self.connection_id, channel)
+        for channel in self._channels:
+            self._registry.join_channel(self.connection_id, channel)
 
-        if self.connect_handler is not None:
-            await self.connect_handler(
-                self.websocket, self.connection_id, self.transport
+        self._send_task = asyncio.create_task(self._send_loop())
+
+        if self._connect_handler is not None:
+            await self._connect_handler(
+                self._websocket, self.connection_id, self._broker
             )
 
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         if self.connection_id is None:
             return
 
         try:
-            if self.disconnect_handler is not None:
-                await self.disconnect_handler(
-                    self.websocket, self.connection_id, self.transport
+            if self._disconnect_handler is not None:
+                await self._disconnect_handler(
+                    self._websocket, self.connection_id, self._broker
                 )
         finally:
-            websocket = self.registry.remove_connection(self.connection_id)
+            if self._send_task is not None:
+                self._send_task.cancel()
+                await asyncio.gather(self._send_task, return_exceptions=True)
+
+            websocket = self._registry.remove(self.connection_id)
 
             if (
                 websocket is not None
@@ -103,43 +112,50 @@ class WebSocketConnection:
                     pass
 
     async def run_until_disconnect(self) -> None:
+        """Receive loop: reads incoming client messages and dispatches them to handlers."""
+
         try:
-            async for text in self.websocket.iter_text():
+            async for text in self._websocket.iter_text():
                 await self._process_text(text)
         except WebSocketDisconnect:
             pass
-        except Exception as e:
-            logger.exception("[WebSocketConnection] failed: %s", e)
+        except Exception:
+            logger.exception("[WebSocketConnection] receive loop failed")
 
-    async def _process_text(self, text: str) -> None:
+    async def _send_loop(self) -> None:
+        """Send loop: drains the connection's queue and writes events to the socket."""
+
         if self.connection_id is None:
             return
 
         try:
+            while True:
+                event = await self._registry.next_event(self.connection_id)
+                await self._websocket.send_json(event)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.exception("[WebSocketConnection] send loop failed")
+
+    async def _process_text(self, text: str) -> None:
+        assert self.connection_id is not None
+
+        # if self.connection_id is None:
+        #     return
+
+        try:
             payload = json.loads(text)
         except json.JSONDecodeError:
-            await self.transport.send(
-                self.connection_id,
-                {
-                    "type": ChatEvent.error.value,
-                    "detail": "invalid json",
-                },
-            )
+            await self._send_error("invalid json")
             return
 
         if not isinstance(payload, dict):
-            await self.transport.send(
-                self.connection_id,
-                {
-                    "type": ChatEvent.error.value,
-                    "detail": "payload must be object",
-                },
-            )
+            await self._send_error("payload must be an object")
             return
 
         event_type = payload.get("type")
         if not isinstance(event_type, str):
-            await self.transport.send(
+            await self._broker.send(
                 self.connection_id,
                 {
                     "type": ChatEvent.error.value,
@@ -148,29 +164,31 @@ class WebSocketConnection:
             )
             return
 
-        try:
-            event = ChatEvent(event_type)
-        except ValueError:
-            await self.transport.send(
-                self.connection_id,
-                {
-                    "type": ChatEvent.error.value,
-                    "detail": "unknown event type",
-                },
-            )
+        raw_event = payload.get("type")
+        if not isinstance(raw_event, str):
+            await self._send_error("missing event type")
             return
 
-        handler = self.handlers.get(event)
+        try:
+            event = ChatEvent(raw_event)
+        except ValueError:
+            await self._send_error(f"unknown event type: {raw_event!r}")
+            return
+
+        handler = self._handlers.get(event)
         if handler is None:
-            await self.transport.send(
-                self.connection_id,
-                {
-                    "type": ChatEvent.error.value,
-                    "detail": "no handler for event",
-                },
-            )
+            await self._send_error(f"no handler for: {raw_event!r}")
             return
 
         await handler(
-            self.websocket, self.connection_id, self.transport, payload
+            self._websocket, self.connection_id, self._broker, payload
+        )
+
+    async def _send_error(self, detail: str) -> None:
+        if self.connection_id is None:
+            return
+
+        await self._broker.send(
+            self.connection_id,
+            {"type": ChatEvent.error.value, "detail": detail},
         )

@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import ARRAY, TIMESTAMP, ForeignKey, String, Text
+from sqlalchemy import TIMESTAMP, ForeignKey, Text
 from sqlalchemy import UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseModel
+
+if TYPE_CHECKING:
+    from src.apps.users.models import UserModel
 
 
 class BaseMessageModel(BaseModel):
@@ -19,15 +23,14 @@ class BaseMessageModel(BaseModel):
         index=True,
     )
     message: Mapped[str | None] = mapped_column(Text)
-    image_urls: Mapped[list[str]] = mapped_column(
-        ARRAY(item_type=String), default=list, server_default="{}"
-    )
-    video_urls: Mapped[list[str]] = mapped_column(
-        ARRAY(item_type=String), default=list, server_default="{}"
-    )
     scheduled_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True)
     )
 
-    def __repr__(self):
-        return "<BaseMessageModel>"
+    # Relationships
+    sender: Mapped["UserModel"] = relationship(
+        back_populates="chat_messages", passive_deletes=True
+    )
+
+    def __repr__(self) -> str:
+        return f"<BaseMessageModel id={self.id}>"
