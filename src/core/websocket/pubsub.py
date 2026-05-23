@@ -36,6 +36,7 @@ class RedisPubSubManager:
         redis: Redis,
         registry: ConnectionRegistry = connection_registry,
         pattern: str = "ws:*",
+        prefix: str = "ws:",
     ) -> None:
         if getattr(self, "_initialized", False):
             return
@@ -44,6 +45,7 @@ class RedisPubSubManager:
         self.redis = redis
         self.registry = registry
         self.pattern = pattern
+        self.prefix = prefix
 
         self._pubsub: PubSub | None = None
         self._listener: asyncio.Task[None] | None = None
@@ -75,7 +77,7 @@ class RedisPubSubManager:
         exclude: ConnectionId | None = None,
     ) -> None:
         await self.redis.publish(
-            f"{self.pattern}{channel}",
+            f"{self.prefix}{channel}",
             json.dumps(
                 {"channel": channel, "event": event, "exclude": exclude}
             ),

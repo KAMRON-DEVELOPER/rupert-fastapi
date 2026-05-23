@@ -17,9 +17,7 @@ from src.core.boto3 import (
 from src.core.database import sessionDep
 from src.core.exceptions import ValidationException
 from src.core.settings import get_settings
-from src.core.validators import (
-    allowed_image_extensions,
-    get_file_extension,
+from src.apps.attachments.validators import (
     get_image_dimensions,
 )
 from src.dependencies.proactive_refresh import authDep
@@ -53,13 +51,13 @@ async def read_validated_image(
     max_width: int,
     max_size_mb: int = 8,
 ) -> tuple[bytes, str]:
-    file_extension = get_file_extension(file)
+    # file_extension = get_file_extension(file)
 
-    if file_extension not in allowed_image_extensions:
-        extensions = ", ".join(allowed_image_extensions)
-        raise ValidationException(
-            detail=f"{extensions} formats are allowed for {field_name}"
-        )
+    # if file_extension not in allowed_image_extensions:
+    #     extensions = ", ".join(allowed_image_extensions)
+    #     raise ValidationException(
+    #         detail=f"{extensions} formats are allowed for {field_name}"
+    #     )
 
     image_bytes = await file.read()
 

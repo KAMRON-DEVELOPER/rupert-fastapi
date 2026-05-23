@@ -153,17 +153,6 @@ class WebSocketConnection:
             await self._send_error("payload must be an object")
             return
 
-        event_type = payload.get("type")
-        if not isinstance(event_type, str):
-            await self._broker.send(
-                self.connection_id,
-                {
-                    "type": ChatEvent.error.value,
-                    "detail": "missing event type",
-                },
-            )
-            return
-
         raw_event = payload.get("type")
         if not isinstance(raw_event, str):
             await self._send_error("missing event type")

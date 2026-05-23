@@ -101,10 +101,13 @@ class ConnectionRegistry:
 
     async def next_event(self, connection_id: ConnectionId) -> dict[str, Any]:
         """Awaited by WebSocketConnection._send_loop to drain a connection's queue."""
-        # TODO: queue.get() useage is correct
-        # If queue is empty, wait until an item is available.
-        # Raises QueueShutDown if the queue has been shut down and is empty, or if the queue has been shut down immediately.
-        return await self._queues[connection_id].get()
+        queue = self._queues.get(connection_id)
+        if queue is None:
+            # If the queue was removed (e.g., due to QueueFull),
+            # raise a CancelledError to kill the _send_loop gracefully.
+            raise asyncio.CancelledError("Connection queue removed")
+
+        return await queue.get()
 
     async def enqueue(
         self, connection_id: ConnectionId, event: dict[str, Any]
@@ -118,7 +121,22 @@ class ConnectionRegistry:
         except asyncio.QueueFull:
             # A connection whose queue is full is too slow to keep up.
             # Drop it rather than blocking the broadcast.
-            self.remove(connection_id)
+
+            # Remove from registry so we stop broadcasting to them
+            websocket = self.remove(connection_id)
+
+            # Forcefully sever the actual network connection
+            if websocket is not None:
+                # Run in a background task so we don't block the event broker!
+                # Code 1008 (Policy Violation) is standard for rate/speed limits.
+                asyncio.create_task(self._close_socket(websocket))
+
+    async def _close_socket(self, websocket: WebSocket) -> None:
+        """Helper to safely close sockets without crashing the broker."""
+        try:
+            await websocket.close(code=1008, reason="Client too slow")
+        except Exception:
+            pass  # The socket might have closed naturally in the last millisecond
 
     async def publish_local(
         self,
