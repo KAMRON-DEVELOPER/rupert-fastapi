@@ -47,9 +47,7 @@ class ChatMessageAttachmentLink(BaseModel):
         ForeignKey(column="attachments.id", ondelete="CASCADE"),
         index=True,
     )
-    position: Mapped[int] = mapped_column(
-        SmallInteger, default=0, server_default="0"
-    )
+    position: Mapped[int | None] = mapped_column(SmallInteger, default=None)
 
     # Relationships
     chat_message: Mapped["ChatMessageModel"] = relationship(

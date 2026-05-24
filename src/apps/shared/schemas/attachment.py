@@ -18,7 +18,7 @@ def build_attachment_url(object_key: str) -> str:
 
 
 class ChatMessageAttachmentRequest(RequestSchema):
-    id: UUID
+    attachment_id: UUID
     position: int = Field(ge=0)
 
 

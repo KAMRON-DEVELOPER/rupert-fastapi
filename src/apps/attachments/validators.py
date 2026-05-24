@@ -1,11 +1,12 @@
-from datetime import timedelta
-from io import BytesIO
 import json
 import subprocess
+from dataclasses import dataclass
+from io import BytesIO
+
 from fastapi import HTTPException, UploadFile, status
 from magika import Magika
-from src.apps.shared.schemas.enums import AttachmentKind
 from PIL import Image
+
 from src.core.logger import logger
 
 """
@@ -17,6 +18,7 @@ a single CPU. Magika has been trained and evaluated on a dataset of ~100M sample
 across 200+ content types (covering both binary and textual file formats), and it
 achieves an average ~99% accuracy on our test set.
 """
+
 m = Magika()
 
 res = m.identify_bytes(b"function log(msg) {console.log(msg);}")
@@ -32,62 +34,50 @@ with open("./tests_data/basic/ini/doc.ini", "rb") as f:
 print(res.output.label)
 # ini
 
+# Magika ContentTypeLabel values
+POSITIONABLE_IMAGE_LABELS = {"jpeg", "png", "gif", "webp"}
+POSITIONABLE_VIDEO_LABELS = {"mp4"}
+POSITIONABLE_VIDEO_CODECS = {"h264"}
 
-ALLOWED_IMAGE_TYPES = {
-    "image/jpeg",
-    "image/png",
-    "image/apng",
-    "image/gif",
-    "image/svg",
-    "image/webp",
-    "image/avif",
-    "image/bmp",
-    "image/heic",
-}
-ALLOWED_VIDEO_TYPES = {
-    "video/mp4",
-    "video/webm",
-    "video/x-matroska",
-    "video/quicktime",
-    "video/x-msvideo",
-}
-ALLOWED_AUDIO_TYPES = {
-    "audio/aac",
-    "audio/mpeg",
-    "audio/mp4",
-    "audio/ogg",
-}
-ALLOWED_DOC_TYPES = {
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "text/plain",
-}
-ALL_ALLOWED_TYPES = (
-    ALLOWED_IMAGE_TYPES | ALLOWED_VIDEO_TYPES | ALLOWED_DOC_TYPES
-)
-
-MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20 MB
-MAX_VIDEO_SIZE = 200 * 1024 * 1024  # 200 MB
-MAX_DOC_SIZE = 50 * 1024 * 1024  # 50 MB
-
-ORPHAN_TTL = timedelta(hours=24)
+MAX_IMAGE_SIZE = 25 * 1024 * 1024  # 25 MB
+MAX_VIDEO_SIZE = 500 * 1024 * 1024  # 500 MB
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 
 
-def _kind_for_mime(mime: str) -> AttachmentKind:
-    if mime in ALLOWED_IMAGE_TYPES:
-        return AttachmentKind.image
-    if mime in ALLOWED_VIDEO_TYPES:
-        return AttachmentKind.video
-    return AttachmentKind.document
+@dataclass
+class ImageMetadata:
+    width: int
+    height: int
 
 
-def _size_limit(kind: AttachmentKind) -> int:
-    return {
-        AttachmentKind.image: MAX_IMAGE_SIZE,
-        AttachmentKind.video: MAX_VIDEO_SIZE,
-        AttachmentKind.document: MAX_DOC_SIZE,
-    }[kind]
+@dataclass
+class VideoMetadata:
+    width: int
+    height: int
+    duration_seconds: float
+    codec: str
+    bitrate_kbps: int
+
+
+@dataclass
+class UploadedAttachmentData:
+    key: str
+    original_filename: str
+    size_bytes: int
+    magika_label: str
+    magika_group: str
+    mime_type: str
+    is_displayable: bool
+    media_metadata: ImageMetadata | VideoMetadata | None
+
+
+async def process_upload_file(
+    client,
+    file: UploadFile,
+    bucket: str,
+    s3_key_prefix: str,
+) -> UploadedAttachmentData:
+    pass
 
 
 def get_file_extension(file: UploadFile):

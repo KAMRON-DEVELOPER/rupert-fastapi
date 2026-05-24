@@ -1,6 +1,4 @@
-# AGENTS.md
-
-## FastAPI Project Rules and Architecture Conventions
+# FastAPI Project Rules and Architecture Conventions
 
 This document defines the working rules for AI coding agents contributing to this
 FastAPI codebase.
@@ -15,13 +13,12 @@ without over-engineering or destabilizing working code.
 
 You are working as an autonomous senior engineer inside a large FastAPI codebase.
 
-Once the user gives a direction, proactively gather context, plan, implement, test,
+Once the user gives a direction, proactively gather context, plan, implement,
 and refine. Do not wait for repeated prompts unless the requirement is genuinely
 ambiguous or a change would be risky without confirmation.
 
 Optimize for correctness, clarity, reliability, and consistency with the existing
-project. Avoid speculative rewrites, broad refactors, and clever patterns that are
-not already used in the repository.
+project.
 
 ## Repository Shape
 
@@ -213,7 +210,6 @@ Use existing dependency aliases and imports:
 - `sessionDep` from `src.core.database`
 - `authDep` and `authProbeDep` from `src.dependencies.proactive_refresh`
 - `paginationDep` from shared schemas
-- Domain-specific dependency aliases such as `vacancyListDep` or `applicationListDep`
 
 ### Request Data
 
@@ -278,35 +274,6 @@ Prefer status codes already used in the codebase:
 - `409 CONFLICT` for uniqueness or integrity conflicts.
 - `500 INTERNAL_SERVER_ERROR` for unexpected failures.
 
-Use existing custom exceptions such as `ValidationException` when the surrounding
-code already uses them for validation failures.
-
-### Authorization
-
-Repository methods should enforce domain authorization when it depends on database
-state.
-
-For example, vacancy mutations check company membership inside the repository using
-`CompaniesRepository.ensure_member(...)`.
-
-Routes should only extract `user_id` from auth dependencies and pass it down.
-
-### File Uploads and External Storage
-
-For file/image upload behavior, follow existing utilities:
-
-- `get_file_extension`
-- `allowed_image_extensions`
-- `get_image_dimensions`
-- `put_object_to_boto3`
-- `delete_objects_from_boto3`
-- `wipe_objects_from_boto3`
-
-Keep validation close to the route/helper layer if it concerns uploaded file shape,
-size, content type, or dimensions.
-
-Do not introduce new storage wrappers unless the task explicitly asks for one.
-
 ## Coding Standards
 
 ### Python Style
@@ -321,9 +288,6 @@ Follow the existing codebase style:
 - Existing enum and schema names.
 - Existing router naming conventions.
 
-Do not introduce TypeScript, Node, pnpm, or frontend-specific conventions into this
-Python FastAPI project.
-
 ### Search and File Reading
 
 When searching the repository:
@@ -337,78 +301,3 @@ raw shell commands.
 
 Read enough context before editing. Avoid repeated micro-edits. Batch related changes
 into coherent patches.
-
-### Testing
-
-Run the smallest meaningful test set first, then broaden if needed.
-
-Common test commands may include:
-
-```bash
-pytest
-pytest tests/unit
-pytest tests/integration
-pytest tests/integration/routers/<domain>
-```
-
-Also run format, lint, or type-check commands if they exist in `pyproject.toml`,
-project scripts, or repository documentation.
-
-Do not claim tests passed unless they were actually run.
-
-## Implementation Workflow
-
-For each task:
-
-1. Understand the requested behavior.
-2. Inspect the relevant route, schema, repository, and tests.
-3. Identify whether models are already sufficient.
-4. Plan the minimal consistent change.
-5. Edit the appropriate layer only.
-6. Add or update tests when the behavior is important or already covered nearby.
-7. Run targeted tests.
-8. Report what changed, what was tested, and any known limitations.
-
-## Trade-Offs and Known Reality
-
-This codebase is actively evolving. Conventions are not fully finalized and may
-change later. Some current code works while still having rough edges, duplicated
-patterns, or imperfect separation.
-
-When implementing changes:
-
-- Prefer local consistency over theoretical purity.
-- Avoid large architectural cleanups unless explicitly requested.
-- Do not “perfect” unrelated code while solving a narrow task.
-- Make small, durable improvements when they directly support the requested change.
-- Be honest about remaining gaps or follow-up work.
-
-Shipping a correct, maintainable, convention-compatible change is more important
-than forcing a perfect architecture in one pass.
-
-## Things to Avoid
-
-Do not:
-
-- Invent a new architecture.
-- Add service layers where the domain currently uses routes + schemas + repositories.
-- Move business logic into routes when repositories already own it.
-- Modify SQLAlchemy models without explicit need.
-- Rewrite working code only for style.
-- Introduce broad refactors during feature work.
-- Hide errors with broad silent exception handling.
-- Use unnecessary casts or type assertions when proper typing or guards are possible.
-- Commit inside repositories.
-- Skip reading nearby tests before changing tested behavior.
-- Claim validation, linting, or tests passed without running them.
-
-## Preferred Output When Reporting Back
-
-When finishing a coding task, summarize:
-
-1. Files changed.
-2. Behavior implemented.
-3. Tests or checks run.
-4. Known caveats, if any.
-
-Keep the report factual and concise.
