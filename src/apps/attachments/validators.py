@@ -67,7 +67,7 @@ class UploadedAttachmentData:
     magika_label: str
     magika_group: str
     mime_type: str
-    is_displayable: bool
+    is_positionable: bool
     media_metadata: ImageMetadata | VideoMetadata | None
 
 
