@@ -43,10 +43,7 @@ async def list_vacancies(
 ):
     user_id = auth[0] if auth else None
     return await VacanciesRepository.get_many(
-        session=session,
-        user_id=user_id,
-        pagination=pagination,
-        filters=filters,
+        session=session, user_id=user_id, pagination=pagination, filters=filters
     )
 
 
@@ -85,10 +82,7 @@ async def get_application(id: Annotated[UUID, Path()], session: sessionDep):
     return ApplicationDetail.model_validate(record)
 
 
-@vacancies_router.patch(
-    "/applications/{id}",
-    response_model=ApplicationDetail,
-)
+@vacancies_router.patch("/applications/{id}", response_model=ApplicationDetail)
 async def update_application_status(
     auth: authDep,
     session: sessionDep,
@@ -146,10 +140,7 @@ async def update_vacancy(
 ):
     user_id, _, _ = auth
     record = await VacanciesRepository.update(
-        session,
-        user_id,
-        id,
-        schm.model_dump(mode="json", exclude_unset=True),
+        session, user_id, id, schm.model_dump(mode="json", exclude_unset=True)
     )
     await session.commit()
     return VacancyDetail.model_validate(record)
@@ -208,14 +199,10 @@ async def update_vacancy_skill(
 
 
 @vacancies_router.delete(
-    "/{vacancy_id}/skills/{skill_link_id}",
-    response_model=MessageResponse,
+    "/{vacancy_id}/skills/{skill_link_id}", response_model=MessageResponse
 )
 async def delete_vacancy_skill(
-    auth: authDep,
-    session: sessionDep,
-    vacancy_id: UUID,
-    skill_link_id: UUID,
+    auth: authDep, session: sessionDep, vacancy_id: UUID, skill_link_id: UUID
 ):
     user_id, _, _ = auth
     await VacanciesRepository.delete_skill_link(

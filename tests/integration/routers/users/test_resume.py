@@ -28,7 +28,7 @@ async def test_resume_create_list_detail_update_and_delete(
     create_res = await client.post(
         "/api/v1/users/resumes",
         json=resume_payload(
-            skills=[{"skillId": str(skill.id), "proficiency": "intermediate"}],
+            skills=[{"skillId": str(skill.id), "proficiency": "intermediate"}]
         ),
     )
     assert create_res.status_code == 201
@@ -117,9 +117,7 @@ async def test_resume_rejects_accessing_another_users_resume(
     resume_id = create_res.json()["id"]
 
     other = await make_user(
-        email="resume-other@example.com",
-        first_name="Other",
-        with_session=False,
+        email="resume-other@example.com", first_name="Other", with_session=False
     )
     await authenticate_as(client, session, other)
 

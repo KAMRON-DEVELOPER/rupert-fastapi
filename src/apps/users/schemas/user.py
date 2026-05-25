@@ -72,8 +72,7 @@ class UserUpdateRequest(NullableLocationRequest):
             FollowPolicy | None, Form(alias="followPolicy")
         ] = None,
         job_search_status: Annotated[
-            JobSearchStatus | None,
-            Form(alias="jobSearchStatus"),
+            JobSearchStatus | None, Form(alias="jobSearchStatus")
         ] = None,
         delete_avatar: Annotated[
             bool | None, Form(alias="deleteAvatar")

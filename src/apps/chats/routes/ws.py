@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.apps.shared.schemas.enums import ChatEvent
 from src.core.database import sessionDep
 from src.core.logger import logger
+from src.core.settings import get_settings
 from src.core.websocket.broker import EventBroker, event_broker
 from src.core.websocket.channels import chat_channel, user_channel
 from src.core.websocket.connection import WebSocketConnection, WebSocketHandler
@@ -16,13 +17,11 @@ from src.dependencies.proactive_refresh import authDep
 
 from .router import chats_router
 
+settings = get_settings()
 
 @chats_router.websocket("/{chat_id}/ws")
 async def chat_ws(
-    session: sessionDep,
-    websocket: WebSocket,
-    auth: authDep,
-    chat_id: UUID,
+    session: sessionDep, websocket: WebSocket, auth: authDep, chat_id: UUID
 ):
     raw_user_id, _, _ = auth
     user_id = UserId(str(raw_user_id))
@@ -62,37 +61,27 @@ async def chat_ws(
 
 
 async def connect_handler(
-    websocket: WebSocket,
-    connection_id: ConnectionId,
-    broker: EventBroker,
+    websocket: WebSocket, connection_id: ConnectionId, broker: EventBroker
 ) -> None:
     user_id: UserId = websocket.state.user_id
     chat_id: UUID = websocket.state.chat_id
 
     await broker.publish(
         chat_channel(chat_id),
-        {
-            "type": ChatEvent.goes_online.value,
-            "user_id": user_id,
-        },
+        {"type": ChatEvent.goes_online.value, "user_id": user_id},
         exclude=connection_id,
     )
 
 
 async def disconnect_handler(
-    websocket: WebSocket,
-    connection_id: ConnectionId,
-    broker: EventBroker,
+    websocket: WebSocket, connection_id: ConnectionId, broker: EventBroker
 ) -> None:
     user_id: UserId = websocket.state.user_id
     chat_id: UUID = websocket.state.chat_id
 
     await broker.publish(
         chat_channel(chat_id),
-        {
-            "type": ChatEvent.goes_offline.value,
-            "user_id": user_id,
-        },
+        {"type": ChatEvent.goes_offline.value, "user_id": user_id},
         exclude=connection_id,
     )
 
@@ -117,10 +106,7 @@ async def handle_typing_start(
 
     await broker.publish(
         chat_channel(chat_id),
-        {
-            "type": ChatEvent.typing_start.value,
-            "user_id": user_id,
-        },
+        {"type": ChatEvent.typing_start.value, "user_id": user_id},
         exclude=connection_id,
     )
 
@@ -136,10 +122,7 @@ async def handle_typing_stop(
 
     await broker.publish(
         chat_channel(chat_id),
-        {
-            "type": ChatEvent.typing_stop.value,
-            "user_id": user_id,
-        },
+        {"type": ChatEvent.typing_stop.value, "user_id": user_id},
         exclude=connection_id,
     )
 

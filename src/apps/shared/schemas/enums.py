@@ -250,13 +250,6 @@ class SalaryCurrency(AutoName):
     TRY = auto()
 
 
-class AttachmentKind(AutoName):
-    image = auto()
-    video = auto()
-    document = auto()
-
-
 class AttachmentStatus(AutoName):
     pending = auto()
     ready = auto()
-    failed = auto()

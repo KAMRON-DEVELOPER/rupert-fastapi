@@ -15,9 +15,5 @@ async def create_skill(session: sessionDep, schm=SkillRequest):
 
 
 @admin_router.patch("/skills/{skill_id}")
-async def update_skill(
-    session: sessionDep,
-    skill_id: UUID,
-    schm: SkillRequest,
-):
+async def update_skill(session: sessionDep, skill_id: UUID, schm: SkillRequest):
     await SkillRepository.update(session, skill_id, schm.name)

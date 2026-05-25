@@ -2,9 +2,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from src.apps.chats.schemas.chat_message import (
-    ChatListLastMessageResponse,
-)
+from src.apps.chats.schemas.chat_message import ChatListLastMessageResponse
 from src.apps.chats.schemas.chat_participant import ChatListUserResponse
 from src.apps.shared.schemas.base import RequestSchema, ResponseSchema
 

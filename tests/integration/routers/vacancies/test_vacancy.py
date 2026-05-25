@@ -55,10 +55,7 @@ async def test_vacancy_create_list_detail_update_and_delete(
 
     patch_res = await client.patch(
         f"/api/v1/vacancies/{vacancy_id}",
-        json={
-            "title": "Senior Backend Engineer",
-            "salaryMax": 5_000,
-        },
+        json={"title": "Senior Backend Engineer", "salaryMax": 5_000},
     )
     assert patch_res.status_code == 200
     assert patch_res.json()["title"] == "Senior Backend Engineer"

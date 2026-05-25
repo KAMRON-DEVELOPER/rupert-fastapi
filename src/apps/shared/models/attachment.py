@@ -7,7 +7,7 @@ from sqlalchemy import BigInteger, Enum, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from src.apps.shared.schemas.enums import AttachmentKind, AttachmentStatus
+from src.apps.shared.schemas.enums import AttachmentStatus
 
 from .base import BaseModel
 
@@ -22,28 +22,27 @@ class AttachmentModel(BaseModel):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
 
-    object_key: Mapped[str] = mapped_column(Text, unique=True)
+    object_key: Mapped[str] = mapped_column(Text)
     original_filename: Mapped[str | None] = mapped_column(String(255))
-    kind: Mapped[AttachmentKind] = mapped_column(
-        Enum(AttachmentKind, name="attachment_kind"), index=True
-    )
     status: Mapped[AttachmentStatus] = mapped_column(
         Enum(AttachmentStatus, name="attachment_status"),
         default=AttachmentStatus.pending,
         index=True,
     )
-    content_type: Mapped[str] = mapped_column(String(255))
+    mime_type: Mapped[str] = mapped_column(String(255))
+    label: Mapped[str] = mapped_column(String(64))
+    group: Mapped[str] = mapped_column(String(64))
     size_bytes: Mapped[int] = mapped_column(BigInteger)
     meta: Mapped[dict] = mapped_column(JSONB, default=dict)
 
     # Relationships
-    chat_message_links: Mapped[list["ChatMessageAttachmentLink"]] = (
-        relationship(back_populates="attachment", passive_deletes=True)
+    chat_message_links: Mapped[list[ChatMessageAttachmentLink]] = relationship(
+        back_populates="attachment", passive_deletes=True
     )
 
     def __repr__(self):
         size_mb = self.size_bytes / (1024 * 1024)
         return (
             f"<AttachmentModel object_key={self.object_key}, "
-            f"kind={self.kind.value}, size_mb={size_mb:.2f}>"
+            f"group={self.group}, label={self.label}, size_mb={size_mb:.2f}>"
         )

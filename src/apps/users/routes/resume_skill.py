@@ -64,10 +64,7 @@ async def update_resume_skill(
     response_model=MessageResponse,
 )
 async def delete_resume_skill(
-    auth: authDep,
-    session: sessionDep,
-    resume_id: UUID,
-    skill_link_id: UUID,
+    auth: authDep, session: sessionDep, resume_id: UUID, skill_link_id: UUID
 ):
     user_id, _, _ = auth
 

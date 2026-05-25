@@ -117,9 +117,7 @@ class CompaniesRepository:
 
         member_count = (
             select(func.count(CompanyMemberModel.id))
-            .where(
-                CompanyMemberModel.company_id == CompanyModel.id,
-            )
+            .where(CompanyMemberModel.company_id == CompanyModel.id)
             .correlate(CompanyModel)
             .scalar_subquery()
             .label("member_count")
@@ -294,10 +292,7 @@ class CompaniesRepository:
 
     @staticmethod
     async def add_member(
-        session: AsyncSession,
-        user_id: UUID,
-        company_id: UUID,
-        values: dict,
+        session: AsyncSession, user_id: UUID, company_id: UUID, values: dict
     ):
         await CompaniesRepository.ensure_member(
             session, user_id, company_id, (CompanyMemberRole.owner,)
@@ -400,10 +395,7 @@ class CompaniesRepository:
 
     @staticmethod
     async def delete_member(
-        session: AsyncSession,
-        user_id: UUID,
-        company_id: UUID,
-        member_id: UUID,
+        session: AsyncSession, user_id: UUID, company_id: UUID, member_id: UUID
     ):
         await CompaniesRepository.ensure_member(
             session, user_id, company_id, (CompanyMemberRole.owner,)
@@ -443,8 +435,7 @@ class CompaniesRepository:
 
         by_type_stmt = (
             select(
-                CompanyModel.type,
-                func.count(CompanyModel.id).label("count"),
+                CompanyModel.type, func.count(CompanyModel.id).label("count")
             )
             .group_by(CompanyModel.type)
             .order_by(CompanyModel.type)

@@ -20,9 +20,7 @@ class BaseModel(Base):
         PG_UUID(as_uuid=True), default=uuid4, primary_key=True
     )
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True),
-        default=func.now(),
-        index=True,
+        TIMESTAMP(timezone=True), default=func.now(), index=True
     )
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),

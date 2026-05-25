@@ -30,10 +30,7 @@ from src.apps.vacancies.schemas.application import (
     ApplicationDetail,
     applicationListDep,
 )
-from src.apps.vacancies.schemas.vacancy import (
-    VacancySummary,
-    vacancyListDep,
-)
+from src.apps.vacancies.schemas.vacancy import VacancySummary, vacancyListDep
 from src.core.helpers import percentage
 from src.core.logger import logger
 
@@ -373,10 +370,7 @@ class VacanciesRepository:
 
     @staticmethod
     async def create_skill_link(
-        session: AsyncSession,
-        user_id: UUID,
-        vacancy_id: UUID,
-        values: dict,
+        session: AsyncSession, user_id: UUID, vacancy_id: UUID, values: dict
     ):
         vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
         await CompaniesRepository.ensure_member(
@@ -469,10 +463,7 @@ class VacanciesRepository:
 
     @staticmethod
     async def delete_skill_link(
-        session: AsyncSession,
-        user_id: UUID,
-        vacancy_id: UUID,
-        link_id: UUID,
+        session: AsyncSession, user_id: UUID, vacancy_id: UUID, link_id: UUID
     ):
         vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
         await CompaniesRepository.ensure_member(
@@ -588,8 +579,7 @@ class VacanciesRepository:
         resume_id = data.get("resume_id")
         if resume_id:
             resume_stmt = select(ResumeModel.id).where(
-                ResumeModel.id == resume_id,
-                ResumeModel.user_id == applicant_id,
+                ResumeModel.id == resume_id, ResumeModel.user_id == applicant_id
             )
             resume_exists = await session.scalar(resume_stmt)
             if not resume_exists:
@@ -739,8 +729,7 @@ class VacanciesRepository:
 
         by_status_stmt = (
             select(
-                VacancyModel.status,
-                func.count(VacancyModel.id).label("count"),
+                VacancyModel.status, func.count(VacancyModel.id).label("count")
             )
             .group_by(VacancyModel.status)
             .order_by(VacancyModel.status)
@@ -749,9 +738,7 @@ class VacanciesRepository:
         by_status_rows = (await session.execute(by_status_stmt)).all()
         by_status = [
             VacancyStatusBucket(
-                key=status,
-                count=count,
-                percentage=percentage(count, total),
+                key=status, count=count, percentage=percentage(count, total)
             )
             for status, count in by_status_rows
         ]

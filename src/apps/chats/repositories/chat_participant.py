@@ -16,9 +16,7 @@ class ChatParticipantRepository:
     @classmethod
     async def create(cls, session: AsyncSession, user_id: UUID, chat_id: UUID):
         record = ChatParticipantModel(
-            user_id=user_id,
-            chat_id=chat_id,
-            last_online_at=datetime.now(UTC),
+            user_id=user_id, chat_id=chat_id, last_online_at=datetime.now(UTC)
         )
 
         try:
@@ -41,12 +39,7 @@ class ChatParticipantRepository:
             )
 
     @classmethod
-    async def delete(
-        cls,
-        session: AsyncSession,
-        user_id: UUID,
-        chat_id: UUID,
-    ):
+    async def delete(cls, session: AsyncSession, user_id: UUID, chat_id: UUID):
         stmt = (
             delete(ChatParticipantModel)
             .where(
@@ -106,9 +99,7 @@ class ChatParticipantRepository:
 
     @classmethod
     async def list_by_chat(
-        cls,
-        session: AsyncSession,
-        chat_id: UUID,
+        cls, session: AsyncSession, chat_id: UUID
     ) -> Sequence[ChatParticipantModel]:
         stmt = (
             select(ChatParticipantModel)
@@ -144,8 +135,7 @@ class ChatParticipantRepository:
             .values(
                 last_seen_at=func.greatest(
                     func.coalesce(
-                        ChatParticipantModel.last_seen_at,
-                        literal(epoch),
+                        ChatParticipantModel.last_seen_at, literal(epoch)
                     ),
                     last_seen_at,
                 )
@@ -167,17 +157,13 @@ class ChatParticipantRepository:
 
         if not participant:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Chat not found",
+                status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found"
             )
         return participant
 
     @classmethod
     async def clear_for_me(
-        cls,
-        session: AsyncSession,
-        user_id: UUID,
-        chat_id: UUID,
+        cls, session: AsyncSession, user_id: UUID, chat_id: UUID
     ):
         participant = await cls.get_by_id(session, chat_id, user_id)
 
@@ -222,10 +208,7 @@ class ChatParticipantRepository:
 
     @classmethod
     async def delete_for_me(
-        cls,
-        session: AsyncSession,
-        chat_id: UUID,
-        user_id: UUID,
+        cls, session: AsyncSession, chat_id: UUID, user_id: UUID
     ):
         participant = await cls.get_by_id(session, chat_id, user_id)
 
@@ -249,11 +232,7 @@ class ChatParticipantRepository:
 
     @classmethod
     async def update_settings(
-        cls,
-        session: AsyncSession,
-        chat_id: UUID,
-        user_id: UUID,
-        values: dict,
+        cls, session: AsyncSession, chat_id: UUID, user_id: UUID, values: dict
     ) -> ChatParticipantModel:
         participant = await cls.get_by_id(session, chat_id, user_id)
         for field, value in values.items():

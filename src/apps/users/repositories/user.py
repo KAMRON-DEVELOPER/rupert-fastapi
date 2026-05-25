@@ -253,8 +253,7 @@ class UsersRepository:
         }
         dau_chart = [
             DailyActiveUsersBucket(
-                count=dau_counts_by_date.get(day, 0),
-                date=day,
+                count=dau_counts_by_date.get(day, 0), date=day
             )
             for offset in range(30)
             for day in [start_date + timedelta(days=offset)]
@@ -272,9 +271,7 @@ class UsersRepository:
         by_status_rows = (await session.execute(by_status_stmt)).all()
         by_job_search_status = [
             JobSearchStatusBucket(
-                key=status,
-                count=count,
-                percentage=percentage(count, total),
+                key=status, count=count, percentage=percentage(count, total)
             )
             for status, count in by_status_rows
         ]

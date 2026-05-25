@@ -50,10 +50,10 @@ class ChatMessageAttachmentLink(BaseModel):
     position: Mapped[int | None] = mapped_column(SmallInteger, default=None)
 
     # Relationships
-    chat_message: Mapped["ChatMessageModel"] = relationship(
+    chat_message: Mapped[ChatMessageModel] = relationship(
         back_populates="attachment_links"
     )
-    attachment: Mapped["AttachmentModel"] = relationship(
+    attachment: Mapped[AttachmentModel] = relationship(
         back_populates="chat_message_links"
     )
 
@@ -83,11 +83,10 @@ class ChatMessageModel(BaseMessageModel):
         back_populates="messages", passive_deletes=True
     )
     reply: Mapped[ChatMessageModel | None] = relationship(
-        remote_side="ChatMessageModel.id",
-        foreign_keys=[reply_id],
+        remote_side="ChatMessageModel.id", foreign_keys=[reply_id]
     )
 
-    attachment_links: Mapped[list["ChatMessageAttachmentLink"]] = relationship(
+    attachment_links: Mapped[list[ChatMessageAttachmentLink]] = relationship(
         back_populates="chat_message",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -124,8 +123,7 @@ class ChatParticipantModel(BaseModel):
     )
     # this participant has read messages in this chat up to this timestamp.
     last_seen_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True),
-        index=True,
+        TIMESTAMP(timezone=True), index=True
     )
     deleted_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True)

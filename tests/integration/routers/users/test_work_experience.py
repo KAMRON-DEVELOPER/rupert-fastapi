@@ -9,8 +9,7 @@ from src.apps.users.models import UserModel
 
 @pytest.mark.integration
 async def test_work_experience_crud(
-    client: AsyncClient,
-    make_user: Callable[..., Awaitable[UserModel]],
+    client: AsyncClient, make_user: Callable[..., Awaitable[UserModel]]
 ):
     await make_user()
 
@@ -52,8 +51,7 @@ async def test_work_experience_crud(
 
 @pytest.mark.integration
 async def test_work_experience_rejects_invalid_date_range(
-    client: AsyncClient,
-    make_user: Callable[..., Awaitable[UserModel]],
+    client: AsyncClient, make_user: Callable[..., Awaitable[UserModel]]
 ):
     await make_user()
 

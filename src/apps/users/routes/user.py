@@ -1,6 +1,8 @@
+from io import BytesIO
 from typing import Annotated
 
-from fastapi import Depends, File, Query, UploadFile
+from fastapi import Depends, File, HTTPException, Query, UploadFile, status
+from PIL import Image
 
 from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
@@ -16,15 +18,26 @@ from src.core.boto3 import (
 )
 from src.core.database import sessionDep
 from src.core.exceptions import ValidationException
+from src.core.logger import logger
 from src.core.settings import get_settings
-from src.apps.attachments.validators import (
-    get_image_dimensions,
-)
 from src.dependencies.proactive_refresh import authDep
 
 from .router import users_router
 
 settings = get_settings()
+
+
+def get_image_dimensions(image_bytes: bytes) -> tuple[int, int]:
+    try:
+        image = Image.open(BytesIO(image_bytes))
+        width, height = image.size
+        return width, height
+    except Exception as e:
+        logger.error(f"Failed to get image dimensions: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get image dimensions",
+        )
 
 
 @users_router.get("/")
@@ -119,9 +132,7 @@ async def update_user(
         )
 
         await put_object_to_boto3(
-            object_name=avatar_key,
-            data=avatar_bytes,
-            content_type=content_type,
+            object_name=avatar_key, data=avatar_bytes, content_type=content_type
         )
 
         values["avatar_url"] = avatar_key
@@ -136,9 +147,7 @@ async def update_user(
         )
 
         await put_object_to_boto3(
-            object_name=banner_key,
-            data=banner_bytes,
-            content_type=content_type,
+            object_name=banner_key, data=banner_bytes, content_type=content_type
         )
 
         values["banner_url"] = banner_key

@@ -1,4 +1,4 @@
-from typing import Annotated, Generic, TypeVar
+from typing import Annotated, TypeVar
 
 from fastapi import Depends
 from pydantic import Field
@@ -16,6 +16,6 @@ paginationDep = Annotated[PaginationQuery, Depends()]
 T = TypeVar("T")
 
 
-class PaginatedResponse(ResponseSchema, Generic[T]):
+class PaginatedResponse[T](ResponseSchema):
     data: list[T]
     total: int

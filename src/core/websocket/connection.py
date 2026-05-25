@@ -1,7 +1,7 @@
 import asyncio
 import json
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, Self
 
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.websockets import WebSocketState
@@ -14,13 +14,11 @@ from .registry import ConnectionRegistry, connection_registry
 from .types import Channel, ConnectionId, UserId
 
 WebSocketHandler = Callable[
-    [WebSocket, ConnectionId, EventBroker, dict[str, Any]],
-    Awaitable[None],
+    [WebSocket, ConnectionId, EventBroker, dict[str, Any]], Awaitable[None]
 ]
 
 WebSocketLifecycleHandler = Callable[
-    [WebSocket, ConnectionId, EventBroker],
-    Awaitable[None],
+    [WebSocket, ConnectionId, EventBroker], Awaitable[None]
 ]
 
 
@@ -66,7 +64,7 @@ class WebSocketConnection:
         self.connection_id: ConnectionId | None = None
         self._send_task: asyncio.Task | None = None
 
-    async def __aenter__(self) -> "WebSocketConnection":
+    async def __aenter__(self) -> Self:
         await self._websocket.accept()
 
         # TODO really need to pass user id?

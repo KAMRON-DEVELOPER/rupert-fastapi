@@ -89,9 +89,7 @@ async def test_vacancy_skill_routes_require_company_member_permissions(
     assert link_res.status_code == 201
 
     other = await make_user(
-        email="skill-other@example.com",
-        first_name="Other",
-        with_session=False,
+        email="skill-other@example.com", first_name="Other", with_session=False
     )
     await authenticate_as(client, session, other)
 

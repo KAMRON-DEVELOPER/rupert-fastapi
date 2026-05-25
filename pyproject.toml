@@ -8,6 +8,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "aioboto3==15.5.0",
+    "aiofiles>=25.1.0",
     "asyncpg>=0.31.0",
     "bcrypt>=5.0.0",
     "coredis>=6.3.0",
@@ -58,6 +59,7 @@ reportUnusedImport = "warning"
 profile = "black"
 line_length = 80
 extend_skip = ["alembic"]
+include_trailing_comma = false
 
 [tool.black]
 line-length = 80
@@ -74,3 +76,7 @@ skip-magic-trailing-comma = true
 
 [tool.ruff.lint]
 extend-select = ["I"]
+ignore = ["BLE001", "PYI036", "PYI034", "S110"]
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false

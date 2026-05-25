@@ -36,9 +36,7 @@ async def list_companies(
 
 
 @companies_router.post(
-    "/",
-    response_model=CompanyDetail,
-    status_code=status.HTTP_201_CREATED,
+    "/", response_model=CompanyDetail, status_code=status.HTTP_201_CREATED
 )
 async def create_company(
     auth: authDep, session: sessionDep, schm: CompanyCreateRequest
@@ -75,10 +73,7 @@ async def update_company(
     return CompanyDetail.model_validate(record)
 
 
-@companies_router.delete(
-    "/{company_id}",
-    response_model=MessageResponse,
-)
+@companies_router.delete("/{company_id}", response_model=MessageResponse)
 async def delete_company(auth: authDep, session: sessionDep, company_id: UUID):
     user_id, _, _ = auth
     await CompaniesRepository.delete(session, user_id, company_id)
@@ -106,8 +101,7 @@ async def add_company_member(
 
 
 @companies_router.patch(
-    "/{company_id}/members/{member_id}",
-    response_model=CompanyMemberResponse,
+    "/{company_id}/members/{member_id}", response_model=CompanyMemberResponse
 )
 async def update_company_member(
     auth: authDep,
@@ -125,14 +119,10 @@ async def update_company_member(
 
 
 @companies_router.delete(
-    "/{company_id}/members/{member_id}",
-    response_model=MessageResponse,
+    "/{company_id}/members/{member_id}", response_model=MessageResponse
 )
 async def delete_company_member(
-    auth: authDep,
-    session: sessionDep,
-    company_id: UUID,
-    member_id: UUID,
+    auth: authDep, session: sessionDep, company_id: UUID, member_id: UUID
 ):
     user_id, _, _ = auth
     await CompaniesRepository.delete_member(

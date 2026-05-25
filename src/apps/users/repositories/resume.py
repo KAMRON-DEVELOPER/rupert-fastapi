@@ -108,10 +108,7 @@ class ResumesRepository:
     async def delete(session: AsyncSession, user_id: UUID, resume_id: UUID):
         stmt = (
             delete(ResumeModel)
-            .where(
-                ResumeModel.id == resume_id,
-                ResumeModel.user_id == user_id,
-            )
+            .where(ResumeModel.id == resume_id, ResumeModel.user_id == user_id)
             .returning(ResumeModel.id)
         )
 
@@ -164,10 +161,7 @@ class ResumesRepository:
                     ResumeSkillLink.skill
                 )
             )
-            .where(
-                ResumeModel.id == resume_id,
-                ResumeModel.user_id == user_id,
-            )
+            .where(ResumeModel.id == resume_id, ResumeModel.user_id == user_id)
         )
         try:
             record = await session.scalar(stmt)

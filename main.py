@@ -9,6 +9,7 @@ from scalar_fastapi import get_scalar_api_reference
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from src.apps.admin.routes import admin_router
+from src.apps.attachments.routes import upload_router
 from src.apps.chats.routes import chats_router
 from src.apps.companies.routes import companies_router
 from src.apps.locations.routes import locations_router
@@ -41,10 +42,7 @@ async def lifespan(_: FastAPI):
 app: FastAPI = FastAPI(lifespan=lifespan)
 
 
-origins = [
-    "http://localhost:5173",
-    "http://192.168.10.11:5173",
-]
+origins = ["http://localhost:5173", "http://192.168.10.11:5173"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,6 +55,9 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 app.include_router(router=stats_router, prefix="/api/v1/stats", tags=["stats"])
 app.include_router(router=users_router, prefix="/api/v1/users", tags=["users"])
+app.include_router(
+    router=upload_router, prefix="/api/v1/attachments", tags=["attachments"]
+)
 app.include_router(router=chats_router, prefix="/api/v1/chats", tags=["chats"])
 app.include_router(
     router=companies_router, prefix="/api/v1/companies", tags=["companies"]

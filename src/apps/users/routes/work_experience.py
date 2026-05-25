@@ -64,8 +64,7 @@ async def update_work_experience(
 
 
 @users_router.delete(
-    "/work-experiences/{work_experience_id}",
-    response_model=MessageResponse,
+    "/work-experiences/{work_experience_id}", response_model=MessageResponse
 )
 async def delete_work_experience(
     auth: authDep, session: sessionDep, work_experience_id: UUID

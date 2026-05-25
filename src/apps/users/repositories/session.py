@@ -132,8 +132,7 @@ class SessionsRepository:
         except_refresh_token: str | None = None,
     ) -> int:
         stmt = delete(SessionModel).where(
-            SessionModel.user_id == user_id,
-            SessionModel.is_active.is_(True),
+            SessionModel.user_id == user_id, SessionModel.is_active.is_(True)
         )
 
         if except_refresh_token:

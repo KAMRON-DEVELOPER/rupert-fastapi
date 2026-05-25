@@ -73,9 +73,7 @@ async def test_update_user_uploads_avatar(
 
     res = await client.patch(
         "/api/v1/users/",
-        files={
-            "avatar": ("avatar.png", avatar_bytes, "image/png"),
-        },
+        files={"avatar": ("avatar.png", avatar_bytes, "image/png")},
         data={
             "firstName": "Kamron",
             "lastName": "Atajanov",

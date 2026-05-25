@@ -19,9 +19,7 @@ async def create_country(session: sessionDep, schm=CountryCreateRequest):
 
 @admin_router.patch("/locations/countries/{country_id}")
 async def update_country(
-    session: sessionDep,
-    country_id: UUID,
-    schm: CountryUpdateRequest,
+    session: sessionDep, country_id: UUID, schm: CountryUpdateRequest
 ):
     await CountryRepository.update(
         session, country_id, schm.model_dump(exclude_unset=True)

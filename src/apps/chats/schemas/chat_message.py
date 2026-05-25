@@ -3,10 +3,9 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from src.apps.shared.schemas.enums import AttachmentKind
 from src.apps.shared.schemas.attachment import (
-    ChatMessageAttachmentRequest,
-    ChatMessageAttachmentResponse,
+    AttachmentIdWithPositionRequest,
+    AttachmentWithPositionResponse,
 )
 from src.apps.shared.schemas.base import RequestSchema, ResponseSchema
 
@@ -16,7 +15,7 @@ class CreateChatMessageRequest(RequestSchema):
     chat_id: UUID | None = None
     reply_id: UUID | None = None
     participant_id: UUID | None = None
-    attachments: list[ChatMessageAttachmentRequest] = Field(
+    attachments: list[AttachmentIdWithPositionRequest] = Field(
         default_factory=list
     )
 
@@ -40,7 +39,7 @@ class CreateChatMessageRequest(RequestSchema):
 
 class UpdateChatMessageRequest(RequestSchema):
     message: str | None = None
-    attachments: list[ChatMessageAttachmentRequest] = Field(
+    attachments: list[AttachmentIdWithPositionRequest] = Field(
         default_factory=list
     )
 
@@ -53,18 +52,10 @@ class ChatMessageResponse(ResponseSchema):
     message: str | None
     chat_id: UUID
     reply_id: UUID | None
-    attachments: list[ChatMessageAttachmentResponse] = Field(
+    attachments: list[AttachmentWithPositionResponse] = Field(
         default_factory=list
     )
 
 
-class ChatListLastMessageResponse(ResponseSchema):
-    id: UUID
-    created_at: datetime
-    updated_at: datetime
-    sender_id: UUID | None
-    message: str | None
-    reply_id: UUID | None
-    attachment_counts: dict[AttachmentKind, int] = Field(default_factory=dict)
-    is_mine: bool
-    seen_by_other: bool | None
+class ChatListLastMessageResponse(ChatMessageResponse):
+    seen_by_recipient: bool | None
