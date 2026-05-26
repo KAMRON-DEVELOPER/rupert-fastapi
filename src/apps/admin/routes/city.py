@@ -13,7 +13,7 @@ from .router import admin_router
     "/locations/{country_id}/cities", status_code=status.HTTP_201_CREATED
 )
 async def create_city(session: sessionDep, country_id: UUID, schm=CityRequest):
-    await CityRepository.create(session, country_id, schm.name)
+    return await CityRepository.create(session, country_id, schm.name)
 
 
 @admin_router.patch("/locations/{country_id}/cities/{city_id}")

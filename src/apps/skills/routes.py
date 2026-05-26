@@ -9,6 +9,6 @@ skills_router = APIRouter()
 
 @skills_router.get("/")
 async def list_skills(session: sessionDep, pagination: paginationDep):
-    return SkillRepository.get_many(
+    return await SkillRepository.get_many(
         session, pagination.limit, pagination.offset
     )

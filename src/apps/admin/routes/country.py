@@ -14,7 +14,9 @@ from .router import admin_router
 
 @admin_router.post("/locations/countries", status_code=status.HTTP_201_CREATED)
 async def create_country(session: sessionDep, schm: CountryCreateRequest):
-    await CountryRepository.create(session, code=schm.code, name=schm.name)
+    return await CountryRepository.create(
+        session, code=schm.code, name=schm.name
+    )
 
 
 @admin_router.patch("/locations/countries/{country_id}")

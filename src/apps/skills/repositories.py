@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -84,7 +85,9 @@ class SkillRepository:
             )
 
     @classmethod
-    async def get_many(cls, session: AsyncSession, limit: int, offset: int):
+    async def get_many(
+        cls, session: AsyncSession, limit: int, offset: int
+    ) -> Sequence[SkillModel]:
         stmt = select(SkillModel).limit(limit).offset(offset)
 
         try:

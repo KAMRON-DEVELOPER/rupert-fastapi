@@ -10,10 +10,11 @@ from .router import admin_router
 
 
 @admin_router.post("/skills", status_code=status.HTTP_201_CREATED)
-async def create_skill(session: sessionDep, schm=SkillRequest):
-    await SkillRepository.create(session, name=schm.name)
+async def create_skill(session: sessionDep, schm: SkillRequest):
+    return await SkillRepository.create(session, name=schm.name)
 
 
 @admin_router.patch("/skills/{skill_id}")
 async def update_skill(session: sessionDep, skill_id: UUID, schm: SkillRequest):
     await SkillRepository.update(session, skill_id, schm.name)
+    await session.commit()
