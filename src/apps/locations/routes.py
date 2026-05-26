@@ -9,14 +9,14 @@ from src.core.database import sessionDep
 locations_router = APIRouter()
 
 
-@locations_router.get("/locations/countries")
+@locations_router.get("/countries")
 async def list_countries(session: sessionDep, pagination: paginationDep):
     return await CountryRepository.get_many(
         session, pagination.limit, pagination.offset
     )
 
 
-@locations_router.get("/locations/countries/{country_id}/cities")
+@locations_router.get("/countries/{country_id}/cities")
 async def list_cities(
     session: sessionDep, country_id: UUID, pagination: paginationDep
 ):
