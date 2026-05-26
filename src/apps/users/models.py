@@ -365,17 +365,13 @@ class UserModel(BaseNullableLocationModel):
     # Computed
     followers_count: Mapped[int] = column_property(
         select(func.count(FollowModel.id))
-        .where(
-            FollowModel.following_id == literal_column("users.id"),
-        )
+        .where(FollowModel.following_id == literal_column("users.id"))
         .correlate_except(FollowModel)
         .scalar_subquery()
     )
     followings_count: Mapped[int] = column_property(
         select(func.count(FollowModel.id))
-        .where(
-            FollowModel.follower_id == literal_column("users.id"),
-        )
+        .where(FollowModel.follower_id == literal_column("users.id"))
         .correlate_except(FollowModel)
         .scalar_subquery()
     )

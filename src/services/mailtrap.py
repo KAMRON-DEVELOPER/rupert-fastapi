@@ -71,8 +71,7 @@ class Mailtrap:
             except Exception as e:
                 logger.error(f"[MailtrapError] send: {e}")
                 raise HTTPException(
-                    status_code=500,
-                    detail=f"Could not send {source} email",
+                    status_code=500, detail=f"Could not send {source} email"
                 )
 
     @classmethod
@@ -92,59 +91,30 @@ class Mailtrap:
 
     @classmethod
     async def send_password_setup_link(
-        cls,
-        to_name: str,
-        to_email: str,
-        link: str,
-        cfg: MailtrapConfig,
+        cls, to_name: str, to_email: str, link: str, cfg: MailtrapConfig
     ) -> None:
         template = cfg.password_setup
 
         payload = Payload(
-            from_=Mailbox(
-                name=template.from_name,
-                email=template.from_email,
-            ),
-            to=[
-                Mailbox(
-                    name=to_name,
-                    email=to_email,
-                )
-            ],
+            from_=Mailbox(name=template.from_name, email=template.from_email),
+            to=[Mailbox(name=to_name, email=to_email)],
             template_uuid=template.template_uuid,
-            template_variables={
-                "link": link,
-            },
+            template_variables={"link": link},
         )
 
         await cls.send(cfg.api_key, payload, "password setup")
 
     @classmethod
     async def send_feedback_confirmation(
-        cls,
-        to_name: str,
-        to_email: str,
-        message: str,
-        cfg: MailtrapConfig,
+        cls, to_name: str, to_email: str, message: str, cfg: MailtrapConfig
     ) -> None:
         template = cfg.feedback_confirmation
 
         payload = Payload(
-            from_=Mailbox(
-                name=template.from_name,
-                email=template.from_email,
-            ),
-            to=[
-                Mailbox(
-                    name=to_name,
-                    email=to_email,
-                )
-            ],
+            from_=Mailbox(name=template.from_name, email=template.from_email),
+            to=[Mailbox(name=to_name, email=to_email)],
             template_uuid=template.template_uuid,
-            template_variables={
-                "name": to_name,
-                "message": message,
-            },
+            template_variables={"name": to_name, "message": message},
         )
 
         await cls.send(cfg.api_key, payload, "feedback confirmation")

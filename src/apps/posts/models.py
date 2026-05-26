@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -24,19 +26,26 @@ if TYPE_CHECKING:
 
 class PostTagLink(BaseModel):
     __tablename__ = "post_tag_links"
+    __table_args__ = (
+        UniqueConstraint("post_id", "tag_id", name="uq_post_tag"),
+    )
 
     post_id: Mapped[UUID] = mapped_column(
-        ForeignKey(column="posts.id", ondelete="CASCADE"), primary_key=True
+        PG_UUID(as_uuid=True),
+        ForeignKey(column="posts.id", ondelete="CASCADE"),
+        index=True,
     )
     tag_id: Mapped[UUID] = mapped_column(
-        ForeignKey(column="tags.id", ondelete="CASCADE"), primary_key=True
+        PG_UUID(as_uuid=True),
+        ForeignKey(column="tags.id", ondelete="CASCADE"),
+        index=True,
     )
 
     # Relationships
-    post: Mapped["PostModel"] = relationship(
+    post: Mapped[PostModel] = relationship(
         back_populates="tag_links", overlaps="posts,tags"
     )
-    tag: Mapped["TagModel"] = relationship(
+    tag: Mapped[TagModel] = relationship(
         back_populates="post_links", overlaps="posts,tag_links"
     )
 
@@ -61,10 +70,10 @@ class PostEngagementModel(BaseModel):
     )
 
     # Relationships
-    user: Mapped["UserModel"] = relationship(
+    user: Mapped[UserModel] = relationship(
         back_populates="post_engagements", passive_deletes=True
     )
-    post: Mapped["PostModel"] = relationship(
+    post: Mapped[PostModel] = relationship(
         back_populates="engagements", passive_deletes=True
     )
 
@@ -94,7 +103,9 @@ class PostCommentModel(BaseModel):
         remote_side="PostCommentModel.id", back_populates="replies"
     )
     replies: Mapped[list[PostCommentModel]] = relationship(
-        back_populates="parent", cascade="all, delete-orphan"
+        back_populates="parent",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     def __repr__(self):
@@ -117,17 +128,21 @@ class PostModel(BaseModel):
     )
 
     # Relationships
-    author: Mapped["UserModel"] = relationship(back_populates="posts")
-    tag_links: Mapped[list["PostTagLink"]] = relationship(
-        back_populates="post", cascade="all, delete-orphan"
+    author: Mapped[UserModel] = relationship(back_populates="posts")
+    tag_links: Mapped[list[PostTagLink]] = relationship(
+        back_populates="post",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
-    tags: Mapped[list["TagModel"]] = relationship(
+    tags: Mapped[list[TagModel]] = relationship(
         secondary="post_tag_links", back_populates="posts", viewonly=True
     )
-    engagements: Mapped[list["PostEngagementModel"]] = relationship(
-        back_populates="post", cascade="all, delete-orphan"
+    engagements: Mapped[list[PostEngagementModel]] = relationship(
+        back_populates="post",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
-    comments: Mapped[list["PostCommentModel"]] = relationship(
+    comments: Mapped[list[PostCommentModel]] = relationship(
         back_populates="post",
         cascade="all, delete-orphan",
         passive_deletes=True,

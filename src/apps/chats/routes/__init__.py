@@ -1,3 +1,4 @@
-from fastapi import APIRouter
+from . import chat, chat_messages, ws
+from .router import chats_router
 
-chats_router = APIRouter()
+__all__ = ["chat", "chat_messages", "chats_router", "ws"]

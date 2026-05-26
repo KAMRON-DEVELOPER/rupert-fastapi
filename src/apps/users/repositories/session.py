@@ -77,13 +77,11 @@ class SessionsRepository:
 
             if not deleted_id:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Session not found to delete",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Session not found",
                 )
-
-            await session.flush()
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             await session.rollback()
             logger.error(f"[SessionsRepository] delete: {e}")
@@ -117,8 +115,8 @@ class SessionsRepository:
 
             await session.flush()
             return deleted_refresh_token
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             await session.rollback()
             logger.error(f"[SessionsRepository] delete_by_id: {e}")
@@ -134,8 +132,7 @@ class SessionsRepository:
         except_refresh_token: str | None = None,
     ) -> int:
         stmt = delete(SessionModel).where(
-            SessionModel.user_id == user_id,
-            SessionModel.is_active.is_(True),
+            SessionModel.user_id == user_id, SessionModel.is_active.is_(True)
         )
 
         if except_refresh_token:

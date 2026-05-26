@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.apps.companies.models import CompanyModel
 from src.apps.companies.repositories.company import CompaniesRepository
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
 from src.apps.shared.schemas.enums import (
@@ -19,7 +20,7 @@ from src.apps.stats.schemas import (
     VacanciesStats,
     VacancyStatusBucket,
 )
-from src.apps.users.models import ResumeModel
+from src.apps.users.models import ResumeModel, UserModel
 from src.apps.vacancies.models import (
     ApplicationModel,
     SavedVacancyModel,
@@ -30,10 +31,7 @@ from src.apps.vacancies.schemas.application import (
     ApplicationDetail,
     applicationListDep,
 )
-from src.apps.vacancies.schemas.vacancy import (
-    VacancySummary,
-    vacancyListDep,
-)
+from src.apps.vacancies.schemas.vacancy import VacancySummary, vacancyListDep
 from src.core.helpers import percentage
 from src.core.logger import logger
 
@@ -46,7 +44,20 @@ class VacanciesRepository:
         filters: vacancyListDep,
         user_id: UUID | None = None,
     ) -> PaginatedResponse[VacancySummary]:
-        stmt = select(VacancyModel).options(selectinload(VacancyModel.company))
+        stmt = (
+            select(VacancyModel)
+            .options(
+                selectinload(VacancyModel.country),
+                selectinload(VacancyModel.city),
+                selectinload(VacancyModel.company).selectinload(
+                    CompanyModel.country
+                ),
+                selectinload(VacancyModel.company).selectinload(
+                    CompanyModel.city
+                ),
+            )
+            .execution_options(populate_existing=True)
+        )
 
         if filters:
             if filters.company_id:
@@ -97,10 +108,10 @@ class VacanciesRepository:
                     VacancySkillLink.skill_id.in_(filters.skill_ids),
                 )
                 stmt = stmt.where(skill_exists)
-            if filters.country:
-                stmt = stmt.where(VacancyModel.country == filters.country)
-            if filters.city:
-                stmt = stmt.where(VacancyModel.city == filters.city)
+            if filters.country_id:
+                stmt = stmt.where(VacancyModel.country_id == filters.country_id)
+            if filters.city_id:
+                stmt = stmt.where(VacancyModel.city_id == filters.city_id)
 
         # Count total BEFORE pagination (filters already applied above)
         # Sorting rows is computationally expensive for the database.
@@ -163,19 +174,13 @@ class VacanciesRepository:
     async def get_by_id(
         session: AsyncSession, id: UUID, user_id: UUID | None = None
     ) -> VacancyModel:
-        stmt = (
-            select(VacancyModel)
-            .options(
-                selectinload(VacancyModel.company),
-                selectinload(VacancyModel.skill_links).selectinload(
-                    VacancySkillLink.skill
-                ),
-            )
-            .where(VacancyModel.id == id)
-        )
-
         load_options = [
-            selectinload(VacancyModel.company),
+            selectinload(VacancyModel.country),
+            selectinload(VacancyModel.city),
+            selectinload(VacancyModel.company).selectinload(
+                CompanyModel.country
+            ),
+            selectinload(VacancyModel.company).selectinload(CompanyModel.city),
             selectinload(VacancyModel.skill_links).selectinload(
                 VacancySkillLink.skill
             ),
@@ -200,6 +205,7 @@ class VacanciesRepository:
                 )
                 .options(*load_options)
                 .where(VacancyModel.id == id)
+                .execution_options(populate_existing=True)
             )
             # row: Row[Tuple[VacancyModel, bool, bool]]
             row = (await session.execute(stmt)).one_or_none()
@@ -217,6 +223,7 @@ class VacanciesRepository:
             select(VacancyModel)
             .options(*load_options)
             .where(VacancyModel.id == id)
+            .execution_options(populate_existing=True)
         )
         vacancy = await session.scalar(stmt)
         if not vacancy:
@@ -373,10 +380,7 @@ class VacanciesRepository:
 
     @staticmethod
     async def create_skill_link(
-        session: AsyncSession,
-        user_id: UUID,
-        vacancy_id: UUID,
-        values: dict,
+        session: AsyncSession, user_id: UUID, vacancy_id: UUID, values: dict
     ):
         vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
         await CompaniesRepository.ensure_member(
@@ -469,10 +473,7 @@ class VacanciesRepository:
 
     @staticmethod
     async def delete_skill_link(
-        session: AsyncSession,
-        user_id: UUID,
-        vacancy_id: UUID,
-        link_id: UUID,
+        session: AsyncSession, user_id: UUID, vacancy_id: UUID, link_id: UUID
     ):
         vacancy = await VacanciesRepository.get_by_id(session, vacancy_id)
         await CompaniesRepository.ensure_member(
@@ -482,22 +483,23 @@ class VacanciesRepository:
             (CompanyMemberRole.owner, CompanyMemberRole.recruiter),
         )
 
-        try:
-            stmt = (
-                delete(VacancySkillLink)
-                .where(
-                    VacancySkillLink.id == link_id,
-                    VacancySkillLink.vacancy_id == vacancy_id,
-                )
-                .returning(VacancySkillLink.id)
+        stmt = (
+            delete(VacancySkillLink)
+            .where(
+                VacancySkillLink.id == link_id,
+                VacancySkillLink.vacancy_id == vacancy_id,
             )
+            .returning(VacancySkillLink.id)
+        )
+
+        try:
             deleted_id = await session.scalar(stmt)
+
             if not deleted_id:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Vacancy skill link not found",
                 )
-            await session.flush()
         except HTTPException:
             raise
         except Exception as e:
@@ -535,11 +537,31 @@ class VacanciesRepository:
         # Apply loading options and ordering
         stmt = stmt.options(
             selectinload(ApplicationModel.vacancy).selectinload(
-                VacancyModel.company
+                VacancyModel.country
             ),
-            selectinload(ApplicationModel.resume),
-            selectinload(ApplicationModel.applicant),
+            selectinload(ApplicationModel.vacancy).selectinload(
+                VacancyModel.city
+            ),
+            selectinload(ApplicationModel.vacancy)
+            .selectinload(VacancyModel.company)
+            .selectinload(CompanyModel.country),
+            selectinload(ApplicationModel.vacancy)
+            .selectinload(VacancyModel.company)
+            .selectinload(CompanyModel.city),
+            selectinload(ApplicationModel.resume).selectinload(
+                ResumeModel.country
+            ),
+            selectinload(ApplicationModel.resume).selectinload(
+                ResumeModel.city
+            ),
+            selectinload(ApplicationModel.applicant).selectinload(
+                UserModel.country
+            ),
+            selectinload(ApplicationModel.applicant).selectinload(
+                UserModel.city
+            ),
         ).order_by(ApplicationModel.created_at.desc())
+        stmt = stmt.execution_options(populate_existing=True)
 
         if pagination:
             stmt = stmt.offset(pagination.offset).limit(pagination.limit)
@@ -556,12 +578,32 @@ class VacanciesRepository:
             select(ApplicationModel)
             .options(
                 selectinload(ApplicationModel.vacancy).selectinload(
-                    VacancyModel.company
+                    VacancyModel.country
                 ),
-                selectinload(ApplicationModel.resume),
-                selectinload(ApplicationModel.applicant),
+                selectinload(ApplicationModel.vacancy).selectinload(
+                    VacancyModel.city
+                ),
+                selectinload(ApplicationModel.vacancy)
+                .selectinload(VacancyModel.company)
+                .selectinload(CompanyModel.country),
+                selectinload(ApplicationModel.vacancy)
+                .selectinload(VacancyModel.company)
+                .selectinload(CompanyModel.city),
+                selectinload(ApplicationModel.resume).selectinload(
+                    ResumeModel.country
+                ),
+                selectinload(ApplicationModel.resume).selectinload(
+                    ResumeModel.city
+                ),
+                selectinload(ApplicationModel.applicant).selectinload(
+                    UserModel.country
+                ),
+                selectinload(ApplicationModel.applicant).selectinload(
+                    UserModel.city
+                ),
             )
             .where(ApplicationModel.id == id)
+            .execution_options(populate_existing=True)
         )
         record = await session.scalar(stmt)
         if not record:
@@ -587,8 +629,7 @@ class VacanciesRepository:
         resume_id = data.get("resume_id")
         if resume_id:
             resume_stmt = select(ResumeModel.id).where(
-                ResumeModel.id == resume_id,
-                ResumeModel.user_id == applicant_id,
+                ResumeModel.id == resume_id, ResumeModel.user_id == applicant_id
             )
             resume_exists = await session.scalar(resume_stmt)
             if not resume_exists:
@@ -710,12 +751,12 @@ class VacanciesRepository:
                 .returning(SavedVacancyModel.id)
             )
             deleted_id = await session.scalar(stmt)
+
             if not deleted_id:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Saved vacancy not found",
                 )
-            await session.flush()
         except HTTPException:
             raise
         except Exception as e:
@@ -738,8 +779,7 @@ class VacanciesRepository:
 
         by_status_stmt = (
             select(
-                VacancyModel.status,
-                func.count(VacancyModel.id).label("count"),
+                VacancyModel.status, func.count(VacancyModel.id).label("count")
             )
             .group_by(VacancyModel.status)
             .order_by(VacancyModel.status)
@@ -748,9 +788,7 @@ class VacanciesRepository:
         by_status_rows = (await session.execute(by_status_stmt)).all()
         by_status = [
             VacancyStatusBucket(
-                key=status,
-                count=count,
-                percentage=percentage(count, total),
+                key=status, count=count, percentage=percentage(count, total)
             )
             for status, count in by_status_rows
         ]

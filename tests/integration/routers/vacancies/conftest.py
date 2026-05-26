@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from httpx import AsyncClient
@@ -43,7 +43,19 @@ async def _create_skill(session: AsyncSession, name: str) -> SkillModel:
     return record
 
 
-def _company_payload(**overrides: object) -> dict[str, object]:
+def _location_ids(
+    default_location: dict[str, object], overrides: dict[str, object]
+) -> dict[str, object]:
+    country = cast(Any, default_location["country"])
+    cities = cast(dict[str, Any], default_location["cities"])
+    city_name = str(overrides.pop("city", "Tashkent"))
+    overrides.pop("country", None)
+    return {"countryId": str(country.id), "cityId": str(cities[city_name].id)}
+
+
+def _company_payload(
+    default_location: dict[str, object], **overrides: object
+) -> dict[str, object]:
     payload: dict[str, object] = {
         "name": "Vacancy Company",
         "tagline": "Hiring better",
@@ -51,14 +63,15 @@ def _company_payload(**overrides: object) -> dict[str, object]:
         "websiteUrl": "https://vacancy-company.example.com",
         "type": "startup",
         "contactEmail": "hello@vacancy-company.example.com",
-        "country": "UZ",
-        "city": "Tashkent",
+        **_location_ids(default_location, overrides),
     }
     payload.update(overrides)
     return payload
 
 
-def _vacancy_payload(**overrides: object) -> dict[str, object]:
+def _vacancy_payload(
+    default_location: dict[str, object], **overrides: object
+) -> dict[str, object]:
     payload: dict[str, object] = {
         "title": "Backend Engineer",
         "description": "Build FastAPI services.",
@@ -73,8 +86,7 @@ def _vacancy_payload(**overrides: object) -> dict[str, object]:
         "workHoursPerWeek": 40,
         "employmentType": "full_time",
         "status": "open",
-        "country": "UZ",
-        "city": "Tashkent",
+        **_location_ids(default_location, overrides),
         "skills": [],
     }
     payload.update(overrides)
@@ -89,13 +101,23 @@ def authenticate_as() -> Callable[
 
 
 @pytest.fixture
-def company_payload() -> Callable[..., dict[str, object]]:
-    return _company_payload
+def company_payload(
+    default_location: dict[str, object],
+) -> Callable[..., dict[str, object]]:
+    def _payload(**overrides: object) -> dict[str, object]:
+        return _company_payload(default_location, **overrides)
+
+    return _payload
 
 
 @pytest.fixture
-def vacancy_payload() -> Callable[..., dict[str, object]]:
-    return _vacancy_payload
+def vacancy_payload(
+    default_location: dict[str, object],
+) -> Callable[..., dict[str, object]]:
+    def _payload(**overrides: object) -> dict[str, object]:
+        return _vacancy_payload(default_location, **overrides)
+
+    return _payload
 
 
 @pytest.fixture

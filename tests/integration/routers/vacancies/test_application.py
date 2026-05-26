@@ -49,8 +49,7 @@ async def test_application_create_list_detail_update_and_duplicate_rejected(
     assert application["applicant"]["firstName"] == applicant.first_name
 
     duplicate_res = await client.post(
-        "/api/v1/vacancies/applications",
-        json={"vacancyId": vacancy["id"]},
+        "/api/v1/vacancies/applications", json={"vacancyId": vacancy["id"]}
     )
     assert duplicate_res.status_code == 409
 
@@ -118,8 +117,7 @@ async def test_application_precondition_permission_and_missing_paths(
     assert closed_apply_res.status_code == 400
 
     application_res = await client.post(
-        "/api/v1/vacancies/applications",
-        json={"vacancyId": open_vacancy["id"]},
+        "/api/v1/vacancies/applications", json={"vacancyId": open_vacancy["id"]}
     )
     assert application_res.status_code == 201
 

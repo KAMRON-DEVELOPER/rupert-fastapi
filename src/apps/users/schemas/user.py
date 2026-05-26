@@ -1,5 +1,6 @@
 from datetime import date
 from typing import Annotated
+from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
 from fastapi import Form
@@ -56,8 +57,8 @@ class UserUpdateRequest(NullableLocationRequest):
         cls,
         first_name: Annotated[str | None, Form(alias="firstName")] = None,
         last_name: Annotated[str | None, Form(alias="lastName")] = None,
-        country: Annotated[str | None, Form()] = None,
-        city: Annotated[str | None, Form()] = None,
+        country_id: Annotated[UUID | None, Form()] = None,
+        city_id: Annotated[UUID | None, Form()] = None,
         headline: Annotated[str | None, Form()] = None,
         birthdate: Annotated[date | None, Form()] = None,
         bio: Annotated[str | None, Form()] = None,
@@ -71,8 +72,7 @@ class UserUpdateRequest(NullableLocationRequest):
             FollowPolicy | None, Form(alias="followPolicy")
         ] = None,
         job_search_status: Annotated[
-            JobSearchStatus | None,
-            Form(alias="jobSearchStatus"),
+            JobSearchStatus | None, Form(alias="jobSearchStatus")
         ] = None,
         delete_avatar: Annotated[
             bool | None, Form(alias="deleteAvatar")
@@ -81,22 +81,25 @@ class UserUpdateRequest(NullableLocationRequest):
             bool | None, Form(alias="deleteBanner")
         ] = None,
     ):
-        return cls(
-            first_name=first_name,
-            last_name=last_name,
-            country=country,
-            city=city,
-            headline=headline,
-            birthdate=birthdate,
-            bio=bio,
-            specialization=specialization,
-            phone_number=phone_number,
-            github_url=github_url,
-            telegram_username=telegram_username,
-            follow_policy=follow_policy,
-            job_search_status=job_search_status,
-            delete_avatar=delete_avatar,
-            delete_banner=delete_banner,
+        data = {
+            "firstName": first_name,
+            "lastName": last_name,
+            "countryId": country_id,
+            "cityId": city_id,
+            "headline": headline,
+            "birthdate": birthdate,
+            "bio": bio,
+            "specialization": specialization,
+            "phoneNumber": phone_number,
+            "githubUrl": github_url,
+            "telegramUsername": telegram_username,
+            "followPolicy": follow_policy,
+            "jobSearchStatus": job_search_status,
+            "deleteAvatar": delete_avatar,
+            "deleteBanner": delete_banner,
+        }
+        return cls.model_validate(
+            {key: value for key, value in data.items() if value is not None}
         )
 
 

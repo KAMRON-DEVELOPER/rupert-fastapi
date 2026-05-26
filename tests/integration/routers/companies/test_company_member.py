@@ -17,9 +17,7 @@ async def test_company_member_create_update_delete_and_duplicate_rejected(
 ):
     await make_user(email="member-owner@example.com")
     user = await make_user(
-        email="member-user@example.com",
-        first_name="Member",
-        with_session=False,
+        email="member-user@example.com", first_name="Member", with_session=False
     )
     company = await create_company(name="Member Company")
 

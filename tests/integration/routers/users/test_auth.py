@@ -61,8 +61,7 @@ async def test_email_auth_create_user(
 
 @pytest.mark.integration
 async def test_email_auth_correct_password(
-    client: AsyncClient,
-    make_user: Callable[..., Awaitable[UserModel]],
+    client: AsyncClient, make_user: Callable[..., Awaitable[UserModel]]
 ):
     """User exist, correct password"""
     user = await make_user()
@@ -77,8 +76,7 @@ async def test_email_auth_correct_password(
 
 @pytest.mark.integration
 async def test_email_auth_incorrect_password(
-    client: AsyncClient,
-    make_user: Callable[..., Awaitable[UserModel]],
+    client: AsyncClient, make_user: Callable[..., Awaitable[UserModel]]
 ):
     """User exist, incorrect password"""
     user = await make_user()
@@ -127,8 +125,7 @@ async def test_email_auth_password_not_set(
 
 @pytest.mark.integration
 async def test_email_auth_password_not_set_no_providers(
-    client: AsyncClient,
-    make_user: Callable[..., Awaitable[UserModel]],
+    client: AsyncClient, make_user: Callable[..., Awaitable[UserModel]]
 ):
     """Password not set, no providers"""
     user = await make_user(with_password=False)
@@ -159,15 +156,14 @@ async def test_verify_email_message_response(
     assert res.status_code == 200
     assert "message" in res.json()
 
-    user = await UsersRepository.get_summary_by_id(session, user.id)
+    user = await UsersRepository.get_summary(session, user.id)
     assert user is not None
     assert user.email_verified
 
 
 @pytest.mark.integration
 async def test_verify_email_redirect(
-    client: AsyncClient,
-    make_user: Callable[..., Awaitable[UserModel]],
+    client: AsyncClient, make_user: Callable[..., Awaitable[UserModel]]
 ):
     user = await make_user(with_session=False)
     assert user is not None
@@ -191,8 +187,7 @@ async def test_logout_requires_auth(client: AsyncClient):
 
 @pytest.mark.integration
 async def test_logout_delete_session_delete_cookies(
-    client: AsyncClient,
-    make_user: Callable[..., Awaitable[UserModel]],
+    client: AsyncClient, make_user: Callable[..., Awaitable[UserModel]]
 ):
     "Logout, delete session, delete cookies"
     user = await make_user(with_session=True)

@@ -35,7 +35,8 @@ async def test_company_create_list_detail_update_and_delete(
     assert len(list_res.json()["data"]) == 1
 
     filter_res = await client.get(
-        "/api/v1/companies/", params={"name": "Rupert", "city": "Tashkent"}
+        "/api/v1/companies/",
+        params={"name": "Rupert", "cityId": first["city"]["id"]},
     )
     assert filter_res.status_code == 200
     assert [item["id"] for item in filter_res.json()["data"]] == [first["id"]]

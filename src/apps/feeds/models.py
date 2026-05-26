@@ -7,8 +7,8 @@ from uuid import UUID
 from sqlalchemy import (
     TIMESTAMP,
     Enum,
-    Float,
     ForeignKey,
+    SmallInteger,
     String,
     UniqueConstraint,
     select,
@@ -17,6 +17,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
 from src.apps.shared.models import BaseModel
+from src.apps.shared.models.attachment import AttachmentModel
 from src.apps.shared.schemas.enums import (
     CommentPolicy,
     FeedEngagementType,
@@ -34,7 +35,9 @@ class FeedCategoryModel(BaseModel):
     name: Mapped[str] = mapped_column(String(24), index=True, unique=True)
 
     # Relationships
-    feeds: Mapped[list[FeedModel]] = relationship(back_populates="category")
+    feeds: Mapped[list[FeedModel]] = relationship(
+        back_populates="category", passive_deletes=True
+    )
 
     def __repr__(self):
         return "<CategoryModel>"
@@ -42,16 +45,19 @@ class FeedCategoryModel(BaseModel):
 
 class FeedTagLink(BaseModel):
     __tablename__ = "feed_tag_links"
+    __table_args__ = (
+        UniqueConstraint("feed_id", "tag_id", name="uq_feed_tag"),
+    )
 
     feed_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey(column="feeds.id", ondelete="CASCADE"),
-        primary_key=True,
+        index=True,
     )
     tag_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey(column="tags.id", ondelete="CASCADE"),
-        primary_key=True,
+        index=True,
     )
 
     # Relationships
@@ -64,6 +70,40 @@ class FeedTagLink(BaseModel):
 
     def __repr__(self):
         return "<FeedTagLink>"
+
+
+class FeedAttachmentLink(BaseModel):
+    __tablename__ = "feed_attachment_links"
+    __table_args__ = (
+        UniqueConstraint("feed_id", "attachment_id", name="uq_feed_attachment"),
+        UniqueConstraint(
+            "feed_id", "position", name="uq_feed_attachment_position"
+        ),
+    )
+
+    feed_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(column="feeds.id", ondelete="CASCADE"),
+        index=True,
+    )
+    attachment_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey(column="attachments.id", ondelete="CASCADE"),
+        index=True,
+    )
+    position: Mapped[int | None] = mapped_column(SmallInteger, default=None)
+
+    # Relationships
+    feed: Mapped[FeedModel] = relationship(back_populates="attachment_links")
+    attachment: Mapped[AttachmentModel] = relationship(
+        back_populates="feed_links"
+    )
+
+    def __repr__(self):
+        return (
+            f"<FeedAttachmentLink "
+            f"feed_id={self.feed_id} position={self.position}>"
+        )
 
 
 class FeedEngagementModel(BaseModel):
@@ -128,20 +168,16 @@ class FeedModel(BaseModel):
     )
     quote_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("feeds.id", ondelete="CASCADE"),
+        ForeignKey("feeds.id", ondelete="SET NULL"),
         index=True,
     )
     category_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
-        ForeignKey("feed_categories.id", ondelete="CASCADE"),
+        ForeignKey("feed_categories.id", ondelete="SET NULL"),
         index=True,
     )
 
     body: Mapped[str] = mapped_column(String(200))
-    video_url: Mapped[str | None] = mapped_column(String(255))
-    video_aspect_ratio: Mapped[float | None] = mapped_column(Float(precision=4))
-    image_url: Mapped[str | None] = mapped_column(String(255))
-    image_aspect_ratio: Mapped[float | None] = mapped_column(Float(precision=4))
 
     feed_visibility: Mapped[FeedVisibility] = mapped_column(
         Enum(FeedVisibility, name="feed_visibility"),
@@ -168,10 +204,7 @@ class FeedModel(BaseModel):
         foreign_keys=[quote_id],
     )
     quotes: Mapped[list[FeedModel]] = relationship(
-        back_populates="quote",
-        foreign_keys=[quote_id],
-        cascade="all, delete-orphan",
-        passive_deletes=True,
+        back_populates="quote", foreign_keys=[quote_id], passive_deletes=True
     )
     comments: Mapped[list[FeedModel]] = relationship(
         back_populates="parent",
@@ -180,18 +213,27 @@ class FeedModel(BaseModel):
         passive_deletes=True,
     )
     category: Mapped[FeedCategoryModel | None] = relationship(
-        back_populates="feeds"
+        back_populates="feeds", passive_deletes=True
     )
     tag_links: Mapped[list[FeedTagLink]] = relationship(
         back_populates="feed",
         overlaps="feeds, tags",
         cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     tags: Mapped[list[TagModel]] = relationship(
         secondary="feed_tag_links", back_populates="feeds", viewonly=True
     )
     engagements: Mapped[list[FeedEngagementModel]] = relationship(
-        back_populates="feed", cascade="all, delete-orphan"
+        back_populates="feed",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    attachment_links: Mapped[list[FeedAttachmentLink]] = relationship(
+        back_populates="feed",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="FeedAttachmentLink.position",
     )
 
     def __repr__(self):

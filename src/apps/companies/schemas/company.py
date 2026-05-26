@@ -5,11 +5,7 @@ from fastapi import Depends, Query
 from pydantic import AnyUrl, EmailStr, Field
 
 from src.apps.companies.schemas.company_member import CompanyMemberResponse
-from src.apps.shared.schemas import (
-    BaseLocationModelResponse,
-    LocationRequest,
-    RequestSchema,
-)
+from src.apps.shared.schemas import BaseLocationModelResponse, LocationRequest
 from src.apps.shared.schemas.enums import CompanyStatus, CompanyType
 from src.apps.shared.schemas.location import NullableLocationRequest
 
@@ -38,12 +34,10 @@ class CompanyUpdateRequest(NullableLocationRequest):
     contact_phone: str | None = Field(default=None, max_length=32)
 
 
-class CompanyListParams(RequestSchema):
+class CompanyListParams(NullableLocationRequest):
     name: str | None = None
     type: CompanyType | None = None
     status: CompanyStatus | None = None
-    country: str | None = None
-    city: str | None = None
     has_open_vacancies: bool | None = None
     skill_ids: list[UUID] | None = Query(None)
 

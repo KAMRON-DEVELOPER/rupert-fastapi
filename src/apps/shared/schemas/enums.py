@@ -210,12 +210,46 @@ class GroupMemberRole(AutoName):
 
 # --- Chats ---
 class ChatEvent(AutoName):
-    goes_online = auto()
-    goes_offline = auto()
+    # commands (client → server)
+    ping = auto()
+
+    join_chat = auto()
+    leave_chat = auto()
+
     typing_start = auto()
     typing_stop = auto()
-    sent_message = auto()
-    created_chat = auto()
+
+    create_chat = auto()
+    delete_chat = auto()
+    clear_chat = auto()
+    read_chat = auto()
+
+    send_message = auto()
+    update_message = auto()
+    delete_message = auto()
+
+    update_chat_settings = auto()
+
+    # notifications (server → client)
+    pong = auto()
+    error = auto()
+
+    chat_joined = auto()
+    chat_left = auto()
+    chat_created = auto()
+    # chat_updated = auto()
+    chat_read = auto()
+    chat_cleared = auto()
+    chat_deleted = auto()
+
+    user_online = auto()
+    user_offline = auto()
+
+    message_created = auto()
+    message_updated = auto()
+    message_deleted = auto()
+
+    chat_settings_updated = auto()
 
 
 # --- Shared ---
@@ -228,3 +262,8 @@ class SalaryCurrency(AutoName):
     USD = auto()
     EUR = auto()
     TRY = auto()
+
+
+class AttachmentStatus(AutoName):
+    pending = auto()
+    ready = auto()

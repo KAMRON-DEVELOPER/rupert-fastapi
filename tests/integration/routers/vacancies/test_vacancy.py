@@ -55,10 +55,7 @@ async def test_vacancy_create_list_detail_update_and_delete(
 
     patch_res = await client.patch(
         f"/api/v1/vacancies/{vacancy_id}",
-        json={
-            "title": "Senior Backend Engineer",
-            "salaryMax": 5_000,
-        },
+        json={"title": "Senior Backend Engineer", "salaryMax": 5_000},
     )
     assert patch_res.status_code == 200
     assert patch_res.json()["title"] == "Senior Backend Engineer"
@@ -109,8 +106,8 @@ async def test_vacancy_list_filters_by_company_location_salary_and_skill(
         "/api/v1/vacancies/",
         params={
             "companyId": first_company["id"],
-            "country": "UZ",
-            "city": "Tashkent",
+            "countryId": vacancy["country"]["id"],
+            "cityId": vacancy["city"]["id"],
             "salaryMin": 5_000,
             "skillIds": str(skill.id),
             "workFormat": "remote",

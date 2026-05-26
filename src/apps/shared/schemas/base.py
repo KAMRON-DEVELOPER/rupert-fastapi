@@ -5,9 +5,18 @@ from pydantic import AliasGenerator, BaseModel, ConfigDict
 from pydantic.alias_generators import to_camel
 
 
+class Schema(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,
+        alias_generator=AliasGenerator(validation_alias=to_camel),
+        extra="forbid",
+    )
+
+
 class RequestSchema(BaseModel):
     model_config = ConfigDict(
         alias_generator=AliasGenerator(validation_alias=to_camel),
+        extra="forbid",
     )
 
 

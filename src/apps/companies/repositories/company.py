@@ -42,7 +42,14 @@ class CompaniesRepository:
             .label("open_vacancies_count")
         )
 
-        stmt = select(CompanyModel, open_vacancies_count)
+        stmt = (
+            select(CompanyModel, open_vacancies_count)
+            .options(
+                selectinload(CompanyModel.country),
+                selectinload(CompanyModel.city),
+            )
+            .execution_options(populate_existing=True)
+        )
 
         if filters:
             if filters.name:
@@ -51,10 +58,10 @@ class CompaniesRepository:
                 stmt = stmt.where(CompanyModel.type == filters.type)
             if filters.status:
                 stmt = stmt.where(CompanyModel.status == filters.status)
-            if filters.country:
-                stmt = stmt.where(CompanyModel.country == filters.country)
-            if filters.city:
-                stmt = stmt.where(CompanyModel.city == filters.city)
+            if filters.country_id:
+                stmt = stmt.where(CompanyModel.country_id == filters.country_id)
+            if filters.city_id:
+                stmt = stmt.where(CompanyModel.city_id == filters.city_id)
             if filters.has_open_vacancies is not None:
                 open_vacancy_exists = exists().where(
                     VacancyModel.company_id == CompanyModel.id,
@@ -117,9 +124,7 @@ class CompaniesRepository:
 
         member_count = (
             select(func.count(CompanyMemberModel.id))
-            .where(
-                CompanyMemberModel.company_id == CompanyModel.id,
-            )
+            .where(CompanyMemberModel.company_id == CompanyModel.id)
             .correlate(CompanyModel)
             .scalar_subquery()
             .label("member_count")
@@ -132,8 +137,11 @@ class CompaniesRepository:
                     CompanyMemberModel.user
                 ),
                 selectinload(CompanyModel.vacancies),
+                selectinload(CompanyModel.country),
+                selectinload(CompanyModel.city),
             )
             .where(CompanyModel.id == company_id)
+            .execution_options(populate_existing=True)
         )
 
         try:
@@ -246,8 +254,6 @@ class CompaniesRepository:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Company not found",
                 )
-
-            await session.flush()
         except HTTPException:
             raise
         except Exception as e:
@@ -296,10 +302,7 @@ class CompaniesRepository:
 
     @staticmethod
     async def add_member(
-        session: AsyncSession,
-        user_id: UUID,
-        company_id: UUID,
-        values: dict,
+        session: AsyncSession, user_id: UUID, company_id: UUID, values: dict
     ):
         await CompaniesRepository.ensure_member(
             session, user_id, company_id, (CompanyMemberRole.owner,)
@@ -402,10 +405,7 @@ class CompaniesRepository:
 
     @staticmethod
     async def delete_member(
-        session: AsyncSession,
-        user_id: UUID,
-        company_id: UUID,
-        member_id: UUID,
+        session: AsyncSession, user_id: UUID, company_id: UUID, member_id: UUID
     ):
         await CompaniesRepository.ensure_member(
             session, user_id, company_id, (CompanyMemberRole.owner,)
@@ -445,8 +445,7 @@ class CompaniesRepository:
 
         by_type_stmt = (
             select(
-                CompanyModel.type,
-                func.count(CompanyModel.id).label("count"),
+                CompanyModel.type, func.count(CompanyModel.id).label("count")
             )
             .group_by(CompanyModel.type)
             .order_by(CompanyModel.type)

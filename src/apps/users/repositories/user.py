@@ -13,7 +13,12 @@ from src.apps.stats.schemas import (
     SpecializationBucket,
     UsersStats,
 )
-from src.apps.users.models import ActivityModel, UserModel, UserSkillLink
+from src.apps.users.models import (
+    ActivityModel,
+    ResumeModel,
+    UserModel,
+    UserSkillLink,
+)
 from src.core.helpers import percentage
 from src.core.logger import logger
 
@@ -67,8 +72,8 @@ class UsersRepository:
                 )
 
             await session.flush()
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             await session.rollback()
             logger.error(f"[UsersRepository] update: {e}")
@@ -88,13 +93,11 @@ class UsersRepository:
 
             if not deleted_id:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="User not found to delete",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found",
                 )
-
-            await session.flush()
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             await session.rollback()
             logger.error(f"[UsersRepository] delete: {e}")
@@ -122,8 +125,8 @@ class UsersRepository:
                 )
 
             await session.flush()
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             await session.rollback()
             logger.error(f"[UsersRepository] delete: {e}")
@@ -134,7 +137,13 @@ class UsersRepository:
 
     @staticmethod
     async def get_by_email(session: AsyncSession, email: str, required=True):
-        stmt = select(UserModel).where(UserModel.email == email)
+        stmt = (
+            select(UserModel)
+            .options(
+                selectinload(UserModel.country), selectinload(UserModel.city)
+            )
+            .where(UserModel.email == email)
+        )
 
         try:
             record = await session.scalar(stmt)
@@ -146,8 +155,8 @@ class UsersRepository:
                 )
 
             return record
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"[UsersRepository] get_by_email: {e}")
             raise HTTPException(
@@ -156,8 +165,14 @@ class UsersRepository:
             )
 
     @staticmethod
-    async def get_summary_by_id(session: AsyncSession, id: UUID, required=True):
-        stmt = select(UserModel).where(UserModel.id == id)
+    async def get_summary(session: AsyncSession, id: UUID, required=True):
+        stmt = (
+            select(UserModel)
+            .options(
+                selectinload(UserModel.country), selectinload(UserModel.city)
+            )
+            .where(UserModel.id == id)
+        )
 
         try:
             record = await session.scalar(stmt)
@@ -169,8 +184,8 @@ class UsersRepository:
                 )
 
             return record
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"[UsersRepository] get_summary_by_id: {e}")
             raise HTTPException(
@@ -179,11 +194,16 @@ class UsersRepository:
             )
 
     @staticmethod
-    async def get_detail_by_id(session: AsyncSession, id: UUID, required=True):
+    async def get_detail(session: AsyncSession, id: UUID, required=True):
         stmt = (
             select(UserModel)
             .options(
-                selectinload(UserModel.resumes),
+                selectinload(UserModel.country),
+                selectinload(UserModel.city),
+                selectinload(UserModel.resumes).selectinload(
+                    ResumeModel.country
+                ),
+                selectinload(UserModel.resumes).selectinload(ResumeModel.city),
                 selectinload(UserModel.skill_links).selectinload(
                     UserSkillLink.skill
                 ),
@@ -202,8 +222,8 @@ class UsersRepository:
                 )
 
             return record
-        except HTTPException as e:
-            raise e
+        except HTTPException:
+            raise
         except Exception as e:
             logger.error(f"[UsersRepository] get_detail_by_id: {e}")
             raise HTTPException(
@@ -255,8 +275,7 @@ class UsersRepository:
         }
         dau_chart = [
             DailyActiveUsersBucket(
-                count=dau_counts_by_date.get(day, 0),
-                date=day,
+                count=dau_counts_by_date.get(day, 0), date=day
             )
             for offset in range(30)
             for day in [start_date + timedelta(days=offset)]
@@ -274,9 +293,7 @@ class UsersRepository:
         by_status_rows = (await session.execute(by_status_stmt)).all()
         by_job_search_status = [
             JobSearchStatusBucket(
-                key=status,
-                count=count,
-                percentage=percentage(count, total),
+                key=status, count=count, percentage=percentage(count, total)
             )
             for status, count in by_status_rows
         ]

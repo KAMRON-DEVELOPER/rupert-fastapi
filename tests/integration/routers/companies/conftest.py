@@ -1,5 +1,5 @@
 from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from httpx import AsyncClient
@@ -33,7 +33,14 @@ async def _authenticate_as(
     return refresh_token
 
 
-def _company_payload(**overrides: object) -> dict[str, object]:
+def _company_payload(
+    default_location: dict[str, object], **overrides: object
+) -> dict[str, object]:
+    country = cast(Any, default_location["country"])
+    cities = cast(dict[str, Any], default_location["cities"])
+    city_name = str(overrides.pop("city", "Tashkent"))
+    overrides.pop("country", None)
+
     payload: dict[str, object] = {
         "name": "Rupert Labs",
         "tagline": "Hiring better",
@@ -42,8 +49,8 @@ def _company_payload(**overrides: object) -> dict[str, object]:
         "type": "startup",
         "contactEmail": "hello@rupert.example.com",
         "contactPhone": "+998901234567",
-        "country": "UZ",
-        "city": "Tashkent",
+        "countryId": str(country.id),
+        "cityId": str(cities[city_name].id),
     }
     payload.update(overrides)
     return payload
@@ -57,8 +64,13 @@ def authenticate_as() -> Callable[
 
 
 @pytest.fixture
-def company_payload() -> Callable[..., dict[str, object]]:
-    return _company_payload
+def company_payload(
+    default_location: dict[str, object],
+) -> Callable[..., dict[str, object]]:
+    def _payload(**overrides: object) -> dict[str, object]:
+        return _company_payload(default_location, **overrides)
+
+    return _payload
 
 
 @pytest.fixture

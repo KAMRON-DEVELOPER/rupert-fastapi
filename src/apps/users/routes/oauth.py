@@ -37,10 +37,7 @@ async def google_oauth_callback(
     )
 
     if oauth_user:
-        user = await UsersRepository.get_summary_by_id(
-            session,
-            oauth_user.user_id,
-        )
+        user = await UsersRepository.get_summary(session, oauth_user.user_id)
         user = cast(UserModel, user)
     else:
         if not google_user.email:
@@ -84,10 +81,7 @@ async def github_oauth_callback(
     )
 
     if oauth_user:
-        user = await UsersRepository.get_summary_by_id(
-            session,
-            oauth_user.user_id,
-        )
+        user = await UsersRepository.get_summary(session, oauth_user.user_id)
         user = cast(UserModel, user)
     else:
         if not github_user.email:

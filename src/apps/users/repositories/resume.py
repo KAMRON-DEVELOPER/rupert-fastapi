@@ -108,10 +108,7 @@ class ResumesRepository:
     async def delete(session: AsyncSession, user_id: UUID, resume_id: UUID):
         stmt = (
             delete(ResumeModel)
-            .where(
-                ResumeModel.id == resume_id,
-                ResumeModel.user_id == user_id,
-            )
+            .where(ResumeModel.id == resume_id, ResumeModel.user_id == user_id)
             .returning(ResumeModel.id)
         )
 
@@ -123,8 +120,6 @@ class ResumesRepository:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Resume not found",
                 )
-
-            await session.flush()
         except HTTPException:
             raise
         except Exception as e:
@@ -139,8 +134,13 @@ class ResumesRepository:
     async def list_by_user_id(session: AsyncSession, user_id: UUID):
         stmt = (
             select(ResumeModel)
+            .options(
+                selectinload(ResumeModel.country),
+                selectinload(ResumeModel.city),
+            )
             .where(ResumeModel.user_id == user_id)
             .order_by(ResumeModel.updated_at.desc())
+            .execution_options(populate_existing=True)
         )
 
         try:
@@ -162,14 +162,14 @@ class ResumesRepository:
         stmt = (
             select(ResumeModel)
             .options(
+                selectinload(ResumeModel.country),
+                selectinload(ResumeModel.city),
                 selectinload(ResumeModel.skill_links).selectinload(
                     ResumeSkillLink.skill
-                )
+                ),
             )
-            .where(
-                ResumeModel.id == resume_id,
-                ResumeModel.user_id == user_id,
-            )
+            .where(ResumeModel.id == resume_id, ResumeModel.user_id == user_id)
+            .execution_options(populate_existing=True)
         )
         try:
             record = await session.scalar(stmt)

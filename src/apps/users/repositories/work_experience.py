@@ -28,14 +28,10 @@ class WorkExperiencesRepository:
 
     @staticmethod
     async def get_by_id_and_user_id(
-        session: AsyncSession,
-        user_id: UUID,
-        id: UUID,
-        required: bool = True,
+        session: AsyncSession, user_id: UUID, id: UUID, required: bool = True
     ):
         stmt = select(WorkExperienceModel).where(
-            WorkExperienceModel.id == id,
-            WorkExperienceModel.user_id == user_id,
+            WorkExperienceModel.id == id, WorkExperienceModel.user_id == user_id
         )
         try:
             record = await session.scalar(stmt)
@@ -134,12 +130,12 @@ class WorkExperiencesRepository:
         )
         try:
             deleted_id = await session.scalar(stmt)
+
             if not deleted_id:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Work experience not found",
                 )
-            await session.flush()
         except HTTPException:
             raise
         except Exception as e:

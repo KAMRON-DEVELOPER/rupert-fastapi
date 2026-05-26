@@ -21,7 +21,7 @@ class SkillModel(BaseModel):
     __tablename__ = "skills"
 
     name: Mapped[str] = mapped_column(
-        String(length=64), nullable=False, index=True, unique=True
+        String(length=64), unique=True, index=True
     )
 
     # Relationships

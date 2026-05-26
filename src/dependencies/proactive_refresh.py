@@ -11,8 +11,10 @@ from pydantic import BaseModel, ValidationError, field_serializer
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.apps.shared.schemas.enums import UserRole
 from src.apps.users.models import ActivityModel
 from src.apps.users.repositories.session import SessionsRepository
+from src.apps.users.repositories.user import UsersRepository
 from src.core.database import sessionDep
 from src.core.logger import logger
 from src.core.settings import get_settings
@@ -198,8 +200,9 @@ async def upsert_daily_activity(
 
 
 class ProactiveRefresh:
-    def __init__(self, required: bool = False):
+    def __init__(self, required: bool = False, admin: bool = False):
         self.required = required
+        self.admin = admin
 
     async def __call__(
         self,
@@ -302,6 +305,16 @@ class ProactiveRefresh:
             if not current_session:
                 return unauthenticated()
 
+        if self.admin:
+            user = await UsersRepository.get_summary(session, user_id)
+            if not user:
+                return unauthenticated()
+            if user.role != UserRole.admin:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Admin access required",
+                )
+
         now = datetime.now(UTC)
         today = now.date()
         today_str = today.isoformat()
@@ -313,10 +326,10 @@ class ProactiveRefresh:
         return user_id, access_token, refresh_token
 
 
-auth_probe_checker_dep = ProactiveRefresh()
-authProbeDep = Annotated[
-    tuple[UUID, str, str] | None, Depends(auth_probe_checker_dep)
-]
+auth_probe_dep = ProactiveRefresh()
+authProbeDep = Annotated[tuple[UUID, str, str] | None, Depends(auth_probe_dep)]
 
-auth_checker_dep = ProactiveRefresh(required=True)
-authDep = Annotated[tuple[UUID, str, str], Depends(auth_checker_dep)]
+auth_dep = ProactiveRefresh(required=True)
+authDep = Annotated[tuple[UUID, str, str], Depends(auth_dep)]
+
+admin_auth_dep = ProactiveRefresh(required=True, admin=True)

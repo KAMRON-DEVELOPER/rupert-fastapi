@@ -40,8 +40,7 @@ class UserSkillsRepository:
             select(UserSkillLink)
             .options(selectinload(UserSkillLink.skill))
             .where(
-                UserSkillLink.id == link_id,
-                UserSkillLink.user_id == user_id,
+                UserSkillLink.id == link_id, UserSkillLink.user_id == user_id
             )
         )
 
@@ -107,8 +106,7 @@ class UserSkillsRepository:
         stmt = (
             update(UserSkillLink)
             .where(
-                UserSkillLink.id == link_id,
-                UserSkillLink.user_id == user_id,
+                UserSkillLink.id == link_id, UserSkillLink.user_id == user_id
             )
             .values(values)
             .returning(UserSkillLink.id)
@@ -143,8 +141,7 @@ class UserSkillsRepository:
         stmt = (
             delete(UserSkillLink)
             .where(
-                UserSkillLink.id == link_id,
-                UserSkillLink.user_id == user_id,
+                UserSkillLink.id == link_id, UserSkillLink.user_id == user_id
             )
             .returning(UserSkillLink.id)
         )
@@ -157,8 +154,6 @@ class UserSkillsRepository:
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="User skill link not found",
                 )
-
-            await session.flush()
         except HTTPException:
             raise
         except Exception as e:
