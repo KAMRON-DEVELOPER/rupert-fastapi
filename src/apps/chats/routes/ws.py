@@ -273,6 +273,8 @@ async def handle_create_chat(
         )
         await session.commit()
 
+        # TODO we might send ChatListItemResponse directly
+        # so frontend does not need to refetch or invalidate cache
         event = _event(
             ChatEvent.chat_created,
             chat_id=chat.id,
