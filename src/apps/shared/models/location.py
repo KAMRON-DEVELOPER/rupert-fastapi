@@ -4,7 +4,7 @@ from uuid import UUID
 
 from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
 from .base import BaseModel
 
@@ -19,6 +19,14 @@ class BaseLocationModel(BaseModel):
         PG_UUID(as_uuid=True), ForeignKey("cities.id"), index=True
     )
 
+    @declared_attr
+    def country(cls) -> Mapped[CountryModel]:
+        return relationship("CountryModel")
+
+    @declared_attr
+    def city(cls) -> Mapped[CityModel | None]:
+        return relationship("CityModel")
+
 
 class BaseNullableLocationModel(BaseModel):
     __abstract__ = True
@@ -29,6 +37,14 @@ class BaseNullableLocationModel(BaseModel):
     city_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("cities.id"), index=True
     )
+
+    @declared_attr
+    def country(cls) -> Mapped[CountryModel | None]:
+        return relationship("CountryModel")
+
+    @declared_attr
+    def city(cls) -> Mapped[CityModel | None]:
+        return relationship("CityModel")
 
 
 class CountryModel(BaseModel):

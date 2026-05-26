@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.apps.companies.models import CompanyModel
 from src.apps.companies.repositories.company import CompaniesRepository
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
 from src.apps.shared.schemas.enums import (
@@ -19,7 +20,7 @@ from src.apps.stats.schemas import (
     VacanciesStats,
     VacancyStatusBucket,
 )
-from src.apps.users.models import ResumeModel
+from src.apps.users.models import ResumeModel, UserModel
 from src.apps.vacancies.models import (
     ApplicationModel,
     SavedVacancyModel,
@@ -43,7 +44,20 @@ class VacanciesRepository:
         filters: vacancyListDep,
         user_id: UUID | None = None,
     ) -> PaginatedResponse[VacancySummary]:
-        stmt = select(VacancyModel).options(selectinload(VacancyModel.company))
+        stmt = (
+            select(VacancyModel)
+            .options(
+                selectinload(VacancyModel.country),
+                selectinload(VacancyModel.city),
+                selectinload(VacancyModel.company).selectinload(
+                    CompanyModel.country
+                ),
+                selectinload(VacancyModel.company).selectinload(
+                    CompanyModel.city
+                ),
+            )
+            .execution_options(populate_existing=True)
+        )
 
         if filters:
             if filters.company_id:
@@ -160,19 +174,13 @@ class VacanciesRepository:
     async def get_by_id(
         session: AsyncSession, id: UUID, user_id: UUID | None = None
     ) -> VacancyModel:
-        stmt = (
-            select(VacancyModel)
-            .options(
-                selectinload(VacancyModel.company),
-                selectinload(VacancyModel.skill_links).selectinload(
-                    VacancySkillLink.skill
-                ),
-            )
-            .where(VacancyModel.id == id)
-        )
-
         load_options = [
-            selectinload(VacancyModel.company),
+            selectinload(VacancyModel.country),
+            selectinload(VacancyModel.city),
+            selectinload(VacancyModel.company).selectinload(
+                CompanyModel.country
+            ),
+            selectinload(VacancyModel.company).selectinload(CompanyModel.city),
             selectinload(VacancyModel.skill_links).selectinload(
                 VacancySkillLink.skill
             ),
@@ -197,6 +205,7 @@ class VacanciesRepository:
                 )
                 .options(*load_options)
                 .where(VacancyModel.id == id)
+                .execution_options(populate_existing=True)
             )
             # row: Row[Tuple[VacancyModel, bool, bool]]
             row = (await session.execute(stmt)).one_or_none()
@@ -214,6 +223,7 @@ class VacanciesRepository:
             select(VacancyModel)
             .options(*load_options)
             .where(VacancyModel.id == id)
+            .execution_options(populate_existing=True)
         )
         vacancy = await session.scalar(stmt)
         if not vacancy:
@@ -527,11 +537,31 @@ class VacanciesRepository:
         # Apply loading options and ordering
         stmt = stmt.options(
             selectinload(ApplicationModel.vacancy).selectinload(
-                VacancyModel.company
+                VacancyModel.country
             ),
-            selectinload(ApplicationModel.resume),
-            selectinload(ApplicationModel.applicant),
+            selectinload(ApplicationModel.vacancy).selectinload(
+                VacancyModel.city
+            ),
+            selectinload(ApplicationModel.vacancy)
+            .selectinload(VacancyModel.company)
+            .selectinload(CompanyModel.country),
+            selectinload(ApplicationModel.vacancy)
+            .selectinload(VacancyModel.company)
+            .selectinload(CompanyModel.city),
+            selectinload(ApplicationModel.resume).selectinload(
+                ResumeModel.country
+            ),
+            selectinload(ApplicationModel.resume).selectinload(
+                ResumeModel.city
+            ),
+            selectinload(ApplicationModel.applicant).selectinload(
+                UserModel.country
+            ),
+            selectinload(ApplicationModel.applicant).selectinload(
+                UserModel.city
+            ),
         ).order_by(ApplicationModel.created_at.desc())
+        stmt = stmt.execution_options(populate_existing=True)
 
         if pagination:
             stmt = stmt.offset(pagination.offset).limit(pagination.limit)
@@ -548,12 +578,32 @@ class VacanciesRepository:
             select(ApplicationModel)
             .options(
                 selectinload(ApplicationModel.vacancy).selectinload(
-                    VacancyModel.company
+                    VacancyModel.country
                 ),
-                selectinload(ApplicationModel.resume),
-                selectinload(ApplicationModel.applicant),
+                selectinload(ApplicationModel.vacancy).selectinload(
+                    VacancyModel.city
+                ),
+                selectinload(ApplicationModel.vacancy)
+                .selectinload(VacancyModel.company)
+                .selectinload(CompanyModel.country),
+                selectinload(ApplicationModel.vacancy)
+                .selectinload(VacancyModel.company)
+                .selectinload(CompanyModel.city),
+                selectinload(ApplicationModel.resume).selectinload(
+                    ResumeModel.country
+                ),
+                selectinload(ApplicationModel.resume).selectinload(
+                    ResumeModel.city
+                ),
+                selectinload(ApplicationModel.applicant).selectinload(
+                    UserModel.country
+                ),
+                selectinload(ApplicationModel.applicant).selectinload(
+                    UserModel.city
+                ),
             )
             .where(ApplicationModel.id == id)
+            .execution_options(populate_existing=True)
         )
         record = await session.scalar(stmt)
         if not record:

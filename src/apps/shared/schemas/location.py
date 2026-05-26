@@ -15,16 +15,6 @@ class NullableLocationRequest(RequestSchema):
     city_id: UUID | None = None
 
 
-class BaseLocationModelResponse(BaseModelResponse):
-    country: CountryResponse
-    city: CityResponse | None
-
-
-class BaseNullableLocationModelResponse(BaseModelResponse):
-    country: CountryResponse | None
-    city: CityResponse | None
-
-
 class CountryCreateRequest(RequestSchema):
     code: str = Field(max_length=2)
     name: str = Field(max_length=56)
@@ -47,3 +37,13 @@ class CityRequest(RequestSchema):
 class CityResponse(BaseModelResponse):
     country_id: UUID
     name: str
+
+
+class BaseLocationModelResponse(BaseModelResponse):
+    country: CountryResponse
+    city: CityResponse | None
+
+
+class BaseNullableLocationModelResponse(BaseModelResponse):
+    country: CountryResponse | None
+    city: CityResponse | None

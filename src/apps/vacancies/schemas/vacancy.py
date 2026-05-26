@@ -6,7 +6,7 @@ from pydantic import AnyUrl, Field, ValidationInfo, field_validator
 
 from src.apps.companies.schemas.company import CompanySummary
 from src.apps.shared.schemas import (
-    BaseModelResponse,
+    BaseLocationModelResponse,
     LocationRequest,
     RequestSchema,
 )
@@ -19,6 +19,7 @@ from src.apps.shared.schemas.enums import (
     VacancyStatus,
     WorkFormat,
 )
+from src.apps.shared.schemas.location import NullableLocationRequest
 from src.apps.vacancies.schemas.skill_links import (
     VacancySkillLinkRequest,
     VacancySkillLinkResponse,
@@ -51,7 +52,7 @@ class VacancyCreateRequest(LocationRequest):
         return v
 
 
-class VacancyUpdateRequest(RequestSchema):
+class VacancyUpdateRequest(NullableLocationRequest):
     title: str | None = Field(default=None, max_length=128)
     description: str | None = None
     external_apply_url: AnyUrl | None = None
@@ -65,8 +66,6 @@ class VacancyUpdateRequest(RequestSchema):
     work_format: WorkFormat | None = None
     work_hours_per_week: int | None = Field(default=None, ge=1, le=168)
     employment_type: EmploymentType | None = None
-    country: str | None = Field(default=None, max_length=64)
-    city: str | None = Field(default=None, max_length=64)
     status: VacancyStatus | None = None
     skills: list[VacancySkillLinkRequest] | None = None
 
@@ -99,7 +98,7 @@ class VacancyListParams(RequestSchema):
 vacancyListDep = Annotated[VacancyListParams, Depends()]
 
 
-class VacancySummary(BaseModelResponse):
+class VacancySummary(BaseLocationModelResponse):
     company: CompanySummary
     title: str
     submission_type: SubmissionType
@@ -111,8 +110,6 @@ class VacancySummary(BaseModelResponse):
     work_format: WorkFormat
     employment_type: EmploymentType
     status: VacancyStatus
-    country: str
-    city: str
     is_saved: bool | None = None
     has_applied: bool | None = None
 

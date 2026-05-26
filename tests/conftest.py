@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from main import app
+from src.apps.shared.models import CityModel, CountryModel
 from src.apps.shared.models.base import Base
 from src.apps.shared.schemas.enums import Provider
 from src.apps.users.models import UserModel
@@ -61,9 +62,7 @@ async def connection() -> AsyncGenerator[AsyncConnection]:
 
 
 @pytest.fixture
-async def session(
-    connection: AsyncConnection,
-) -> AsyncGenerator[AsyncSession]:
+async def session(connection: AsyncConnection) -> AsyncGenerator[AsyncSession]:
     session = async_sessionmaker(
         bind=connection,
         class_=AsyncSession,
@@ -153,6 +152,22 @@ async def make_user(
         return user
 
     return _make_user
+
+
+@pytest.fixture
+async def default_location(session: AsyncSession) -> dict[str, object]:
+    country = CountryModel(code="UZ", name="Uzbekistan")
+    session.add(country)
+    await session.flush()
+
+    cities = {
+        name: CityModel(country_id=country.id, name=name)
+        for name in ("Tashkent", "Samarkand")
+    }
+    session.add_all(cities.values())
+    await session.flush()
+
+    return {"country": country, "cities": cities}
 
 
 @pytest.fixture

@@ -134,8 +134,13 @@ class ResumesRepository:
     async def list_by_user_id(session: AsyncSession, user_id: UUID):
         stmt = (
             select(ResumeModel)
+            .options(
+                selectinload(ResumeModel.country),
+                selectinload(ResumeModel.city),
+            )
             .where(ResumeModel.user_id == user_id)
             .order_by(ResumeModel.updated_at.desc())
+            .execution_options(populate_existing=True)
         )
 
         try:
@@ -157,11 +162,14 @@ class ResumesRepository:
         stmt = (
             select(ResumeModel)
             .options(
+                selectinload(ResumeModel.country),
+                selectinload(ResumeModel.city),
                 selectinload(ResumeModel.skill_links).selectinload(
                     ResumeSkillLink.skill
-                )
+                ),
             )
             .where(ResumeModel.id == resume_id, ResumeModel.user_id == user_id)
+            .execution_options(populate_existing=True)
         )
         try:
             record = await session.scalar(stmt)

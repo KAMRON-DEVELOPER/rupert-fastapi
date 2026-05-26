@@ -106,8 +106,8 @@ async def test_vacancy_list_filters_by_company_location_salary_and_skill(
         "/api/v1/vacancies/",
         params={
             "companyId": first_company["id"],
-            "country": "UZ",
-            "city": "Tashkent",
+            "countryId": vacancy["country"]["id"],
+            "cityId": vacancy["city"]["id"],
             "salaryMin": 5_000,
             "skillIds": str(skill.id),
             "workFormat": "remote",

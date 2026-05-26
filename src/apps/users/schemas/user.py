@@ -81,22 +81,25 @@ class UserUpdateRequest(NullableLocationRequest):
             bool | None, Form(alias="deleteBanner")
         ] = None,
     ):
-        return cls(
-            first_name=first_name,
-            last_name=last_name,
-            country_id=country_id,
-            city_id=city_id,
-            headline=headline,
-            birthdate=birthdate,
-            bio=bio,
-            specialization=specialization,
-            phone_number=phone_number,
-            github_url=github_url,
-            telegram_username=telegram_username,
-            follow_policy=follow_policy,
-            job_search_status=job_search_status,
-            delete_avatar=delete_avatar,
-            delete_banner=delete_banner,
+        data = {
+            "firstName": first_name,
+            "lastName": last_name,
+            "countryId": country_id,
+            "cityId": city_id,
+            "headline": headline,
+            "birthdate": birthdate,
+            "bio": bio,
+            "specialization": specialization,
+            "phoneNumber": phone_number,
+            "githubUrl": github_url,
+            "telegramUsername": telegram_username,
+            "followPolicy": follow_policy,
+            "jobSearchStatus": job_search_status,
+            "deleteAvatar": delete_avatar,
+            "deleteBanner": delete_banner,
+        }
+        return cls.model_validate(
+            {key: value for key, value in data.items() if value is not None}
         )
 
 

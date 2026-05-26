@@ -13,7 +13,12 @@ from src.apps.stats.schemas import (
     SpecializationBucket,
     UsersStats,
 )
-from src.apps.users.models import ActivityModel, UserModel, UserSkillLink
+from src.apps.users.models import (
+    ActivityModel,
+    ResumeModel,
+    UserModel,
+    UserSkillLink,
+)
 from src.core.helpers import percentage
 from src.core.logger import logger
 
@@ -132,7 +137,13 @@ class UsersRepository:
 
     @staticmethod
     async def get_by_email(session: AsyncSession, email: str, required=True):
-        stmt = select(UserModel).where(UserModel.email == email)
+        stmt = (
+            select(UserModel)
+            .options(
+                selectinload(UserModel.country), selectinload(UserModel.city)
+            )
+            .where(UserModel.email == email)
+        )
 
         try:
             record = await session.scalar(stmt)
@@ -155,7 +166,13 @@ class UsersRepository:
 
     @staticmethod
     async def get_summary(session: AsyncSession, id: UUID, required=True):
-        stmt = select(UserModel).where(UserModel.id == id)
+        stmt = (
+            select(UserModel)
+            .options(
+                selectinload(UserModel.country), selectinload(UserModel.city)
+            )
+            .where(UserModel.id == id)
+        )
 
         try:
             record = await session.scalar(stmt)
@@ -181,7 +198,12 @@ class UsersRepository:
         stmt = (
             select(UserModel)
             .options(
-                selectinload(UserModel.resumes),
+                selectinload(UserModel.country),
+                selectinload(UserModel.city),
+                selectinload(UserModel.resumes).selectinload(
+                    ResumeModel.country
+                ),
+                selectinload(UserModel.resumes).selectinload(ResumeModel.city),
                 selectinload(UserModel.skill_links).selectinload(
                     UserSkillLink.skill
                 ),

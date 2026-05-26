@@ -2,25 +2,24 @@ from uuid import UUID
 
 from pydantic import Field, ValidationInfo, field_validator
 
-from src.apps.shared.schemas import BaseModelResponse, RequestSchema
+from src.apps.shared.schemas import BaseLocationModelResponse, LocationRequest
 from src.apps.shared.schemas.enums import (
     EmploymentType,
     SalaryCurrency,
     Specialization,
     WorkFormat,
 )
+from src.apps.shared.schemas.location import NullableLocationRequest
 from src.apps.users.schemas.skill_links import (
     ResumeSkillLinkRequest,
     ResumeSkillLinkResponse,
 )
 
 
-class ResumeRequest(RequestSchema):
+class ResumeRequest(LocationRequest):
     title: str = Field(max_length=128)
     summary: str | None = None
     specialization: Specialization
-    country: str = Field(max_length=64)
-    city: str = Field(max_length=64)
     salary_expectation_min: int | None = Field(default=None, ge=0)
     salary_expectation_max: int | None = Field(default=None, ge=0)
     salary_currency: SalaryCurrency | None = None
@@ -39,12 +38,10 @@ class ResumeRequest(RequestSchema):
         return v
 
 
-class ResumeUpdateRequest(RequestSchema):
+class ResumeUpdateRequest(NullableLocationRequest):
     title: str | None = Field(default=None, max_length=128)
     summary: str | None = None
     specialization: Specialization | None = None
-    country: str | None = Field(default=None, max_length=64)
-    city: str | None = Field(default=None, max_length=64)
     salary_expectation_min: int | None = Field(default=None, ge=0)
     salary_expectation_max: int | None = Field(default=None, ge=0)
     salary_currency: SalaryCurrency | None = None
@@ -63,13 +60,11 @@ class ResumeUpdateRequest(RequestSchema):
         return v
 
 
-class ResumeResponse(BaseModelResponse):
+class ResumeResponse(BaseLocationModelResponse):
     user_id: UUID
     title: str
     summary: str | None
     specialization: Specialization
-    country: str
-    city: str
     salary_expectation_min: int | None
     salary_expectation_max: int | None
     salary_currency: SalaryCurrency | None
@@ -80,12 +75,10 @@ class ResumeResponse(BaseModelResponse):
     )
 
 
-class ResumeSummary(BaseModelResponse):
+class ResumeSummary(BaseLocationModelResponse):
     user_id: UUID
     title: str
     specialization: Specialization
-    country: str
-    city: str
     salary_expectation_min: int | None
     salary_expectation_max: int | None
     salary_currency: SalaryCurrency | None

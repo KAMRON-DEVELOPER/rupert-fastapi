@@ -13,7 +13,7 @@ from .router import admin_router
 
 
 @admin_router.post("/locations/countries", status_code=status.HTTP_201_CREATED)
-async def create_country(session: sessionDep, schm=CountryCreateRequest):
+async def create_country(session: sessionDep, schm: CountryCreateRequest):
     await CountryRepository.create(session, code=schm.code, name=schm.name)
 
 
@@ -24,3 +24,4 @@ async def update_country(
     await CountryRepository.update(
         session, country_id, schm.model_dump(exclude_unset=True)
     )
+    await session.commit()

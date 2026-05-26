@@ -1,4 +1,5 @@
 from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
 import pytest
 from httpx import AsyncClient
@@ -42,12 +43,19 @@ async def _create_skill(session: AsyncSession, name: str) -> SkillModel:
     return record
 
 
-def _resume_payload(**overrides: object) -> dict[str, object]:
+def _resume_payload(
+    default_location: dict[str, object], **overrides: object
+) -> dict[str, object]:
+    country = cast(Any, default_location["country"])
+    cities = cast(dict[str, Any], default_location["cities"])
+    city_name = str(overrides.pop("city", "Tashkent"))
+    overrides.pop("country", None)
+
     payload: dict[str, object] = {
         "title": "Backend Resume",
         "specialization": "backend",
-        "country": "UZ",
-        "city": "Tashkent",
+        "countryId": str(country.id),
+        "cityId": str(cities[city_name].id),
     }
     payload.update(overrides)
     return payload
@@ -61,8 +69,13 @@ def authenticate_as() -> Callable[
 
 
 @pytest.fixture
-def resume_payload() -> Callable[..., dict[str, object]]:
-    return _resume_payload
+def resume_payload(
+    default_location: dict[str, object],
+) -> Callable[..., dict[str, object]]:
+    def _payload(**overrides: object) -> dict[str, object]:
+        return _resume_payload(default_location, **overrides)
+
+    return _payload
 
 
 @pytest.fixture

@@ -18,6 +18,7 @@ async def create_city(session: sessionDep, country_id: UUID, schm=CityRequest):
 
 @admin_router.patch("/locations/{country_id}/cities/{city_id}")
 async def update_city(
-    session: sessionDep, country_id: UUID, city_id: UUID, schm=CityRequest
+    session: sessionDep, country_id: UUID, city_id: UUID, schm: CityRequest
 ):
     await CityRepository.update(session, country_id, city_id, schm.name)
+    await session.commit()

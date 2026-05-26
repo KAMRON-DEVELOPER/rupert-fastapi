@@ -42,7 +42,14 @@ class CompaniesRepository:
             .label("open_vacancies_count")
         )
 
-        stmt = select(CompanyModel, open_vacancies_count)
+        stmt = (
+            select(CompanyModel, open_vacancies_count)
+            .options(
+                selectinload(CompanyModel.country),
+                selectinload(CompanyModel.city),
+            )
+            .execution_options(populate_existing=True)
+        )
 
         if filters:
             if filters.name:
@@ -130,8 +137,11 @@ class CompaniesRepository:
                     CompanyMemberModel.user
                 ),
                 selectinload(CompanyModel.vacancies),
+                selectinload(CompanyModel.country),
+                selectinload(CompanyModel.city),
             )
             .where(CompanyModel.id == company_id)
+            .execution_options(populate_existing=True)
         )
 
         try:
