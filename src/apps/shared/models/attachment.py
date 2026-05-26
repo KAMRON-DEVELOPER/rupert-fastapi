@@ -13,6 +13,8 @@ from .base import BaseModel
 
 if TYPE_CHECKING:
     from src.apps.chats.models import ChatMessageAttachmentLink
+    from src.apps.feeds.models import FeedAttachmentLink
+    from src.apps.groups.models import GroupMessageAttachmentLink
 
 
 class AttachmentModel(BaseModel):
@@ -37,6 +39,12 @@ class AttachmentModel(BaseModel):
 
     # Relationships
     chat_message_links: Mapped[list[ChatMessageAttachmentLink]] = relationship(
+        back_populates="attachment", passive_deletes=True
+    )
+    group_message_links: Mapped[list[GroupMessageAttachmentLink]] = (
+        relationship(back_populates="attachment", passive_deletes=True)
+    )
+    feed_links: Mapped[list[FeedAttachmentLink]] = relationship(
         back_populates="attachment", passive_deletes=True
     )
 

@@ -50,7 +50,7 @@ async def setup_db():
 
 
 @pytest.fixture
-async def connection() -> AsyncGenerator[AsyncConnection, None]:
+async def connection() -> AsyncGenerator[AsyncConnection]:
     async with engine.connect() as conn:
         tx = await conn.begin()
 
@@ -63,7 +63,7 @@ async def connection() -> AsyncGenerator[AsyncConnection, None]:
 @pytest.fixture
 async def session(
     connection: AsyncConnection,
-) -> AsyncGenerator[AsyncSession, None]:
+) -> AsyncGenerator[AsyncSession]:
     session = async_sessionmaker(
         bind=connection,
         class_=AsyncSession,
@@ -77,7 +77,7 @@ async def session(
 
 
 @pytest.fixture
-async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient]:
     async def override_get_session():
         yield session
 

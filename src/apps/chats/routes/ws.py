@@ -7,7 +7,6 @@ from fastapi import HTTPException, WebSocket
 from pydantic import Field, ValidationError, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.settings import get_settings
 from src.apps.chats.repositories.chat import ChatRepository
 from src.apps.chats.repositories.chat_message import ChatMessageRepository
 from src.apps.chats.repositories.chat_participant import (
@@ -27,6 +26,7 @@ from src.core.boto3 import (
 )
 from src.core.database import sessionDep
 from src.core.logger import logger
+from src.core.settings import get_settings
 from src.core.websocket.broker import EventBroker, event_broker
 from src.core.websocket.channels import chat_channel, user_channel
 from src.core.websocket.connection import WebSocketConnection, WebSocketHandler

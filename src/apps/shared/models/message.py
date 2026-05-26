@@ -30,8 +30,13 @@ class BaseMessageModel(BaseModel):
     # Relationships
     @declared_attr
     def sender(cls) -> Mapped[UserModel | None]:
+        back_populates = (
+            "group_messages"
+            if cls.__name__ == "GroupMessageModel"
+            else "chat_messages"
+        )
         return relationship(
-            "UserModel", back_populates="chat_messages", passive_deletes=True
+            "UserModel", back_populates=back_populates, passive_deletes=True
         )
 
     def __repr__(self) -> str:

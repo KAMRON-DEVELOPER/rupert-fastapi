@@ -1,18 +1,21 @@
 # pyright: reportUnusedImport=false
 
 from src.apps.chats.models import (
+    ChatMessageAttachmentLink,
     ChatMessageModel,
     ChatModel,
     ChatParticipantModel,
 )
 from src.apps.companies.models import CompanyMemberModel, CompanyModel
 from src.apps.feeds.models import (
+    FeedAttachmentLink,
     FeedCategoryModel,
     FeedEngagementModel,
     FeedModel,
     FeedTagLink,
 )
 from src.apps.groups.models import (
+    GroupMessageAttachmentLink,
     GroupMessageModel,
     GroupModel,
     GroupParticipantModel,
@@ -48,16 +51,21 @@ from src.apps.vacancies.models import (
 __all__ = [
     "ApplicationModel",
     "Base",
+    "ChatMessageAttachmentLink",
     "ChatMessageModel",
     "ChatModel",
     "ChatParticipantModel",
+    "CityModel",
     "CompanyMemberModel",
     "CompanyModel",
+    "CountryModel",
+    "FeedAttachmentLink",
     "FeedCategoryModel",
     "FeedEngagementModel",
     "FeedModel",
     "FeedTagLink",
     "FollowModel",
+    "GroupMessageAttachmentLink",
     "GroupMessageModel",
     "GroupModel",
     "GroupParticipantModel",
@@ -70,8 +78,6 @@ __all__ = [
     "SavedVacancyModel",
     "SkillModel",
     "TagModel",
-    "CityModel",
-    "CountryModel",
     "UserModel",
     "UserSkillLink",
     "VacancyModel",
