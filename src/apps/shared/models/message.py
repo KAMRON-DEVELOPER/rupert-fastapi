@@ -6,7 +6,7 @@ from uuid import UUID
 
 from sqlalchemy import TIMESTAMP, ForeignKey, Text
 from sqlalchemy import UUID as PG_UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
 from .base import BaseModel
 
@@ -28,9 +28,11 @@ class BaseMessageModel(BaseModel):
     )
 
     # Relationships
-    sender: Mapped["UserModel"] = relationship(
-        back_populates="chat_messages", passive_deletes=True
-    )
+    @declared_attr
+    def sender(cls) -> Mapped[UserModel | None]:
+        return relationship(
+            "UserModel", back_populates="chat_messages", passive_deletes=True
+        )
 
     def __repr__(self) -> str:
         return f"<BaseMessageModel id={self.id}>"

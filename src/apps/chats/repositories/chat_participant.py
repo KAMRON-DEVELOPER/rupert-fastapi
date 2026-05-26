@@ -162,13 +162,29 @@ class ChatParticipantRepository:
         return participant
 
     @classmethod
+    async def set_last_online_at(
+        cls, session: AsyncSession, user_id: UUID, last_online_at: datetime
+    ) -> None:
+        try:
+            await session.execute(
+                update(ChatParticipantModel)
+                .where(ChatParticipantModel.user_id == user_id)
+                .values(last_online_at=last_online_at)
+            )
+            await session.flush()
+        except SQLAlchemyError as e:
+            await session.rollback()
+            logger.error(f"[ChatParticipantRepository] set_last_online_at: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not update online state",
+            )
+
+    @classmethod
     async def clear_for_me(
         cls, session: AsyncSession, user_id: UUID, chat_id: UUID
     ):
-        participant = await cls.get_by_id(session, chat_id, user_id)
-
-        if participant is None:
-            raise HTTPException(status_code=404, detail="Chat not found")
+        participant = await cls.get_by_id(session, user_id, chat_id)
 
         participant.cleared_at = datetime.now(UTC)
         participant.deleted_at = None
@@ -188,13 +204,13 @@ class ChatParticipantRepository:
     async def clear_for_everyone(
         cls, session: AsyncSession, chat_id: UUID, user_id: UUID
     ) -> datetime:
-        await cls.get_by_id(session, chat_id, user_id)
+        await cls.get_by_id(session, user_id, chat_id)
         now = datetime.now(UTC)
         try:
             await session.execute(
                 update(ChatParticipantModel)
                 .where(ChatParticipantModel.chat_id == chat_id)
-                .values(last_seen_at=now)
+                .values(cleared_at=now, deleted_at=None, last_seen_at=now)
             )
             await session.flush()
             return now
@@ -210,10 +226,7 @@ class ChatParticipantRepository:
     async def delete_for_me(
         cls, session: AsyncSession, chat_id: UUID, user_id: UUID
     ):
-        participant = await cls.get_by_id(session, chat_id, user_id)
-
-        if participant is None:
-            raise HTTPException(status_code=404, detail="Chat not found")
+        participant = await cls.get_by_id(session, user_id, chat_id)
 
         now = datetime.now(UTC)
         participant.deleted_at = now
@@ -232,9 +245,13 @@ class ChatParticipantRepository:
 
     @classmethod
     async def update_settings(
-        cls, session: AsyncSession, chat_id: UUID, user_id: UUID, values: dict
+        cls,
+        session: AsyncSession,
+        chat_id: UUID,
+        user_id: UUID,
+        values: dict[str, object],
     ) -> ChatParticipantModel:
-        participant = await cls.get_by_id(session, chat_id, user_id)
+        participant = await cls.get_by_id(session, user_id, chat_id)
         for field, value in values.items():
             if value is not None:
                 setattr(participant, field, value)

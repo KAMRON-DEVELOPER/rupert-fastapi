@@ -210,32 +210,46 @@ class GroupMemberRole(AutoName):
 
 # --- Chats ---
 class ChatEvent(AutoName):
+    # commands (client → server)
     ping = auto()
-    error = auto()
-    goes_online = auto()
-    goes_offline = auto()
+
+    join_chat = auto()
+    leave_chat = auto()
+
     typing_start = auto()
     typing_stop = auto()
-    sent_message = auto()
-    created_chat = auto()
 
+    create_chat = auto()
+    delete_chat = auto()
+    clear_chat = auto()
+    read_chat = auto()
 
-class EventType(AutoName):
-    ping = auto()
+    send_message = auto()
+    update_message = auto()
+    delete_message = auto()
+
+    update_chat_settings = auto()
+
+    # notifications (server → client)
     pong = auto()
-
-    chat_message_send = auto()
-    chat_message_created = auto()
-    chat_message_read = auto()
     error = auto()
 
+    chat_joined = auto()
+    chat_left = auto()
+    chat_created = auto()
+    # chat_updated = auto()
+    chat_read = auto()
+    chat_cleared = auto()
+    chat_deleted = auto()
 
-class MessageKind(AutoName):
-    text = auto()
-    image = auto()
-    video = auto()
-    gif = auto()
-    media = auto()
+    user_online = auto()
+    user_offline = auto()
+
+    message_created = auto()
+    message_updated = auto()
+    message_deleted = auto()
+
+    chat_settings_updated = auto()
 
 
 # --- Shared ---

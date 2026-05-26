@@ -39,9 +39,21 @@ class CreateChatMessageRequest(RequestSchema):
 
 class UpdateChatMessageRequest(RequestSchema):
     message: str | None = None
-    attachments: list[AttachmentIdWithPositionRequest] = Field(
-        default_factory=list
-    )
+    attachments: list[AttachmentIdWithPositionRequest] | None = None
+
+    @model_validator(mode="after")
+    def validate_payload(self):
+        has_text = self.message is not None
+        has_attachments = self.attachments is not None
+
+        if not has_text and not has_attachments:
+            raise ValueError("message or attachments are required")
+
+        positions = [item.position for item in self.attachments or []]
+        if len(positions) != len(set(positions)):
+            raise ValueError("attachment positions must be unique")
+
+        return self
 
 
 class ChatMessageResponse(ResponseSchema):

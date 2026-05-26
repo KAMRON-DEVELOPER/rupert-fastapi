@@ -125,10 +125,10 @@ class ChatParticipantModel(BaseModel):
     last_seen_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), index=True
     )
-    deleted_at: Mapped[datetime | None] = mapped_column(
+    cleared_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True)
     )
-    cleared_at: Mapped[datetime | None] = mapped_column(
+    deleted_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True)
     )
 

@@ -38,9 +38,6 @@ class GroupMessageModel(BaseMessageModel):
     group: Mapped[GroupModel] = relationship(
         back_populates="group_messages", passive_deletes=True
     )
-    sender: Mapped[UserModel] = relationship(
-        back_populates="group_messages", passive_deletes=True
-    )
 
 
 class GroupParticipantModel(BaseModel):

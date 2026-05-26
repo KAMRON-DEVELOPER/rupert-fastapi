@@ -1,407 +1,459 @@
-# from dataclasses import dataclass
-# from datetime import UTC, datetime
-# from uuid import UUID
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from uuid import UUID
 
-# from fastapi import HTTPException, status
-# from sqlalchemy import and_, delete, func, literal, or_, select, update
-# from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-# from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.orm import aliased
+from fastapi import HTTPException, status
+from sqlalchemy import and_, delete, func, literal, or_, select, update
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased, selectinload
 
-# from src.apps.chats.models import (
-#     ChatMessageModel,
-#     ChatModel,
-#     ChatParticipantModel,
-# )
-# from src.apps.chats.schemas.chat import ChatListItemResponse
-# from src.apps.chats.schemas.chat_message import ChatListLastMessageResponse
-# from src.apps.chats.schemas.chat_participant import ChatListUserResponse
-# from src.apps.shared.schemas import PaginatedResponse
-# from src.apps.users.models import UserModel
-# from src.core.logger import logger
-
-
-# @dataclass(frozen=True, slots=True)
-# class ChatListRow:
-#     chat_id: UUID
-
-#     is_pinned: bool
-#     is_muted: bool
-
-#     other_user_id: UUID
-#     other_user_first_name: str
-#     other_user_last_name: str | None
-#     other_user_avatar_url: str | None
-
-#     other_last_seen_at: datetime | None
-
-#     latest_message_id: UUID | None
-#     latest_message_sender_id: UUID | None
-#     latest_message_created_at: datetime | None
-#     latest_message_text: str | None
-#     latest_message_image_urls: list[str] | None
-#     latest_message_video_urls: list[str] | None
-#     latest_message_reply_id: UUID | None
-
-#     unread_count: int
+from src.apps.chats.models import (
+    ChatMessageAttachmentLink,
+    ChatMessageModel,
+    ChatModel,
+    ChatParticipantModel,
+)
+from src.apps.chats.schemas.chat import ChatListItemResponse
+from src.apps.chats.schemas.chat_message import ChatListLastMessageResponse
+from src.apps.chats.schemas.chat_participant import ChatListUserResponse
+from src.apps.shared.models.attachment import AttachmentModel
+from src.apps.shared.schemas import PaginatedResponse, paginationDep
+from src.apps.shared.schemas.attachment import AttachmentWithPositionResponse
+from src.apps.users.models import UserModel
+from src.core.logger import logger
 
 
-# @dataclass(frozen=True, slots=True)
-# class ChatListPage:
-#     data: list[ChatListRow]
-#     total: int
+class ChatRepository:
+    @classmethod
+    async def get_or_create_direct_chat(
+        cls, session: AsyncSession, user_id: UUID, participant_id: UUID
+    ) -> ChatModel:
+        if user_id == participant_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You cannot create a chat with yourself",
+            )
 
+        other_exists = await session.scalar(
+            select(UserModel.id).where(UserModel.id == participant_id)
+        )
+        if not other_exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
 
-# class ChatRepository:
-#     @staticmethod
-#     def _preview(
-#         message: str | None, image_count: int, video_count: int
-#     ) -> str:
-#         text = (message or "").strip()
-#         if text:
-#             return text
-#         if image_count and video_count:
-#             return f"{image_count + video_count} media"
-#         if image_count == 1:
-#             return "Photo"
-#         if image_count > 1:
-#             return f"{image_count} photos"
-#         if video_count == 1:
-#             return "Video"
-#         if video_count > 1:
-#             return f"{video_count} videos"
-#         return ""
+        candidate_chat_ids = (
+            select(ChatParticipantModel.chat_id)
+            .where(ChatParticipantModel.user_id.in_([user_id, participant_id]))
+            .group_by(ChatParticipantModel.chat_id)
+            .having(
+                func.count(func.distinct(ChatParticipantModel.user_id)) == 2
+            )
+            .subquery()
+        )
 
-#     @classmethod
-#     async def delete(cls, session: AsyncSession, chat_id: UUID) -> UUID:
-#         stmt = (
-#             delete(ChatModel)
-#             .where(ChatModel.id == chat_id)
-#             .returning(ChatModel.id)
-#         )
+        existing_chat = await session.scalar(
+            select(ChatModel)
+            .join(
+                ChatParticipantModel,
+                ChatParticipantModel.chat_id == ChatModel.id,
+            )
+            .where(ChatModel.id.in_(select(candidate_chat_ids.c.chat_id)))
+            .group_by(ChatModel.id)
+            .having(func.count(ChatParticipantModel.id) == 2)
+            .limit(1)
+        )
 
-#         try:
-#             deleted_id = await session.scalar(stmt)
+        if existing_chat:
+            await session.execute(
+                update(ChatParticipantModel)
+                .where(ChatParticipantModel.chat_id == existing_chat.id)
+                .where(
+                    ChatParticipantModel.user_id.in_([user_id, participant_id])
+                )
+                .values(deleted_at=None)
+            )
+            await session.flush()
+            return existing_chat
 
-#             if not deleted_id:
-#                 raise HTTPException(
-#                     status_code=status.HTTP_404_NOT_FOUND,
-#                     detail="Chat not found",
-#                 )
+        chat = ChatModel()
+        session.add(chat)
+        await session.flush()
 
-#             return deleted_id
-#         except HTTPException:
-#             raise
-#         except SQLAlchemyError as e:
-#             await session.rollback()
-#             logger.error(f"[ChatRepository] delete: {e}")
-#             raise HTTPException(
-#                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                 detail="Something went wrong while deleting chat",
-#             )
+        session.add_all(
+            [
+                ChatParticipantModel(chat_id=chat.id, user_id=user_id),
+                ChatParticipantModel(chat_id=chat.id, user_id=participant_id),
+            ]
+        )
 
-#     @classmethod
-#     async def get_or_create_direct_chat(
-#         cls, session: AsyncSession, current_user_id: UUID, other_user_id: UUID
-#     ) -> ChatModel:
-#         if current_user_id == other_user_id:
-#             raise HTTPException(
-#                 status_code=status.HTTP_400_BAD_REQUEST,
-#                 detail="You cannot create a chat with yourself",
-#             )
+        try:
+            await session.flush()
+            return chat
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(
+                f"[ChatRepository] get_or_create_direct_chat integrity: {e}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Could not create direct chat",
+            )
+        except SQLAlchemyError as e:
+            await session.rollback()
+            logger.error(f"[ChatRepository] get_or_create_direct_chat: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while creating direct chat",
+            )
 
-#         other_exists = await session.scalar(
-#             select(UserModel.id).where(UserModel.id == other_user_id)
-#         )
-#         if not other_exists:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-#             )
+    @classmethod
+    async def assert_participant(
+        cls, session: AsyncSession, chat_id: UUID, user_id: UUID
+    ) -> ChatParticipantModel:
+        try:
+            participant = await session.scalar(
+                select(ChatParticipantModel).where(
+                    ChatParticipantModel.chat_id == chat_id,
+                    ChatParticipantModel.user_id == user_id,
+                )
+            )
+        except SQLAlchemyError as e:
+            logger.error(f"[ChatRepository] assert_participant: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while checking chat access",
+            )
 
-#         candidate_chat_ids = (
-#             select(ChatParticipantModel.chat_id)
-#             .where(
-#                 ChatParticipantModel.user_id.in_(
-#                     [current_user_id, other_user_id]
-#                 )
-#             )
-#             .group_by(ChatParticipantModel.chat_id)
-#             .having(
-#                 func.count(func.distinct(ChatParticipantModel.user_id)) == 2
-#             )
-#             .subquery()
-#         )
+        if not participant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found"
+            )
+        return participant
 
-#         existing_chat = await session.scalar(
-#             select(ChatModel)
-#             .join(
-#                 ChatParticipantModel,
-#                 ChatParticipantModel.chat_id == ChatModel.id,
-#             )
-#             .where(ChatModel.id.in_(select(candidate_chat_ids.c.chat_id)))
-#             .group_by(ChatModel.id)
-#             .having(func.count(ChatParticipantModel.id) == 2)
-#             .limit(1)
-#         )
+    @classmethod
+    async def get_participant_ids(
+        cls, session: AsyncSession, user_id: UUID
+    ) -> Sequence[UUID]:
+        user = aliased(ChatParticipantModel)
+        participant = aliased(ChatParticipantModel)
 
-#         if existing_chat:
-#             await session.execute(
-#                 update(ChatParticipantModel)
-#                 .where(ChatParticipantModel.chat_id == existing_chat.id)
-#                 .where(
-#                     ChatParticipantModel.user_id.in_(
-#                         [current_user_id, other_user_id]
-#                     )
-#                 )
-#                 .values(deleted_at=None)
-#             )
-#             await session.flush()
-#             return existing_chat
+        stmt = (
+            select(participant.user_id)
+            .distinct()
+            .join(participant, participant.chat_id == user.chat_id)
+            .where(
+                user.user_id == user_id,
+                participant.user_id != user_id,
+                participant.deleted_at.is_(None),
+            )
+        )
 
-#         chat = ChatModel()
-#         session.add(chat)
-#         await session.flush()
+        try:
+            return (await session.scalars(stmt)).all()
+        except SQLAlchemyError as e:
+            logger.error(f"[ChatRepository] get_participant_ids: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not retrieve chat participants",
+            )
 
-#         session.add_all(
-#             [
-#                 ChatParticipantModel(chat_id=chat.id, user_id=current_user_id),
-#                 ChatParticipantModel(chat_id=chat.id, user_id=other_user_id),
-#             ]
-#         )
+    @classmethod
+    async def get_many(
+        cls, session: AsyncSession, user_id: UUID, pagination: paginationDep
+    ) -> PaginatedResponse[ChatListItemResponse]:
+        epoch = datetime(1970, 1, 1, tzinfo=UTC)
+        current_for_latest = aliased(ChatParticipantModel)
+        current_for_unread = aliased(ChatParticipantModel)
+        other_participant = aliased(ChatParticipantModel)
 
-#         try:
-#             await session.flush()
-#             return chat
-#         except IntegrityError as e:
-#             await session.rollback()
-#             logger.error(
-#                 f"[ChatRepository] get_or_create_direct_chat integrity: {e}"
-#             )
-#             raise HTTPException(
-#                 status_code=status.HTTP_409_CONFLICT,
-#                 detail="Could not create direct chat",
-#             )
-#         except SQLAlchemyError as e:
-#             await session.rollback()
-#             logger.error(f"[ChatRepository] get_or_create_direct_chat: {e}")
-#             raise HTTPException(
-#                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                 detail="Something went wrong while creating direct chat",
-#             )
+        visible_filter = and_(
+            ChatParticipantModel.user_id == user_id,
+            ChatParticipantModel.deleted_at.is_(None),
+            ChatParticipantModel.is_archived.is_(False),
+        )
 
-#     @classmethod
-#     async def assert_participant(
-#         cls, session: AsyncSession, chat_id: UUID, user_id: UUID
-#     ) -> ChatParticipantModel:
-#         participant = await session.scalar(
-#             select(ChatParticipantModel).where(
-#                 ChatParticipantModel.chat_id == chat_id,
-#                 ChatParticipantModel.user_id == user_id,
-#             )
-#         )
-#         if not participant:
-#             raise HTTPException(
-#                 status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found"
-#             )
-#         return participant
+        total_stmt = select(func.count(ChatParticipantModel.id)).where(
+            visible_filter
+        )
 
-#     @classmethod
-#     async def get_many(
-#         cls, session: AsyncSession, user_id: UUID, offset: int, limit: int
-#     ) -> PaginatedResponse[ChatListItemResponse]:
-#         epoch = datetime(1970, 1, 1, tzinfo=UTC)
+        latest_messages = (
+            select(
+                ChatMessageModel.id.label("id"),
+                ChatMessageModel.chat_id.label("chat_id"),
+                ChatMessageModel.created_at.label("created_at"),
+                func.row_number()
+                .over(
+                    partition_by=ChatMessageModel.chat_id,
+                    order_by=ChatMessageModel.created_at.desc(),
+                )
+                .label("rn"),
+            )
+            .join(
+                current_for_latest,
+                and_(
+                    current_for_latest.chat_id == ChatMessageModel.chat_id,
+                    current_for_latest.user_id == user_id,
+                ),
+            )
+            .where(
+                or_(
+                    current_for_latest.cleared_at.is_(None),
+                    ChatMessageModel.created_at > current_for_latest.cleared_at,
+                )
+            )
+            .subquery()
+        )
 
-#         CurrentForLatest = aliased(ChatParticipantModel)
-#         CurrentForUnread = aliased(ChatParticipantModel)
-#         OtherParticipant = aliased(ChatParticipantModel)
+        unread_counts = (
+            select(
+                ChatMessageModel.chat_id.label("chat_id"),
+                func.count(ChatMessageModel.id).label("unread_count"),
+            )
+            .join(
+                current_for_unread,
+                and_(
+                    current_for_unread.chat_id == ChatMessageModel.chat_id,
+                    current_for_unread.user_id == user_id,
+                ),
+            )
+            .where(
+                ChatMessageModel.sender_id != user_id,
+                ChatMessageModel.created_at
+                > func.coalesce(
+                    current_for_unread.last_seen_at, literal(epoch)
+                ),
+                or_(
+                    current_for_unread.cleared_at.is_(None),
+                    ChatMessageModel.created_at > current_for_unread.cleared_at,
+                ),
+            )
+            .group_by(ChatMessageModel.chat_id)
+            .subquery()
+        )
 
-#         visible_filter = and_(
-#             ChatParticipantModel.user_id == user_id,
-#             ChatParticipantModel.deleted_at.is_(None),
-#             ChatParticipantModel.is_archived.is_(False),
-#         )
+        data_stmt = (
+            select(
+                ChatModel.id.label("chat_id"),
+                ChatParticipantModel.is_pinned,
+                ChatParticipantModel.is_muted,
+                ChatParticipantModel.is_archived,
+                UserModel.id.label("other_user_id"),
+                UserModel.first_name.label("other_first_name"),
+                UserModel.last_name.label("other_last_name"),
+                UserModel.avatar_url.label("other_avatar_url"),
+                other_participant.last_seen_at.label("other_last_seen_at"),
+                latest_messages.c.id.label("last_message_id"),
+                func.coalesce(unread_counts.c.unread_count, 0).label(
+                    "unread_count"
+                ),
+            )
+            .join(ChatModel, ChatModel.id == ChatParticipantModel.chat_id)
+            .join(
+                other_participant,
+                and_(
+                    other_participant.chat_id == ChatModel.id,
+                    other_participant.user_id != user_id,
+                ),
+            )
+            .join(UserModel, UserModel.id == other_participant.user_id)
+            .outerjoin(
+                latest_messages,
+                and_(
+                    latest_messages.c.chat_id == ChatModel.id,
+                    latest_messages.c.rn == 1,
+                ),
+            )
+            .outerjoin(unread_counts, unread_counts.c.chat_id == ChatModel.id)
+            .where(visible_filter)
+            .order_by(
+                ChatParticipantModel.is_pinned.desc(),
+                latest_messages.c.created_at.desc().nulls_last(),
+                ChatModel.created_at.desc(),
+            )
+            .offset(pagination.offset)
+            .limit(pagination.limit)
+        )
 
-#         total_stmt = (
-#             select(func.count(ChatModel.id))
-#             .join(
-#                 ChatParticipantModel,
-#                 ChatParticipantModel.chat_id == ChatModel.id,
-#             )
-#             .where(visible_filter)
-#         )
+        try:
+            total = await session.scalar(total_stmt) or 0
+            rows = (await session.execute(data_stmt)).all()
+        except SQLAlchemyError as e:
+            logger.error(f"[ChatRepository] get_many: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not retrieve chat list",
+            )
 
-#         latest_messages_stmt = (
-#             select(
-#                 ChatMessageModel.id.label("id"),
-#                 ChatMessageModel.created_at.label("created_at"),
-#                 ChatMessageModel.updated_at.label("updated_at"),
-#                 ChatMessageModel.sender_id.label("sender_id"),
-#                 ChatMessageModel.message.label("message"),
-#                 ChatMessageModel.image_urls.label("image_urls"),
-#                 ChatMessageModel.video_urls.label("video_urls"),
-#                 ChatMessageModel.chat_id.label("chat_id"),
-#                 ChatMessageModel.reply_id.label("reply_id"),
-#                 func.row_number()
-#                 .over(
-#                     partition_by=ChatMessageModel.chat_id,
-#                     order_by=ChatMessageModel.updated_at.desc(),
-#                 )
-#                 .label("rn"),
-#             )
-#             .join(
-#                 CurrentForLatest,
-#                 and_(
-#                     CurrentForLatest.chat_id == ChatMessageModel.chat_id,
-#                     CurrentForLatest.user_id == user_id,
-#                 ),
-#             )
-#             .where(
-#                 or_(
-#                     CurrentForLatest.cleared_at.is_(None),
-#                     ChatMessageModel.created_at > CurrentForLatest.cleared_at,
-#                 )
-#             )
-#             .subquery()
-#         )
+        last_message_ids = [
+            row.last_message_id for row in rows if row.last_message_id
+        ]
+        last_messages = await cls._messages_by_id(session, last_message_ids)
 
-#         unread_counts_stmt = (
-#             select(
-#                 ChatMessageModel.chat_id.label("chat_id"),
-#                 func.count(ChatMessageModel.id).label("unread_count"),
-#             )
-#             .join(
-#                 CurrentForUnread,
-#                 and_(
-#                     CurrentForUnread.chat_id == ChatMessageModel.chat_id,
-#                     CurrentForUnread.user_id == user_id,
-#                 ),
-#             )
-#             .where(
-#                 ChatMessageModel.sender_id != user_id,
-#                 ChatMessageModel.created_at
-#                 > func.coalesce(CurrentForUnread.last_seen_at, literal(epoch)),
-#                 or_(
-#                     CurrentForUnread.cleared_at.is_(None),
-#                     ChatMessageModel.created_at > CurrentForUnread.cleared_at,
-#                 ),
-#             )
-#             .group_by(ChatMessageModel.chat_id)
-#             .subquery()
-#         )
+        items: list[ChatListItemResponse] = []
+        for row in rows:
+            message = last_messages.get(row.last_message_id)
+            last_message = None
+            if message is not None:
+                seen_by_recipient = None
+                if message.sender_id == user_id:
+                    seen_by_recipient = (
+                        row.other_last_seen_at is not None
+                        and row.other_last_seen_at >= message.created_at
+                    )
+                last_message = cls._last_message_response(
+                    message, seen_by_recipient=seen_by_recipient
+                )
 
-#         data_stmt = (
-#             select(
-#                 ChatModel.id.label("chat_id"),
-#                 ChatParticipantModel.is_pinned,
-#                 ChatParticipantModel.is_muted,
-#                 ChatParticipantModel.is_archived,
-#                 UserModel.id.label("other_user_id"),
-#                 UserModel.first_name.label("other_first_name"),
-#                 UserModel.last_name.label("other_last_name"),
-#                 UserModel.avatar_url.label("other_avatar_url"),
-#                 OtherParticipant.last_seen_at.label("other_last_seen_at"),
-#                 latest_messages_stmt.c.id.label("last_message_id"),
-#                 latest_messages_stmt.c.sender_id.label("last_sender_id"),
-#                 latest_messages_stmt.c.created_at.label("last_created_at"),
-#                 latest_messages_stmt.c.updated_at.label("last_updated_at"),
-#                 latest_messages_stmt.c.message.label("last_message"),
-#                 latest_messages_stmt.c.image_urls.label("last_image_urls"),
-#                 latest_messages_stmt.c.video_urls.label("last_video_urls"),
-#                 latest_messages_stmt.c.reply_id.label("last_reply_id"),
-#                 func.coalesce(unread_counts_stmt.c.unread_count, 0).label(
-#                     "unread_count"
-#                 ),
-#             )
-#             .join(
-#                 ChatParticipantModel,
-#                 and_(
-#                     ChatParticipantModel.chat_id == ChatModel.id,
-#                     ChatParticipantModel.user_id == user_id,
-#                 ),
-#             )
-#             .join(
-#                 OtherParticipant,
-#                 and_(
-#                     OtherParticipant.chat_id == ChatModel.id,
-#                     OtherParticipant.user_id != user_id,
-#                 ),
-#             )
-#             .join(UserModel, UserModel.id == OtherParticipant.user_id)
-#             .outerjoin(
-#                 latest_messages_stmt,
-#                 and_(
-#                     latest_messages_stmt.c.chat_id == ChatModel.id,
-#                     latest_messages_stmt.c.rn == 1,
-#                 ),
-#             )
-#             .outerjoin(
-#                 unread_counts_stmt, unread_counts_stmt.c.chat_id == ChatModel.id
-#             )
-#             .where(ChatParticipantModel.deleted_at.is_(None))
-#             .where(ChatParticipantModel.is_archived.is_(False))
-#             .order_by(
-#                 ChatParticipantModel.is_pinned.desc(),
-#                 latest_messages_stmt.c.created_at.desc().nulls_last(),
-#                 ChatModel.created_at.desc(),
-#             )
-#             .offset(offset)
-#             .limit(limit)
-#         )
+            items.append(
+                ChatListItemResponse(
+                    id=row.chat_id,
+                    user=ChatListUserResponse(
+                        id=row.other_user_id,
+                        first_name=row.other_first_name,
+                        last_name=row.other_last_name,
+                        avatar_url=row.other_avatar_url,
+                    ),
+                    is_pinned=row.is_pinned,
+                    is_muted=row.is_muted,
+                    is_archived=row.is_archived,
+                    last_message=last_message,
+                    unread_count=row.unread_count,
+                )
+            )
 
-#         try:
-#             total = await session.scalar(total_stmt) or 0
-#             rows = (await session.execute(data_stmt)).all()
-#         except SQLAlchemyError as e:
-#             logger.error(f"[ChatRepository] get_many: {e}")
-#             raise HTTPException(
-#                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                 detail="Could not retrieve chat list",
-#             )
+        return PaginatedResponse(data=items, total=total)
 
-#         items: list[ChatListItemResponse] = []
-#         for row in rows:
-#             last_message = None
-#             if row.last_message_id and row.last_created_at:
-#                 image_count = len(row.last_image_urls or [])
-#                 video_count = len(row.last_video_urls or [])
-#                 is_mine = row.last_sender_id == user_id
-#                 last_message = ChatListLastMessageResponse(
-#                     id=row.last_message_id,
-#                     sender_id=row.last_sender_id,
-#                     created_at=row.last_created_at,
-#                     updated_at=row.last_updated_at,
-#                     reply_id=row.last_reply_id,
-#                     message=row.last_message,
-#                     image_count=image_count,
-#                     video_count=video_count,
-#                     media_count=image_count + video_count,
-#                     preview=cls._preview(
-#                         row.last_message, image_count, video_count
-#                     ),
-#                     is_mine=is_mine,
-#                     seen_by_other=(
-#                         row.other_last_seen_at is not None
-#                         and row.other_last_seen_at >= row.last_created_at
-#                         if is_mine
-#                         else None
-#                     ),
-#                 )
+    @classmethod
+    async def attachment_keys(
+        cls, session: AsyncSession, chat_id: UUID
+    ) -> list[str]:
+        try:
+            return list(
+                await session.scalars(
+                    select(AttachmentModel.object_key)
+                    .join(
+                        ChatMessageAttachmentLink,
+                        ChatMessageAttachmentLink.attachment_id
+                        == AttachmentModel.id,
+                    )
+                    .join(
+                        ChatMessageModel,
+                        ChatMessageModel.id
+                        == ChatMessageAttachmentLink.chat_message_id,
+                    )
+                    .where(ChatMessageModel.chat_id == chat_id)
+                )
+            )
+        except SQLAlchemyError as e:
+            logger.error(f"[ChatRepository] attachment_keys: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not retrieve chat attachments",
+            )
 
-#             items.append(
-#                 ChatListItemResponse(
-#                     id=row.chat_id,
-#                     user=ChatListUserResponse(
-#                         id=row.other_user_id,
-#                         first_name=row.other_first_name,
-#                         last_name=row.other_last_name,
-#                         avatar_url=row.other_avatar_url,
-#                     ),
-#                     is_pinned=row.is_pinned,
-#                     is_muted=row.is_muted,
-#                     is_archived=row.is_archived,
-#                     last_message=last_message,
-#                     unread_count=row.unread_count,
-#                 )
-#             )
+    @classmethod
+    async def delete_for_everyone(
+        cls, session: AsyncSession, chat_id: UUID, user_id: UUID
+    ) -> None:
+        await cls.assert_participant(session, chat_id, user_id)
+        try:
+            attachment_ids = await cls._attachment_ids(session, chat_id)
+            if attachment_ids:
+                await session.execute(
+                    delete(AttachmentModel).where(
+                        AttachmentModel.id.in_(attachment_ids)
+                    )
+                )
+            deleted_id = await session.scalar(
+                delete(ChatModel)
+                .where(ChatModel.id == chat_id)
+                .returning(ChatModel.id)
+            )
+            if not deleted_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Chat not found",
+                )
+            await session.flush()
+        except HTTPException:
+            raise
+        except SQLAlchemyError as e:
+            await session.rollback()
+            logger.error(f"[ChatRepository] delete_for_everyone: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while deleting chat",
+            )
 
-#         return PaginatedResponse(data=items, total=total)
+    @staticmethod
+    async def _messages_by_id(
+        session: AsyncSession, message_ids: list[UUID]
+    ) -> dict[UUID, ChatMessageModel]:
+        if not message_ids:
+            return {}
+
+        records = (
+            await session.scalars(
+                select(ChatMessageModel)
+                .options(
+                    selectinload(
+                        ChatMessageModel.attachment_links
+                    ).selectinload(ChatMessageAttachmentLink.attachment)
+                )
+                .where(ChatMessageModel.id.in_(message_ids))
+            )
+        ).all()
+        return {record.id: record for record in records}
+
+    @staticmethod
+    def _last_message_response(
+        message: ChatMessageModel, *, seen_by_recipient: bool | None
+    ) -> ChatListLastMessageResponse:
+        return ChatListLastMessageResponse(
+            id=message.id,
+            created_at=message.created_at,
+            updated_at=message.updated_at,
+            sender_id=message.sender_id,
+            message=message.message,
+            chat_id=message.chat_id,
+            reply_id=message.reply_id,
+            attachments=[
+                AttachmentWithPositionResponse(
+                    id=link.attachment.id,
+                    object_key=link.attachment.object_key,
+                    original_filename=link.attachment.original_filename,
+                    status=link.attachment.status,
+                    mime_type=link.attachment.mime_type,
+                    label=link.attachment.label,
+                    group=link.attachment.group,
+                    size_bytes=link.attachment.size_bytes,
+                    meta=link.attachment.meta,
+                    position=link.position,
+                )
+                for link in message.attachment_links
+            ],
+            seen_by_recipient=seen_by_recipient,
+        )
+
+    @staticmethod
+    async def _attachment_ids(
+        session: AsyncSession, chat_id: UUID
+    ) -> list[UUID]:
+        return list(
+            await session.scalars(
+                select(AttachmentModel.id)
+                .join(
+                    ChatMessageAttachmentLink,
+                    ChatMessageAttachmentLink.attachment_id
+                    == AttachmentModel.id,
+                )
+                .join(
+                    ChatMessageModel,
+                    ChatMessageModel.id
+                    == ChatMessageAttachmentLink.chat_message_id,
+                )
+                .where(ChatMessageModel.chat_id == chat_id)
+            )
+        )

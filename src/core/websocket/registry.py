@@ -99,6 +99,27 @@ class ConnectionRegistry:
         if not self._connection_channels[connection_id]:
             self._connection_channels.pop(connection_id, None)
 
+    def user_has_channel_connection(
+        self,
+        user_id: UserId,
+        channel: Channel,
+        *,
+        exclude: ConnectionId | None = None,
+    ) -> bool:
+        return any(
+            connection_id != exclude
+            and channel in self._connection_channels.get(connection_id, set())
+            for connection_id in self._user_connections.get(user_id, set())
+        )
+
+    def user_has_connection(
+        self, user_id: UserId, *, exclude: ConnectionId | None = None
+    ) -> bool:
+        return any(
+            connection_id != exclude
+            for connection_id in self._user_connections.get(user_id, set())
+        )
+
     async def next_event(self, connection_id: ConnectionId) -> dict[str, Any]:
         """Awaited by WebSocketConnection._send_loop to drain a connection's queue."""
         queue = self._queues.get(connection_id)
