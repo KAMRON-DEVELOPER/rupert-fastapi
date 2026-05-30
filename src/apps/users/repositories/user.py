@@ -2,10 +2,12 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.apps.chats.schemas.chat_participant import ChatListUserResponse
+from src.apps.shared.schemas import PaginatedResponse
 from src.apps.shared.schemas.enums import JobSearchStatus
 from src.apps.stats.schemas import (
     DailyActiveUsersBucket,
@@ -229,6 +231,60 @@ class UsersRepository:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while retrieving user detail by id",
+            )
+
+    @staticmethod
+    async def search(
+        session: AsyncSession,
+        query: str | None,
+        limit: int,
+        offset: int,
+    ) -> PaginatedResponse[ChatListUserResponse]:
+        search_pattern = f"%{query}%" if query else "%"
+
+        user_filter = or_(
+            UserModel.first_name.ilike(search_pattern),
+            UserModel.last_name.ilike(search_pattern),
+        )
+
+        data_stmt = (
+            select(
+                UserModel.id,
+                UserModel.first_name,
+                UserModel.last_name,
+                UserModel.avatar_url,
+            )
+            .where(user_filter)
+            .order_by(UserModel.first_name)
+            .offset(offset)
+            .limit(limit)
+        )
+
+        count_stmt = (
+            select(func.count()).select_from(UserModel).where(user_filter)
+        )
+
+        try:
+            rows = (await session.execute(data_stmt)).all()
+            total = await session.scalar(count_stmt) or 0
+
+            return PaginatedResponse(
+                data=[
+                    ChatListUserResponse(
+                        id=row.id,
+                        first_name=row.first_name,
+                        last_name=row.last_name,
+                        avatar_url=row.avatar_url,
+                    )
+                    for row in rows
+                ],
+                total=total,
+            )
+        except Exception as e:
+            logger.error(f"[UsersRepository] search: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while searching users",
             )
 
     @staticmethod

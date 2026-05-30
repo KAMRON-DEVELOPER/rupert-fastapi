@@ -152,7 +152,7 @@ async def disconnect_handler(
         )
 
     if connection_registry.user_has_connection(user_id, exclude=connection_id):
-        logger.debug("[chat_ws] disconnected user=%s", user_id)
+        logger.debug(f"[chat_ws] disconnected user={user_id}")
         return
 
     last_online_at = datetime.now(UTC)
@@ -166,7 +166,7 @@ async def disconnect_handler(
         await session.commit()
     except Exception as e:
         await session.rollback()
-        logger.exception("[chat_ws] disconnect presence update failed: %s", e)
+        logger.exception(f"[chat_ws] disconnect presence update failed: {e}")
         return
 
     await _publish_to_users(
@@ -178,7 +178,7 @@ async def disconnect_handler(
             last_online_at=last_online_at,
         ),
     )
-    logger.debug("[chat_ws] disconnected user=%s", user_id)
+    logger.debug(f"[chat_ws] disconnected user={user_id}")
 
 
 async def handle_ping(
@@ -628,7 +628,7 @@ async def _guard(
         await _send_error(broker, connection_id, e.detail, e.status_code)
     except Exception as e:
         await session.rollback()
-        logger.exception("[chat_ws] action failed: %s", e)
+        logger.exception(f"[chat_ws] action failed: {e}")
         await _send_error(broker, connection_id, "internal server error")
 
 
@@ -716,4 +716,4 @@ async def _delete_objects(keys: list[str]) -> None:
     try:
         await delete_objects_from_boto3(keys)
     except HTTPException as e:
-        logger.error("[chat_ws] committed DB change, S3 delete failed: %s", e)
+        logger.error(f"[chat_ws] committed DB change, S3 delete failed: {e}")

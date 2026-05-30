@@ -138,9 +138,6 @@ class WebSocketConnection:
     async def _process_text(self, text: str) -> None:
         assert self.connection_id is not None
 
-        # if self.connection_id is None:
-        #     return
-
         try:
             payload = json.loads(text)
         except json.JSONDecodeError:
@@ -155,6 +152,9 @@ class WebSocketConnection:
         if not isinstance(raw_event, str):
             await self._send_error("missing event type")
             return
+
+        if raw_event != "ping":
+            logger.debug(f"[WebSocketConnection][_process_text] text: {text}")
 
         try:
             event = ChatEvent(raw_event)

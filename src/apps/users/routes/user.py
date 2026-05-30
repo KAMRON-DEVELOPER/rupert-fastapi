@@ -4,6 +4,8 @@ from typing import Annotated
 from fastapi import Depends, File, HTTPException, Query, UploadFile, status
 from PIL import Image
 
+from src.apps.chats.schemas.chat_participant import ChatListUserResponse
+from src.apps.shared.schemas import PaginatedResponse, paginationDep
 from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
 from src.apps.users.schemas.user import (
@@ -38,6 +40,22 @@ def get_image_dimensions(image_bytes: bytes) -> tuple[int, int]:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get image dimensions",
         )
+
+
+@users_router.get(
+    "/search", response_model=PaginatedResponse[ChatListUserResponse]
+)
+async def search_users(
+    session: sessionDep,
+    pagination: paginationDep,
+    q: Annotated[str | None, Query(min_length=1)] = None,
+):
+    return await UsersRepository.search(
+        session,
+        query=q,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @users_router.get("/")

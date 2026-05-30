@@ -142,6 +142,7 @@ class ChatRepository:
         stmt = (
             select(participant.user_id)
             .distinct()
+            .select_from(user)
             .join(participant, participant.chat_id == user.chat_id)
             .where(
                 user.user_id == user_id,
