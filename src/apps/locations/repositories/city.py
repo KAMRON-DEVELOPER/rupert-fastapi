@@ -59,9 +59,12 @@ class CityRepository:
             )
 
     @classmethod
-    async def delete(cls, session: AsyncSession, city_id: UUID):
+    async def delete(
+        cls, session: AsyncSession, country_id: UUID, city_id: UUID
+    ):
         stmt = (
             delete(CityModel)
+            .where(CityModel.country_id == country_id)
             .where(CityModel.id == city_id)
             .returning(CityModel.id)
         )

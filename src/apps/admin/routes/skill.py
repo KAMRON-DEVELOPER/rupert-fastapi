@@ -20,3 +20,12 @@ async def create_skill(session: sessionDep, schm: SkillRequest):
 async def update_skill(session: sessionDep, skill_id: UUID, schm: SkillRequest):
     await SkillRepository.update(session, skill_id, schm.name)
     await session.commit()
+
+
+@admin_router.delete(
+    "/skills/{skill_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_skill(session: sessionDep, skill_id: UUID):
+    await SkillRepository.delete(session, skill_id)
+    await session.commit()

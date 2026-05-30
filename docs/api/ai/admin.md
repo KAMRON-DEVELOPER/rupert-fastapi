@@ -10,19 +10,16 @@ OpenAPI document generated from `main.py`.
 - Method: `POST`
 - Path: `/api/v1/admin/locations/{country_id}/cities`
 - Summary: Create City.
-- Note: Current OpenAPI exposes `schm` as a query parameter. The route code
-  appears to expect a `CityRequest` payload.
 - Path parameters:
   - `country_id` (string(uuid), required)
-- Query parameters:
-  - `schm` (Schm, optional)
 - Cookie parameters:
   - `access_token` (string | null, optional)
   - `refresh_token` (string | null, optional)
   - `dau` (string | null, optional)
-- Request body: none.
+- Request body (required):
+  - `application/json` as `CityRequest`
 - Responses:
-  - `201`: Successful Response; `application/json` not specified
+  - `201`: Successful Response; `application/json` as `CityResponse`
   - `422`: Validation Error; `application/json` `HTTPValidationError`
 
 ### Endpoint 2
@@ -40,7 +37,7 @@ OpenAPI document generated from `main.py`.
 - Request body (required):
   - `application/json` as `CityRequest`
 - Responses:
-  - `200`: Successful Response; `application/json` not specified
+  - `200`: Successful Response; `application/json` as `CityResponse`
   - `422`: Validation Error; `application/json` `HTTPValidationError`
 
 ### Endpoint 3
@@ -55,7 +52,7 @@ OpenAPI document generated from `main.py`.
 - Request body (required):
   - `application/json` as `CountryCreateRequest`
 - Responses:
-  - `201`: Successful Response; `application/json` not specified
+  - `201`: Successful Response; `application/json` as `CountryResponse`
   - `422`: Validation Error; `application/json` `HTTPValidationError`
 
 ### Endpoint 4
@@ -72,7 +69,7 @@ OpenAPI document generated from `main.py`.
 - Request body (required):
   - `application/json` as `CountryUpdateRequest`
 - Responses:
-  - `200`: Successful Response; `application/json` not specified
+  - `200`: Successful Response; `application/json` as `CountryResponse`
   - `422`: Validation Error; `application/json` `HTTPValidationError`
 
 ### Endpoint 5
@@ -80,17 +77,14 @@ OpenAPI document generated from `main.py`.
 - Method: `POST`
 - Path: `/api/v1/admin/skills`
 - Summary: Create Skill.
-- Note: Current OpenAPI exposes `schm` as a query parameter. The route code
-  appears to expect a `SkillRequest` payload.
-- Query parameters:
-  - `schm` (Schm, optional)
 - Cookie parameters:
   - `access_token` (string | null, optional)
   - `refresh_token` (string | null, optional)
   - `dau` (string | null, optional)
-- Request body: none.
+- Request body (required):
+  - `application/json` as `SkillRequest`
 - Responses:
-  - `201`: Successful Response; `application/json` not specified
+  - `201`: Successful Response; `application/json` as `SkillResponse`
   - `422`: Validation Error; `application/json` `HTTPValidationError`
 
 ### Endpoint 6
@@ -107,7 +101,53 @@ OpenAPI document generated from `main.py`.
 - Request body (required):
   - `application/json` as `SkillRequest`
 - Responses:
-  - `200`: Successful Response; `application/json` not specified
+  - `200`: Successful Response; `application/json` as `SkillResponse`
+  - `422`: Validation Error; `application/json` `HTTPValidationError`
+
+### Endpoint 7
+
+- Method: `DELETE`
+- Path: `/api/v1/admin/locations/{country_id}/cities/{city_id}`
+- Summary: Delete City.
+- Path parameters:
+  - `country_id` (string(uuid), required)
+  - `city_id` (string(uuid), required)
+- Cookie parameters:
+  - `access_token` (string | null, optional)
+  - `refresh_token` (string | null, optional)
+  - `dau` (string | null, optional)
+- Responses:
+  - `204`: Successful Response
+  - `422`: Validation Error; `application/json` `HTTPValidationError`
+
+### Endpoint 8
+
+- Method: `DELETE`
+- Path: `/api/v1/admin/locations/countries/{country_id}`
+- Summary: Delete Country.
+- Path parameters:
+  - `country_id` (string(uuid), required)
+- Cookie parameters:
+  - `access_token` (string | null, optional)
+  - `refresh_token` (string | null, optional)
+  - `dau` (string | null, optional)
+- Responses:
+  - `204`: Successful Response
+  - `422`: Validation Error; `application/json` `HTTPValidationError`
+
+### Endpoint 9
+
+- Method: `DELETE`
+- Path: `/api/v1/admin/skills/{skill_id}`
+- Summary: Delete Skill.
+- Path parameters:
+  - `skill_id` (string(uuid), required)
+- Cookie parameters:
+  - `access_token` (string | null, optional)
+  - `refresh_token` (string | null, optional)
+  - `dau` (string | null, optional)
+- Responses:
+  - `204`: Successful Response
   - `422`: Validation Error; `application/json` `HTTPValidationError`
 
 ## Schemas

@@ -1,11 +1,11 @@
 from pydantic import Field
 
-from .base import RequestSchema, ResponseSchema
+from .base import BaseModelResponse, RequestSchema
 
 
 class SkillRequest(RequestSchema):
     name: str = Field(max_length=64)
 
 
-class SkillResponse(ResponseSchema):
+class SkillResponse(BaseModelResponse):
     name: str

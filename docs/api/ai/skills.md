@@ -17,10 +17,19 @@ FastAPI OpenAPI document generated from `main.py`.
   - `limit` (integer, optional); min 1, max 100, default 20
 - Request body: none.
 - Responses:
-  - `200`: Successful Response; `application/json` not specified
+  - `200`: Successful Response; `application/json` as `PaginatedSkillResponse`
   - `422`: Validation Error; `application/json` `HTTPValidationError`
 
 ## Schemas
+
+### `PaginatedSkillResponse`
+
+Type: `object`.
+Required fields: `data`, `total`.
+
+- Fields:
+  - `data` (required): `array[SkillResponse]`
+  - `total` (required): `integer`
 
 ### `HTTPValidationError`
 
@@ -32,7 +41,7 @@ Type: `object`.
 ### `SkillResponse`
 
 Type: `object`.
-Required fields: `name`.
+Required fields: `id, createdAt, updatedAt, name`.
 
 - Fields:
   - `name` (required): `string`

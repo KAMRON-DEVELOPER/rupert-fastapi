@@ -14,7 +14,7 @@ from .router import admin_router
     status_code=status.HTTP_201_CREATED,
     response_model=CityResponse,
 )
-async def create_city(session: sessionDep, country_id: UUID, schm=CityRequest):
+async def create_city(session: sessionDep, country_id: UUID, schm: CityRequest):
     return await CityRepository.create(session, country_id, schm.name)
 
 
@@ -23,4 +23,13 @@ async def update_city(
     session: sessionDep, country_id: UUID, city_id: UUID, schm: CityRequest
 ):
     await CityRepository.update(session, country_id, city_id, schm.name)
+    await session.commit()
+
+
+@admin_router.delete(
+    "/locations/{country_id}/cities/{city_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_city(session: sessionDep, country_id: UUID, city_id: UUID):
+    await CityRepository.delete(session, country_id, city_id)
     await session.commit()
