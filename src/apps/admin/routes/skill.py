@@ -2,14 +2,16 @@ from uuid import UUID
 
 from fastapi import status
 
-from src.apps.shared.schemas import SkillRequest
+from src.apps.shared.schemas import SkillRequest, SkillResponse
 from src.apps.skills.repositories import SkillRepository
 from src.core.database import sessionDep
 
 from .router import admin_router
 
 
-@admin_router.post("/skills", status_code=status.HTTP_201_CREATED)
+@admin_router.post(
+    "/skills", status_code=status.HTTP_201_CREATED, response_model=SkillResponse
+)
 async def create_skill(session: sessionDep, schm: SkillRequest):
     return await SkillRepository.create(session, name=schm.name)
 

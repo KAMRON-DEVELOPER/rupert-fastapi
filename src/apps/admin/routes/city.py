@@ -3,14 +3,16 @@ from uuid import UUID
 from fastapi import status
 
 from src.apps.locations.repositories import CityRepository
-from src.apps.shared.schemas.location import CityRequest
+from src.apps.shared.schemas import CityRequest, CityResponse
 from src.core.database import sessionDep
 
 from .router import admin_router
 
 
 @admin_router.post(
-    "/locations/{country_id}/cities", status_code=status.HTTP_201_CREATED
+    "/locations/{country_id}/cities",
+    status_code=status.HTTP_201_CREATED,
+    response_model=CityResponse,
 )
 async def create_city(session: sessionDep, country_id: UUID, schm=CityRequest):
     return await CityRepository.create(session, country_id, schm.name)

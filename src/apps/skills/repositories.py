@@ -1,8 +1,9 @@
+import asyncio
 from collections.abc import Sequence
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -87,11 +88,17 @@ class SkillRepository:
     @classmethod
     async def get_many(
         cls, session: AsyncSession, limit: int, offset: int
-    ) -> Sequence[SkillModel]:
+    ) -> tuple[Sequence[SkillModel], int]:
         stmt = select(SkillModel).limit(limit).offset(offset)
+        count_stmt = select(func.count()).select_from(SkillModel)
 
         try:
-            return (await session.scalars(stmt)).all()
+            rows, total = await asyncio.gather(
+                session.scalars(stmt),
+                session.scalar(count_stmt),
+            )
+
+            return rows.all(), total or 0
         except Exception as e:
             logger.error(f"[SkillRepository] get_many: {e}")
             raise HTTPException(

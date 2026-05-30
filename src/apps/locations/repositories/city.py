@@ -1,7 +1,9 @@
+import asyncio
+from collections.abc import Sequence
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -88,16 +90,22 @@ class CityRepository:
     @classmethod
     async def get_many(
         cls, session: AsyncSession, country_id: UUID, limit: int, offset: int
-    ):
+    ) -> tuple[Sequence[CityModel], int]:
         stmt = (
             select(CityModel)
             .where(CityModel.country_id == country_id)
             .limit(limit)
             .offset(offset)
         )
+        count_stmt = select(func.count()).select_from(CityModel)
 
         try:
-            return (await session.scalars(stmt)).all()
+            rows, total = await asyncio.gather(
+                session.scalars(stmt),
+                session.scalar(count_stmt),
+            )
+
+            return rows.all(), total or 0
         except Exception as e:
             logger.error(f"[CityRepository] get_many: {e}")
             raise HTTPException(
