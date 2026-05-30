@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Annotated, TypeVar
 
 from fastapi import Depends
@@ -17,5 +18,5 @@ T = TypeVar("T")
 
 
 class PaginatedResponse[T](ResponseSchema):
-    data: list[T]
+    data: Sequence[T]
     total: int

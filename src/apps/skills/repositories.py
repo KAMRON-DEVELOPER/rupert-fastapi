@@ -1,5 +1,3 @@
-import asyncio
-from collections.abc import Sequence
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -8,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.shared.models import SkillModel
+from src.apps.shared.schemas import PaginatedResponse, SkillResponse
 from src.core.logger import logger
 
 
@@ -88,17 +87,18 @@ class SkillRepository:
     @classmethod
     async def get_many(
         cls, session: AsyncSession, limit: int, offset: int
-    ) -> tuple[Sequence[SkillModel], int]:
+    ) -> PaginatedResponse[SkillResponse]:
         stmt = select(SkillModel).limit(limit).offset(offset)
         count_stmt = select(func.count()).select_from(SkillModel)
 
         try:
-            rows, total = await asyncio.gather(
-                session.scalars(stmt),
-                session.scalar(count_stmt),
-            )
+            rows = (await session.scalars(stmt)).all()
+            total = await session.scalar(count_stmt) or 0
 
-            return rows.all(), total or 0
+            return PaginatedResponse(
+                data=[SkillResponse.model_validate(row) for row in rows],
+                total=total,
+            )
         except Exception as e:
             logger.error(f"[SkillRepository] get_many: {e}")
             raise HTTPException(

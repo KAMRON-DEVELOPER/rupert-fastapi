@@ -1,5 +1,3 @@
-import asyncio
-from collections.abc import Sequence
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -8,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.shared.models import CityModel
+from src.apps.shared.schemas import CityResponse, PaginatedResponse
 from src.core.logger import logger
 
 
@@ -90,7 +89,7 @@ class CityRepository:
     @classmethod
     async def get_many(
         cls, session: AsyncSession, country_id: UUID, limit: int, offset: int
-    ) -> tuple[Sequence[CityModel], int]:
+    ) -> PaginatedResponse[CityResponse]:
         stmt = (
             select(CityModel)
             .where(CityModel.country_id == country_id)
@@ -100,12 +99,13 @@ class CityRepository:
         count_stmt = select(func.count()).select_from(CityModel)
 
         try:
-            rows, total = await asyncio.gather(
-                session.scalars(stmt),
-                session.scalar(count_stmt),
-            )
+            rows = (await session.scalars(stmt)).all()
+            total = await session.scalar(count_stmt) or 0
 
-            return rows.all(), total or 0
+            return PaginatedResponse(
+                data=[CityResponse.model_validate(row) for row in rows],
+                total=total,
+            )
         except Exception as e:
             logger.error(f"[CityRepository] get_many: {e}")
             raise HTTPException(
