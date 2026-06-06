@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Literal
 from urllib.parse import urlparse
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import Cookie, Depends, HTTPException, status
 from fastapi.responses import Response
@@ -15,6 +15,7 @@ from src.apps.shared.schemas.enums import UserRole
 from src.apps.users.models import ActivityModel
 from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
+from src.core.anonymous_activity import record_anonymous_activity
 from src.core.database import sessionDep
 from src.core.logger import logger
 from src.core.settings import get_settings
@@ -177,6 +178,8 @@ class Cookies(BaseModel):
     access_token: str | None = None
     refresh_token: str | None = None
     dau: str | None = None
+    anonymous_dau: str | None = None
+    anonymous_id: str | None = None
 
     model_config = {"extra": "ignore"}
 
@@ -210,9 +213,15 @@ class ProactiveRefresh:
         auth_cookies: Annotated[Cookies, Cookie()],
         session: sessionDep,
     ):
+        domain = get_cookie_domain()
+        logger.debug(f"domain: {domain}")
+        logger.debug(f"settings.debug: {settings.debug}")
         access_token = auth_cookies.access_token
         refresh_token = auth_cookies.refresh_token
+        logger.debug(f"access_token: {access_token}")
+        logger.debug(f"refresh_token: {refresh_token}")
         dau = auth_cookies.dau
+        logger.debug(f"dau: {dau}")
         user_id: UUID | None = None
         session_verified = False
 
@@ -223,7 +232,6 @@ class ProactiveRefresh:
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Session not found or expired",
                 )
-            return None
 
         if access_token:
             access_needs_refresh, access_claims, expired = handle_decode(
@@ -296,6 +304,31 @@ class ProactiveRefresh:
         if not user_id:
             if self.required:
                 raise HTTPException(status_code=401, detail="Not authenticated")
+
+            anonymous_id = auth_cookies.anonymous_id
+            logger.debug(f"anonymous_id: {anonymous_id}")
+
+            if not anonymous_id:
+                anonymous_id = str(uuid4())
+
+                set_cookie(
+                    res,
+                    key="anonymous_id",
+                    value=anonymous_id,
+                    max_age=31 * 12 * 86400,
+                )
+
+            anonymous_dau = auth_cookies.anonymous_dau
+            logger.debug(f"anonymous_dau: {anonymous_dau}")
+            today_str = datetime.now(UTC).date().isoformat()
+            logger.debug(f"today_str: {today_str}")
+            if anonymous_dau != today_str:
+                await record_anonymous_activity(anonymous_id)
+                set_cookie(
+                    res, key="anonymous_dau", value=today_str, max_age=86400
+                )
+
+            logger.debug(res.headers.getlist("set-cookie"))
             return None
 
         if refresh_token and not session_verified:

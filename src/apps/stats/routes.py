@@ -1,5 +1,3 @@
-from pprint import pprint
-
 from fastapi import APIRouter, HTTPException, status
 
 from src.apps.companies.repositories.company import CompaniesRepository
@@ -19,8 +17,7 @@ async def stats(session: sessionDep):
         vacancies = await VacanciesRepository.get_stats(session)
         companies = await CompaniesRepository.get_stats(session)
     except Exception as e:
-        logger.error("stats")
-        pprint(e)
+        logger.error(f"<stats>: {e}")
         raise HTTPException(status_code=status.HTTP)
 
     return Stats(users=users, vacancies=vacancies, companies=companies)

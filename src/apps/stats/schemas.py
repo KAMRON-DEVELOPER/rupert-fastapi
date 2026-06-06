@@ -32,6 +32,7 @@ class CompanyTypeBucket(BucketBase):
 
 class DailyActiveUsersBucket(ResponseSchema):
     count: int
+    anonymous_counts: int
     date: date
 
 

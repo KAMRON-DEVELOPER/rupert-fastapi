@@ -21,6 +21,7 @@ from src.apps.users.models import (
     UserModel,
     UserSkillLink,
 )
+from src.core.anonymous_activity import get_anonymous_dau_counts
 from src.core.helpers import percentage
 from src.core.logger import logger
 
@@ -329,9 +330,13 @@ class UsersRepository:
         dau_counts_by_date = {
             activity_date: count for activity_date, count in dau_chart_rows
         }
+        anonymous_counts = await get_anonymous_dau_counts(start_date, days=30)
+        logger.debug(f"anonymous_counts: {anonymous_counts}")
         dau_chart = [
             DailyActiveUsersBucket(
-                count=dau_counts_by_date.get(day, 0), date=day
+                count=dau_counts_by_date.get(day, 0),
+                anonymous_counts=anonymous_counts.get(day, 0),
+                date=day,
             )
             for offset in range(30)
             for day in [start_date + timedelta(days=offset)]
