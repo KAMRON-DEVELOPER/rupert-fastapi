@@ -4,15 +4,15 @@ from pydantic import Field
 
 from src.apps.chats.schemas.chat_message import ChatListLastMessageResponse
 from src.apps.chats.schemas.chat_participant import ChatListUserResponse
-from src.apps.shared.schemas.base import RequestSchema, ResponseSchema
+from src.apps.shared.schemas import BaseModelResponse
+from src.apps.shared.schemas.base import RequestSchema
 
 
 class CreateChatSchema(RequestSchema):
     participant_id: UUID
 
 
-class ChatListItemResponse(ResponseSchema):
-    id: UUID
+class ChatListItemResponse(BaseModelResponse):
     user: ChatListUserResponse
     is_pinned: bool
     is_muted: bool

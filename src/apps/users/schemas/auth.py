@@ -1,7 +1,7 @@
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
-from pydantic import AfterValidator, EmailStr, field_validator
+from pydantic import AfterValidator, EmailStr, Field, field_validator
 
 from src.apps.shared.schemas import (
     BaseNullableLocationModelResponse,
@@ -9,6 +9,7 @@ from src.apps.shared.schemas import (
     ResponseSchema,
 )
 from src.apps.shared.schemas.enums import (
+    AuthResultType,
     FollowPolicy,
     JobSearchStatus,
     Specialization,
@@ -48,10 +49,19 @@ class EmailAuthRequest(RequestSchema):
     last_name: Annotated[str | None, AfterValidator(validate_last_name)] = None
 
 
-class EmailAuthResponse(BaseNullableLocationModelResponse):
+class EmailAuthNewUser(ResponseSchema):
+    kind: Literal[AuthResultType.new_user] = AuthResultType.new_user
+
+
+class EmailAuthSetupPassword(ResponseSchema):
+    kind: Literal[AuthResultType.setup_password] = AuthResultType.setup_password
+    message: str
+
+
+class EmailAuthSuccess(BaseNullableLocationModelResponse):
+    kind: Literal[AuthResultType.success] = AuthResultType.success
     email: str
     email_verified: bool
-    password_hash: str | None
     first_name: str
     last_name: str | None
     headline: str | None
@@ -67,6 +77,12 @@ class EmailAuthResponse(BaseNullableLocationModelResponse):
     status: UserStatus
     follow_policy: FollowPolicy
     job_search_status: JobSearchStatus
+
+
+EmailAuthResponse = Annotated[
+    EmailAuthSuccess | EmailAuthSetupPassword | EmailAuthNewUser,
+    Field(discriminator="kind"),
+]
 
 
 class PasswordSetupRequest(RequestSchema):

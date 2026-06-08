@@ -236,10 +236,7 @@ class UsersRepository:
 
     @staticmethod
     async def search(
-        session: AsyncSession,
-        query: str | None,
-        limit: int,
-        offset: int,
+        session: AsyncSession, query: str | None, limit: int, offset: int
     ) -> PaginatedResponse[ChatListUserResponse]:
         search_pattern = f"%{query}%" if query else "%"
 
@@ -335,7 +332,7 @@ class UsersRepository:
         dau_chart = [
             DailyActiveUsersBucket(
                 count=dau_counts_by_date.get(day, 0),
-                anonymous_counts=anonymous_counts.get(day, 0),
+                anonymous_count=anonymous_counts.get(day, 0),
                 date=day,
             )
             for offset in range(30)

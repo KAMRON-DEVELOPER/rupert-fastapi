@@ -1,3 +1,4 @@
+import datetime
 from datetime import date
 from typing import Annotated
 from uuid import UUID
@@ -15,8 +16,8 @@ from src.apps.shared.schemas.enums import (
     UserStatus,
 )
 from src.apps.shared.schemas.location import NullableLocationRequest
-from src.apps.users.schemas.resume import ResumeSummary
-from src.apps.users.schemas.skill_links import UserSkillLinkResponse
+from src.apps.shared.schemas.skill import SkillLinkResponse
+from src.apps.users.schemas.resume import ResumeSummaryResponse
 from src.apps.users.schemas.work_experience import WorkExperienceResponse
 from src.core.exceptions import ValidationException
 
@@ -41,7 +42,7 @@ class UserUpdateRequest(NullableLocationRequest):
         if value is None:
             return value
 
-        today = date.today()
+        today = datetime.datetime.now(tz=datetime.UTC).date()
         min_birthdate = today - relativedelta(years=100)
         max_birthdate = today - relativedelta(years=12)
 
@@ -136,8 +137,8 @@ class UserDetailResponse(BaseNullableLocationModelResponse):
     job_search_status: JobSearchStatus
 
     # Relationships
-    resumes: list[ResumeSummary]
-    skills: list[UserSkillLinkResponse] = Field(validation_alias="skill_links")
+    resumes: list[ResumeSummaryResponse]
+    skills: list[SkillLinkResponse] = Field(validation_alias="skill_links")
     work_experiences: list[WorkExperienceResponse]
 
     # Computed

@@ -12,8 +12,11 @@ from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
 from src.apps.users.schemas.auth import (
     AuthProbeResponse,
+    EmailAuthNewUser,
     EmailAuthRequest,
     EmailAuthResponse,
+    EmailAuthSetupPassword,
+    EmailAuthSuccess,
 )
 from src.apps.users.utils import finalize_session
 from src.core.database import sessionDep
@@ -40,7 +43,7 @@ async def auth_probe(auth: authProbeDep):
     return AuthProbeResponse(is_authenticated=auth is not None)
 
 
-@users_router.post(path="/auth/email")
+@users_router.post(path="/auth/email", response_model=EmailAuthResponse)
 async def email_auth(
     req: Request, res: Response, session: sessionDep, schm: EmailAuthRequest
 ):
@@ -56,7 +59,7 @@ async def email_auth(
 
             await finalize_session(req, res, session, user.id)
             await session.commit()
-            return EmailAuthResponse.model_validate(user)
+            return EmailAuthSuccess.model_validate(user)
 
         # Password not set
         providers = await OAuthUsersRepository.find_providers_by_user_id(
@@ -83,12 +86,12 @@ async def email_auth(
         )
 
         providers_text = ", ".join(str(p.value) for p in providers)
-        return MessageResponse(
+        return EmailAuthSetupPassword(
             message=f"This account was created with {providers_text}. Use that provider to sign in, or use the link we sent to set a password."
         )
 
     if not schm.first_name or not schm.last_name:
-        return MessageResponse(message="new_user")
+        return EmailAuthNewUser()
 
     hash_password_bytes = await asyncio.to_thread(
         hashpw, schm.password.encode(), gensalt(rounds=8)
@@ -118,23 +121,22 @@ async def email_auth(
         clear_auth_cookies(res)
         raise
 
-    return EmailAuthResponse.model_validate(user)
+    return EmailAuthSuccess.model_validate(user)
 
 
-@users_router.post("/auth/verify")
+@users_router.post("/auth/verify", response_model=None)
 async def verify(
     session: sessionDep, auth: authProbeDep, token: Annotated[str, Query()]
 ):
     claims = decode_token(token, "email_verification")
 
-    if auth:
-        if auth[0] != claims.sub:
-            content = MessageResponse(
-                message="You are not the same person!"
-            ).model_dump_json()
-            return Response(
-                status_code=status.HTTP_400_BAD_REQUEST, content=content
-            )
+    if auth and auth[0] != claims.sub:
+        content = MessageResponse(
+            message="You are not the same person!"
+        ).model_dump_json()
+        return Response(
+            status_code=status.HTTP_400_BAD_REQUEST, content=content
+        )
 
     await UsersRepository.set_email_verified(session, claims.sub)
     await session.commit()
@@ -147,7 +149,7 @@ async def verify(
         return RedirectResponse(url)
 
 
-@users_router.post("/auth/logout")
+@users_router.post("/auth/logout", response_model=MessageResponse)
 async def logout(res: Response, auth: authDep, session: sessionDep):
     user_id, _, refresh_token = auth
 

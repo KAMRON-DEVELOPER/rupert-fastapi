@@ -6,7 +6,7 @@ from typing import Any, Self
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.websockets import WebSocketState
 
-from src.apps.shared.schemas.enums import ChatEvent
+from src.apps.shared.schemas.enums import IncomingEvent, OutgoingEvent
 from src.core.logger import logger
 
 from .broker import EventBroker, event_broker
@@ -46,7 +46,7 @@ class WebSocketConnection:
         websocket: WebSocket,
         user_id: UserId,
         channels: set[Channel],
-        handlers: dict[ChatEvent, WebSocketHandler],
+        handlers: dict[IncomingEvent, WebSocketHandler],
         registry: ConnectionRegistry = connection_registry,
         broker: EventBroker = event_broker,
         connect_handler: WebSocketLifecycleHandler | None = None,
@@ -55,7 +55,7 @@ class WebSocketConnection:
         self._websocket = websocket
         self._user_id = user_id
         self._channels = channels
-        self._handlers = handlers
+        self._handlers: dict[IncomingEvent, WebSocketHandler] = handlers
         self._registry = registry
         self._broker = broker
         self._connect_handler = connect_handler
@@ -157,7 +157,7 @@ class WebSocketConnection:
             logger.debug(f"[WebSocketConnection][_process_text] text: {text}")
 
         try:
-            event = ChatEvent(raw_event)
+            event = IncomingEvent(raw_event)
         except ValueError:
             await self._send_error(f"unknown event type: {raw_event!r}")
             return
@@ -177,5 +177,5 @@ class WebSocketConnection:
 
         await self._broker.send(
             self.connection_id,
-            {"type": ChatEvent.error.value, "detail": detail},
+            {"type": OutgoingEvent.error.value, "detail": detail},
         )

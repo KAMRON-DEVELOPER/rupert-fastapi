@@ -310,6 +310,8 @@ class ChatRepository:
             items.append(
                 ChatListItemResponse(
                     id=row.chat_id,
+                    created_at=row.created_at,
+                    updated_at=row.updated_at,
                     user=ChatListUserResponse(
                         id=row.other_user_id,
                         first_name=row.other_first_name,

@@ -23,12 +23,12 @@ from .router import users_router
 settings = get_settings()
 
 
-@users_router.get("/auth/google")
+@users_router.get("/auth/google", response_model=None)
 async def google_oauth(req: Request):
     return await google.redirect(req)
 
 
-@users_router.get("/auth/google/callback")
+@users_router.get("/auth/google/callback", response_model=None)
 async def google_oauth_callback(
     req: Request, google_user: GoogleUserDep, session: sessionDep
 ):
@@ -67,12 +67,12 @@ async def google_oauth_callback(
     return redirect
 
 
-@users_router.get("/auth/github")
+@users_router.get("/auth/github", response_model=None)
 async def github_oauth(request: Request):
     return await github.redirect(request)
 
 
-@users_router.get("/auth/github/callback")
+@users_router.get("/auth/github/callback", response_model=None)
 async def github_oauth_callback(
     req: Request, github_user: GithubUserDep, session: sessionDep
 ):
@@ -116,7 +116,7 @@ async def github_oauth_callback(
     return redirect
 
 
-@users_router.post("/auth/password-setup")
+@users_router.post("/auth/password-setup", response_model=None)
 async def password_setup(
     token: Annotated[str, Query],
     schm: PasswordSetupRequest,

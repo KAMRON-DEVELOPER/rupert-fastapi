@@ -6,7 +6,7 @@ from pydantic import Field, computed_field, field_validator
 from src.apps.shared.schemas import BaseModelResponse, RequestSchema
 
 
-class WorkExperienceRequest(RequestSchema):
+class WorkExperienceCreateRequest(RequestSchema):
     company_name: str = Field(max_length=128)
     location: str | None = Field(default=None, max_length=128)
     position: str = Field(max_length=128)

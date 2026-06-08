@@ -32,34 +32,28 @@ class CompanyTypeBucket(BucketBase):
 
 class DailyActiveUsersBucket(ResponseSchema):
     count: int
-    anonymous_counts: int
+    anonymous_count: int
     date: date
 
 
 class UsersStats(ResponseSchema):
     total: int
-
     looking_for_job_count: int
     looking_for_job_percentage: float
-
     dau_chart: list[DailyActiveUsersBucket]
-
     by_job_search_status: list[JobSearchStatusBucket]
     by_specialization: list[SpecializationBucket]
 
 
 class VacanciesStats(ResponseSchema):
     total: int
-
     open: int
-
     by_status: list[VacancyStatusBucket]
     by_specialization: list[SpecializationBucket]
 
 
 class CompaniesStats(ResponseSchema):
     total: int
-
     by_type: list[CompanyTypeBucket]
 
 

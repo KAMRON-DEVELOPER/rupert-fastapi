@@ -7,7 +7,7 @@ from src.apps.users.repositories.work_experience import (
     WorkExperiencesRepository,
 )
 from src.apps.users.schemas.work_experience import (
-    WorkExperienceRequest,
+    WorkExperienceCreateRequest,
     WorkExperienceResponse,
     WorkExperienceUpdateRequest,
 )
@@ -32,7 +32,7 @@ async def list_work_experiences(auth: authDep, session: sessionDep):
     status_code=status.HTTP_201_CREATED,
 )
 async def create_work_experience(
-    auth: authDep, session: sessionDep, schm: WorkExperienceRequest
+    auth: authDep, session: sessionDep, schm: WorkExperienceCreateRequest
 ):
     user_id, _, _ = auth
     record = await WorkExperiencesRepository.create(
@@ -64,7 +64,9 @@ async def update_work_experience(
 
 
 @users_router.delete(
-    "/work-experiences/{work_experience_id}", response_model=MessageResponse
+    "/work-experiences/{work_experience_id}",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
 )
 async def delete_work_experience(
     auth: authDep, session: sessionDep, work_experience_id: UUID

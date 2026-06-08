@@ -5,7 +5,11 @@ from fastapi import Depends, File, HTTPException, Query, UploadFile, status
 from PIL import Image
 
 from src.apps.chats.schemas.chat_participant import ChatListUserResponse
-from src.apps.shared.schemas import PaginatedResponse, paginationDep
+from src.apps.shared.schemas import (
+    MessageResponse,
+    PaginatedResponse,
+    paginationDep,
+)
 from src.apps.users.repositories.session import SessionsRepository
 from src.apps.users.repositories.user import UsersRepository
 from src.apps.users.schemas.user import (
@@ -51,14 +55,11 @@ async def search_users(
     q: Annotated[str | None, Query(min_length=1)] = None,
 ):
     return await UsersRepository.search(
-        session,
-        query=q,
-        limit=pagination.limit,
-        offset=pagination.offset,
+        session, query=q, limit=pagination.limit, offset=pagination.offset
     )
 
 
-@users_router.get("/")
+@users_router.get("/", response_model=UserDetailResponse | UserSummaryResponse)
 async def get_user(
     auth: authDep,
     session: sessionDep,
@@ -114,7 +115,7 @@ async def read_validated_image(
     return image_bytes, content_type
 
 
-@users_router.patch("/")
+@users_router.patch("/", response_model=MessageResponse)
 async def update_user(
     auth: authDep,
     session: sessionDep,
@@ -172,9 +173,12 @@ async def update_user(
 
     await UsersRepository.update(session, user_id, values)
     await session.commit()
+    return MessageResponse(message="User updated successfully")
 
 
-@users_router.delete("/")
+@users_router.delete(
+    "/", response_model=None, status_code=status.HTTP_204_NO_CONTENT
+)
 async def delete_user(auth: authDep, session: sessionDep):
     user_id, _, refresh_token = auth
 

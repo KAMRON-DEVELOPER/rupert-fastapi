@@ -10,13 +10,13 @@ from src.apps.shared.schemas.enums import (
     WorkFormat,
 )
 from src.apps.shared.schemas.location import NullableLocationRequest
-from src.apps.users.schemas.skill_links import (
-    ResumeSkillLinkRequest,
-    ResumeSkillLinkResponse,
+from src.apps.shared.schemas.skill import (
+    SkillLinkCreateRequest,
+    SkillLinkResponse,
 )
 
 
-class ResumeRequest(LocationRequest):
+class ResumeCreateRequest(LocationRequest):
     title: str = Field(max_length=128)
     summary: str | None = None
     specialization: Specialization
@@ -25,7 +25,7 @@ class ResumeRequest(LocationRequest):
     salary_currency: SalaryCurrency | None = None
     work_format: WorkFormat | None = None
     employment_type: EmploymentType | None = None
-    skills: list[ResumeSkillLinkRequest] = Field(default_factory=list)
+    skills: list[SkillLinkCreateRequest] = Field(default_factory=list)
 
     @field_validator("salary_expectation_max")
     @classmethod
@@ -47,7 +47,7 @@ class ResumeUpdateRequest(NullableLocationRequest):
     salary_currency: SalaryCurrency | None = None
     work_format: WorkFormat | None = None
     employment_type: EmploymentType | None = None
-    skills: list[ResumeSkillLinkRequest] | None = None
+    skills: list[SkillLinkCreateRequest] | None = None
 
     @field_validator("salary_expectation_max")
     @classmethod
@@ -60,7 +60,7 @@ class ResumeUpdateRequest(NullableLocationRequest):
         return v
 
 
-class ResumeResponse(BaseLocationModelResponse):
+class ResumeDetailResponse(BaseLocationModelResponse):
     user_id: UUID
     title: str
     summary: str | None
@@ -70,12 +70,10 @@ class ResumeResponse(BaseLocationModelResponse):
     salary_currency: SalaryCurrency | None
     work_format: WorkFormat | None
     employment_type: EmploymentType | None
-    skills: list[ResumeSkillLinkResponse] = Field(
-        validation_alias="skill_links"
-    )
+    skills: list[SkillLinkResponse] = Field(validation_alias="skill_links")
 
 
-class ResumeSummary(BaseLocationModelResponse):
+class ResumeSummaryResponse(BaseLocationModelResponse):
     user_id: UUID
     title: str
     specialization: Specialization

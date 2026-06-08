@@ -28,7 +28,11 @@ settings = get_settings()
 upload_router = APIRouter()
 
 
-@upload_router.post("/", response_model=UploadAttachmentsResponse)
+@upload_router.post(
+    "/",
+    response_model=UploadAttachmentsResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def upload_attachments(
     session: sessionDep,
     auth: authDep,
@@ -127,7 +131,9 @@ async def upload_attachments(
     return UploadAttachmentsResponse(attachments=attachments, failed=failed)
 
 
-@upload_router.delete("/")
+@upload_router.delete(
+    "/", response_model=MessageResponse, status_code=status.HTTP_200_OK
+)
 async def delete_attachments(
     session: sessionDep,
     auth: authDep,

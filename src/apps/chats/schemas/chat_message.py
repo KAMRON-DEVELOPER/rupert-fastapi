@@ -1,16 +1,16 @@
-from datetime import datetime
 from uuid import UUID
 
 from pydantic import Field, model_validator
 
+from src.apps.shared.schemas import BaseModelResponse
 from src.apps.shared.schemas.attachment import (
     AttachmentIdWithPositionRequest,
     AttachmentWithPositionResponse,
 )
-from src.apps.shared.schemas.base import RequestSchema, ResponseSchema
+from src.apps.shared.schemas.base import RequestSchema
 
 
-class CreateChatMessageRequest(RequestSchema):
+class ChatMessageCreateRequest(RequestSchema):
     message: str | None = None
     chat_id: UUID | None = None
     reply_id: UUID | None = None
@@ -37,7 +37,7 @@ class CreateChatMessageRequest(RequestSchema):
         return self
 
 
-class UpdateChatMessageRequest(RequestSchema):
+class ChatMessageUpdateRequest(RequestSchema):
     message: str | None = None
     attachments: list[AttachmentIdWithPositionRequest] | None = None
 
@@ -56,10 +56,7 @@ class UpdateChatMessageRequest(RequestSchema):
         return self
 
 
-class ChatMessageResponse(ResponseSchema):
-    id: UUID
-    created_at: datetime
-    updated_at: datetime
+class ChatMessageResponse(BaseModelResponse):
     sender_id: UUID | None
     message: str | None
     chat_id: UUID

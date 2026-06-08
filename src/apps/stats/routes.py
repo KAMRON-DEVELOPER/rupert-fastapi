@@ -10,7 +10,7 @@ from src.core.logger import logger
 stats_router = APIRouter()
 
 
-@stats_router.get("/")
+@stats_router.get("/", response_model=Stats)
 async def stats(session: sessionDep):
     try:
         users = await UsersRepository.get_stats(session)

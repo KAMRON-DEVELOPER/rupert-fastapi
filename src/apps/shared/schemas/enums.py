@@ -1,10 +1,17 @@
-from enum import Enum, auto
+from enum import Enum, StrEnum, auto
 
 
 class AutoName(Enum):
     @staticmethod
     def _generate_next_value_(name, start, count, last_values):
         return name
+
+
+# --- Auth ---
+class AuthResultType(StrEnum):
+    success = auto()
+    new_user = auto()
+    setup_password = auto()
 
 
 # --- OAuthUsers ---
@@ -209,8 +216,10 @@ class GroupMemberRole(AutoName):
 
 
 # --- Chats ---
-class ChatEvent(AutoName):
-    # commands (client → server)
+class IncomingEvent(AutoName):
+    # client → server
+
+    # chats domain
     ping = auto()
 
     join_chat = auto()
@@ -219,26 +228,36 @@ class ChatEvent(AutoName):
     typing_start = auto()
     typing_stop = auto()
 
+    read_chat = auto()
     create_chat = auto()
     delete_chat = auto()
     clear_chat = auto()
-    read_chat = auto()
+
+    update_chat_settings = auto()
 
     send_message = auto()
     update_message = auto()
     delete_message = auto()
 
-    update_chat_settings = auto()
+    # groups domain
+    # ...
+    # feeds domain
+    # ...
 
-    # notifications (server → client)
+
+class OutgoingEvent(AutoName):
+    # server → client
     pong = auto()
     error = auto()
 
     chat_joined = auto()
     chat_left = auto()
-    chat_created = auto()
-    # chat_updated = auto()
+
+    typing_start = auto()
+    typing_stop = auto()
+
     chat_read = auto()
+    chat_created = auto()
     chat_cleared = auto()
     chat_deleted = auto()
 

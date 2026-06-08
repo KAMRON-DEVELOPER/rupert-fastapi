@@ -73,7 +73,11 @@ async def update_company(
     return CompanyDetail.model_validate(record)
 
 
-@companies_router.delete("/{company_id}", response_model=MessageResponse)
+@companies_router.delete(
+    "/{company_id}",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def delete_company(auth: authDep, session: sessionDep, company_id: UUID):
     user_id, _, _ = auth
     await CompaniesRepository.delete(session, user_id, company_id)
@@ -119,7 +123,9 @@ async def update_company_member(
 
 
 @companies_router.delete(
-    "/{company_id}/members/{member_id}", response_model=MessageResponse
+    "/{company_id}/members/{member_id}",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
 )
 async def delete_company_member(
     auth: authDep, session: sessionDep, company_id: UUID, member_id: UUID

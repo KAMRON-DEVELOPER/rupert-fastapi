@@ -4,7 +4,7 @@ from uuid import UUID
 from src.apps.shared.schemas import BaseModelResponse
 
 
-class SessionResponse(BaseModelResponse):
+class SessionDetailResponse(BaseModelResponse):
     user_id: UUID
     user_agent: str | None
     ip_addr: str | None

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from scalar_fastapi import get_scalar_api_reference
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
+from apps.ws.router import ws_router
 from src.apps.admin.routes import admin_router
 from src.apps.attachments.routes import upload_router
 from src.apps.chats.routes import chats_router
@@ -53,6 +54,7 @@ app.add_middleware(
 )
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
+app.include_router(router=ws_router, prefix="/api/v1/ws", tags=["ws"])
 app.include_router(router=stats_router, prefix="/api/v1/stats", tags=["stats"])
 app.include_router(router=users_router, prefix="/api/v1/users", tags=["users"])
 app.include_router(

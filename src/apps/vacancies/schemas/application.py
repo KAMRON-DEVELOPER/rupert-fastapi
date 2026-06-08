@@ -5,7 +5,7 @@ from fastapi import Depends
 
 from src.apps.shared.schemas import BaseModelResponse, RequestSchema
 from src.apps.shared.schemas.enums import ApplicationStatus
-from src.apps.users.schemas.resume import ResumeSummary
+from src.apps.users.schemas.resume import ResumeSummaryResponse
 from src.apps.users.schemas.user import UserSummaryResponse
 from src.apps.vacancies.schemas.vacancy import VacancySummary
 
@@ -36,7 +36,7 @@ class ApplicationSummary(BaseModelResponse):
     status: ApplicationStatus
     cover_letter: str | None
     vacancy: VacancySummary
-    resume: ResumeSummary | None
+    resume: ResumeSummaryResponse | None
 
 
 class ApplicationDetail(ApplicationSummary):

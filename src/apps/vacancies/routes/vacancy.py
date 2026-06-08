@@ -146,7 +146,9 @@ async def update_vacancy(
     return VacancyDetail.model_validate(record)
 
 
-@vacancies_router.delete("/{id}", response_model=MessageResponse)
+@vacancies_router.delete(
+    "/{id}", response_model=MessageResponse, status_code=status.HTTP_200_OK
+)
 async def delete_vacancy(
     auth: authDep, session: sessionDep, id: Annotated[UUID, Path()]
 ):
@@ -199,7 +201,9 @@ async def update_vacancy_skill(
 
 
 @vacancies_router.delete(
-    "/{vacancy_id}/skills/{skill_link_id}", response_model=MessageResponse
+    "/{vacancy_id}/skills/{skill_link_id}",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
 )
 async def delete_vacancy_skill(
     auth: authDep, session: sessionDep, vacancy_id: UUID, skill_link_id: UUID
@@ -212,7 +216,11 @@ async def delete_vacancy_skill(
     return MessageResponse(message="Vacancy skill deleted successfully")
 
 
-@vacancies_router.post("/{id}/save", response_model=MessageResponse)
+@vacancies_router.post(
+    "/{id}/save",
+    response_model=MessageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def save_vacancy(
     auth: authDep, session: sessionDep, id: Annotated[UUID, Path()]
 ):
@@ -222,7 +230,9 @@ async def save_vacancy(
     return MessageResponse(message="Vacancy saved successfully")
 
 
-@vacancies_router.delete("/{id}/save", response_model=MessageResponse)
+@vacancies_router.delete(
+    "/{id}/save", response_model=MessageResponse, status_code=status.HTTP_200_OK
+)
 async def unsave_vacancy(
     auth: authDep, session: sessionDep, id: Annotated[UUID, Path()]
 ):

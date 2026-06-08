@@ -23,7 +23,7 @@ class ChatListUserResponse(ResponseSchema):
     def name(self) -> str:
         return " ".join(
             part for part in [self.first_name, self.last_name] if part
-        )
+        ).strip()
 
 
 class LastSeenAtRequest(RequestSchema):

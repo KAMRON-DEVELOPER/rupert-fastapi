@@ -16,6 +16,11 @@ def build_attachment_url(object_key: str) -> str:
     return f"{scheme}://{s.endpoint}/{s.bucket_name}/{object_key}"
 
 
+class AttachmentIdWithPositionRequest(RequestSchema):
+    attachment_id: UUID
+    position: int | None = Field(default=None, ge=0)
+
+
 class AttachmentResponse(ResponseSchema):
     id: UUID
     object_key: str
@@ -31,11 +36,6 @@ class AttachmentResponse(ResponseSchema):
     @property
     def url(self) -> str:
         return build_attachment_url(self.object_key)
-
-
-class AttachmentIdWithPositionRequest(RequestSchema):
-    attachment_id: UUID
-    position: int | None = Field(default=None, ge=0)
 
 
 class AttachmentWithPositionResponse(AttachmentResponse):

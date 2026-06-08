@@ -7,6 +7,7 @@ from src.apps.shared.schemas import (
     CountryCreateRequest,
     CountryResponse,
     CountryUpdateRequest,
+    MessageResponse,
 )
 from src.core.database import sessionDep
 
@@ -24,7 +25,9 @@ async def create_country(session: sessionDep, schm: CountryCreateRequest):
     )
 
 
-@admin_router.patch("/locations/countries/{country_id}")
+@admin_router.patch(
+    "/locations/countries/{country_id}", response_model=MessageResponse
+)
 async def update_country(
     session: sessionDep, country_id: UUID, schm: CountryUpdateRequest
 ):
@@ -32,10 +35,12 @@ async def update_country(
         session, country_id, schm.model_dump(exclude_unset=True)
     )
     await session.commit()
+    return MessageResponse(message="Country updated successfully")
 
 
 @admin_router.delete(
     "/locations/countries/{country_id}",
+    response_model=None,
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_country(session: sessionDep, country_id: UUID):

@@ -26,7 +26,11 @@ async def follow(auth: authDep, session: sessionDep, following_id: UUID):
     return FollowResponse.model_validate(record)
 
 
-@users_router.delete("/{following_id}/follow", response_model=MessageResponse)
+@users_router.delete(
+    "/{following_id}/follow",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def unfollow_(auth: authDep, session: sessionDep, following_id: UUID):
     user_id, _, _ = auth
 

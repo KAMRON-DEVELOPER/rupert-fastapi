@@ -1,24 +1,28 @@
 from uuid import UUID
 
-from fastapi import Query, Response
+from fastapi import Query, Response, status
 
 from src.apps.shared.schemas import MessageResponse
 from src.apps.users.repositories.session import SessionsRepository
-from src.apps.users.schemas.session import SessionResponse
+from src.apps.users.schemas.session import SessionDetailResponse
 from src.core.database import sessionDep
 from src.dependencies.proactive_refresh import authDep, clear_auth_cookies
 
 from .router import users_router
 
 
-@users_router.get("/sessions", response_model=list[SessionResponse])
+@users_router.get("/sessions", response_model=list[SessionDetailResponse])
 async def list_sessions(auth: authDep, session: sessionDep):
     user_id, _, _ = auth
     records = await SessionsRepository.list_by_user_id(session, user_id)
-    return [SessionResponse.model_validate(record) for record in records]
+    return [SessionDetailResponse.model_validate(record) for record in records]
 
 
-@users_router.delete("/sessions/{session_id}", response_model=MessageResponse)
+@users_router.delete(
+    "/sessions/{session_id}",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+)
 async def revoke_session(
     res: Response, auth: authDep, session: sessionDep, session_id: UUID
 ):
@@ -34,7 +38,9 @@ async def revoke_session(
     return MessageResponse(message="Session revoked successfully")
 
 
-@users_router.delete("/sessions", response_model=MessageResponse)
+@users_router.delete(
+    "/sessions", response_model=MessageResponse, status_code=status.HTTP_200_OK
+)
 async def revoke_sessions(
     res: Response,
     auth: authDep,
