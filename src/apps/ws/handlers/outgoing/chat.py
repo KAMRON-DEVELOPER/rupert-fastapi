@@ -1,5 +1,4 @@
 from collections.abc import Iterable
-from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -8,8 +7,8 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.chats.repositories.chat import ChatRepository
-from src.apps.shared.schemas.base import RequestSchema, ResponseSchema
 from src.apps.shared.schemas.enums import OutgoingEvent
+from src.apps.ws.helpers import get_websocket_state
 from src.apps.ws.schemas.chat import Action, ChatRoomActionRequest
 from src.core.boto3 import (
     delete_objects_from_boto3,
@@ -30,15 +29,19 @@ async def publish_typing(
     event_type: OutgoingEvent,
 ) -> None:
     async def action() -> None:
-        data = parse(ChatRoomActionRequest, payload)
-        session, user_uuid, _ = context(websocket)
+        data = ChatRoomActionRequest.model_validate(payload)
+        session, user_uuid, _, _ = get_websocket_state(websocket)
         await ChatRepository.assert_participant(
             session, data.chat_id, user_uuid
         )
 
         await broker.publish(
             chat_channel(data.chat_id),
-            event(event_type, chat_id=data.chat_id, user_id=user_uuid),
+            {
+                "type": event_type.value,
+                "chatId": data.chat_id,
+                "userId": user_uuid,
+            },
             exclude=connection_id,
         )
 
@@ -55,14 +58,16 @@ async def leave_chat_channel(
 ) -> None:
     channel = chat_channel(chat_id)
 
-    was_joined = chat_id in websocket.state.chat_ids
+    _, _, _, chat_ids = get_websocket_state(websocket)
+    was_joined = chat_id in chat_ids
     if was_joined:
         connection_registry.leave_channel(connection_id, channel)
         websocket.state.chat_ids.discard(chat_id)
 
     if notify_self:
         await broker.send(
-            connection_id, event(OutgoingEvent.chat_left, chat_id=chat_id)
+            connection_id,
+            {"type": OutgoingEvent.chat_left.value, "chatId": chat_id},
         )
 
 
@@ -85,47 +90,6 @@ async def guard(
         await session.rollback()
         logger.exception(f"[chat_ws] action failed: {e}")
         await send_error(broker, connection_id, "internal server error")
-
-
-def parse[TRequest: RequestSchema](
-    model: type[TRequest], payload: dict[str, Any]
-) -> TRequest:
-    data = {key: value for key, value in payload.items() if key != "type"}
-    return model.model_validate(data)
-
-
-def context(websocket: WebSocket) -> tuple[AsyncSession, UUID, UserId]:
-    return (
-        websocket.state.session,
-        websocket.state.user_uuid,
-        websocket.state.user_id,
-    )
-
-
-def event(event_type: OutgoingEvent, **payload: Any) -> dict[str, Any]:
-    data: dict[str, Any] = {"type": event_type.value}
-    for key, value in payload.items():
-        data[camel(key)] = jsonable(value)
-    return data
-
-
-def jsonable(value: Any) -> Any:
-    if isinstance(value, ResponseSchema):
-        return value.model_dump(mode="json", by_alias=True)
-    if isinstance(value, UUID):
-        return str(value)
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, list):
-        return [jsonable(item) for item in value]
-    if isinstance(value, dict):
-        return {camel(str(key)): jsonable(item) for key, item in value.items()}
-    return value
-
-
-def camel(value: str) -> str:
-    head, *tail = value.split("_")
-    return head + "".join(part.capitalize() for part in tail)
 
 
 async def publish_to_users(

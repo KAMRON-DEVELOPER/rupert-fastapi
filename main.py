@@ -8,7 +8,6 @@ from fastapi.responses import JSONResponse
 from scalar_fastapi import get_scalar_api_reference
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from apps.ws.router import ws_router
 from src.apps.admin.routes import admin_router
 from src.apps.attachments.routes import upload_router
 from src.apps.chats.routes import chats_router
@@ -18,6 +17,7 @@ from src.apps.skills.routes import skills_router
 from src.apps.stats.routes import stats_router
 from src.apps.users.routes import users_router
 from src.apps.vacancies.routes import vacancies_router
+from src.apps.ws.router import ws_router
 from src.core.boto3 import initialize_boto3
 from src.core.database import engine
 from src.core.exceptions import ApiException

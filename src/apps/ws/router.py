@@ -16,6 +16,7 @@ from src.apps.ws.handlers.incoming.chat import (
     handle_update_chat_settings,
     handle_update_message,
 )
+from src.apps.ws.helpers import set_websocket_state
 from src.apps.ws.lifecycle import connect_handler, disconnect_handler
 from src.core.database import sessionDep
 from src.core.settings import get_settings
@@ -50,13 +51,10 @@ handlers: dict[IncomingEvent, WebSocketHandler] = {
 
 @ws_router.websocket("/")
 async def chat_ws(websocket: WebSocket, session: sessionDep, auth: authDep):
-    raw_user_id, _, _ = auth
-    user_id = UserId(str(raw_user_id))
+    user_uuid, _, _ = auth
+    user_id = UserId(str(user_uuid))
 
-    websocket.state.session = session
-    websocket.state.user_id = user_id
-    websocket.state.user_uuid = raw_user_id
-    websocket.state.chat_ids = set()
+    set_websocket_state(websocket, session, user_uuid, user_id)
 
     channels = {user_channel(user_id)}
 

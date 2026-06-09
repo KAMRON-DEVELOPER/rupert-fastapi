@@ -9,11 +9,10 @@ from src.apps.chats.repositories.chat_participant import (
 )
 from src.apps.shared.schemas.enums import OutgoingEvent
 from src.apps.ws.handlers.outgoing.chat import (
-    context,
-    event,
     leave_chat_channel,
     publish_to_users,
 )
+from src.apps.ws.helpers import get_websocket_state
 from src.core.logger import logger
 from src.core.websocket.broker import EventBroker
 from src.core.websocket.registry import connection_registry
@@ -23,7 +22,7 @@ from src.core.websocket.types import ConnectionId
 async def connect_handler(
     websocket: WebSocket, connection_id: ConnectionId, broker: EventBroker
 ) -> None:
-    session, user_uuid, user_id = context(websocket)
+    session, user_uuid, user_id, _ = get_websocket_state(websocket)
     if connection_registry.user_has_connection(user_id, exclude=connection_id):
         return
 
@@ -33,14 +32,14 @@ async def connect_handler(
     await publish_to_users(
         broker,
         participant_ids,
-        event(OutgoingEvent.user_online, user_id=user_uuid),
+        {"type": OutgoingEvent.user_online.value, "userId": user_uuid},
     )
 
 
 async def disconnect_handler(
     websocket: WebSocket, connection_id: ConnectionId, broker: EventBroker
 ) -> None:
-    session, user_uuid, user_id = context(websocket)
+    session, user_uuid, user_id, _ = get_websocket_state(websocket)
     chat_ids: set[UUID] = websocket.state.chat_ids
 
     for chat_id in chat_ids:
@@ -73,10 +72,10 @@ async def disconnect_handler(
     await publish_to_users(
         broker,
         participant_ids,
-        event(
-            OutgoingEvent.user_offline,
-            user_id=user_uuid,
-            last_online_at=last_online_at,
-        ),
+        {
+            "type": OutgoingEvent.user_offline.value,
+            "userId": user_uuid,
+            "lastOnlineAt": last_online_at,
+        },
     )
     logger.debug(f"[chat_ws] disconnected user={user_id}")

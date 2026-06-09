@@ -1,6 +1,5 @@
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
-from typing import TypeVar
 from uuid import UUID
 
 from pydantic import Field, model_validator
@@ -9,7 +8,6 @@ from src.apps.chats.schemas.chat_message import ChatMessageUpdateRequest
 from src.apps.chats.schemas.chat_participant import ChatSettingsRequest
 from src.apps.shared.schemas.base import RequestSchema
 
-TRequest = TypeVar("TRequest", bound=RequestSchema)
 Action = Callable[[], Awaitable[None]]
 
 
