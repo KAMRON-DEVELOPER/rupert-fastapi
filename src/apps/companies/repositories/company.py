@@ -15,7 +15,7 @@ from src.apps.companies.schemas.company import (
 )
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
 from src.apps.shared.schemas.enums import CompanyMemberRole, VacancyStatus
-from src.apps.stats.schemas import CompaniesStats, CompanyTypeBucket
+from src.apps.stats.schemas import CompaniesStatsResponse, CompanyTypeBucket
 from src.apps.vacancies.models import VacancyModel, VacancySkillLink
 from src.core.helpers import percentage
 from src.core.logger import logger
@@ -461,4 +461,4 @@ class CompaniesRepository:
             for company_type, count in by_type_rows
         ]
 
-        return CompaniesStats(total=total, by_type=by_type)
+        return CompaniesStatsResponse(total=total, by_type=by_type)

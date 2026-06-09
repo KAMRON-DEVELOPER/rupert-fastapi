@@ -17,7 +17,7 @@ from src.apps.shared.schemas.enums import (
 )
 from src.apps.stats.schemas import (
     SpecializationBucket,
-    VacanciesStats,
+    VacanciesStatsResponse,
     VacancyStatusBucket,
 )
 from src.apps.users.models import ResumeModel, UserModel
@@ -816,7 +816,7 @@ class VacanciesRepository:
             for specialization, count in by_specialization_rows
         ]
 
-        return VacanciesStats(
+        return VacanciesStatsResponse(
             total=total,
             open=open,
             by_status=by_status,

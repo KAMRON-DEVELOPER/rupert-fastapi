@@ -31,7 +31,7 @@ def validate_last_name(v: str | None) -> str | None:
 
 
 def validate_password(v: str | None) -> str | None:
-    if v and (len(v) < 3 or len(v) > 24):
+    if v and (len(v) < 8 or len(v) > 24):
         raise ValueError("Password should be long between 3 and 24")
     return v
 

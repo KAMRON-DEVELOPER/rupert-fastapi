@@ -13,7 +13,7 @@ from src.apps.stats.schemas import (
     DailyActiveUsersBucket,
     JobSearchStatusBucket,
     SpecializationBucket,
-    UsersStats,
+    UsersStatsResponse,
 )
 from src.apps.users.models import (
     ActivityModel,
@@ -378,7 +378,7 @@ class UsersRepository:
             for specialization, count in by_specialization_rows
         ]
 
-        return UsersStats(
+        return UsersStatsResponse(
             total=total,
             looking_for_job_count=looking_for_job_count,
             looking_for_job_percentage=looking_for_job_percentage,

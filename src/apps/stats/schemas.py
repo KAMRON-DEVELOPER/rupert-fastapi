@@ -36,7 +36,7 @@ class DailyActiveUsersBucket(ResponseSchema):
     date: date
 
 
-class UsersStats(ResponseSchema):
+class UsersStatsResponse(ResponseSchema):
     total: int
     looking_for_job_count: int
     looking_for_job_percentage: float
@@ -45,19 +45,19 @@ class UsersStats(ResponseSchema):
     by_specialization: list[SpecializationBucket]
 
 
-class VacanciesStats(ResponseSchema):
+class VacanciesStatsResponse(ResponseSchema):
     total: int
     open: int
     by_status: list[VacancyStatusBucket]
     by_specialization: list[SpecializationBucket]
 
 
-class CompaniesStats(ResponseSchema):
+class CompaniesStatsResponse(ResponseSchema):
     total: int
     by_type: list[CompanyTypeBucket]
 
 
-class Stats(ResponseSchema):
-    users: UsersStats
-    vacancies: VacanciesStats
-    companies: CompaniesStats
+class StatsResponse(ResponseSchema):
+    users: UsersStatsResponse
+    vacancies: VacanciesStatsResponse
+    companies: CompaniesStatsResponse

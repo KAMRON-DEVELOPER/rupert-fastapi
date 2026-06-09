@@ -1,10 +1,7 @@
 import datetime
 from datetime import date
-from typing import Annotated
-from uuid import UUID
 
 from dateutil.relativedelta import relativedelta
-from fastapi import Form
 from pydantic import Field, field_validator
 
 from src.apps.shared.schemas import BaseNullableLocationModelResponse
@@ -34,8 +31,8 @@ class UserUpdateRequest(NullableLocationRequest):
     telegram_username: str | None = None
     follow_policy: FollowPolicy | None = None
     job_search_status: JobSearchStatus | None = None
-    delete_avatar: bool | None = None
-    delete_banner: bool | None = None
+    delete_avatar_key: str | None = None
+    delete_banner_key: str | None = None
 
     @field_validator("birthdate")
     def validate_birthdate(cls, value: date | None):
@@ -52,56 +49,6 @@ class UserUpdateRequest(NullableLocationRequest):
             )
 
         return value
-
-    @classmethod
-    def as_form(
-        cls,
-        first_name: Annotated[str | None, Form(alias="firstName")] = None,
-        last_name: Annotated[str | None, Form(alias="lastName")] = None,
-        country_id: Annotated[UUID | None, Form()] = None,
-        city_id: Annotated[UUID | None, Form()] = None,
-        headline: Annotated[str | None, Form()] = None,
-        birthdate: Annotated[date | None, Form()] = None,
-        bio: Annotated[str | None, Form()] = None,
-        specialization: Annotated[Specialization | None, Form()] = None,
-        phone_number: Annotated[str | None, Form(alias="phoneNumber")] = None,
-        github_url: Annotated[str | None, Form(alias="githubUrl")] = None,
-        telegram_username: Annotated[
-            str | None, Form(alias="telegramUsername")
-        ] = None,
-        follow_policy: Annotated[
-            FollowPolicy | None, Form(alias="followPolicy")
-        ] = None,
-        job_search_status: Annotated[
-            JobSearchStatus | None, Form(alias="jobSearchStatus")
-        ] = None,
-        delete_avatar: Annotated[
-            bool | None, Form(alias="deleteAvatar")
-        ] = None,
-        delete_banner: Annotated[
-            bool | None, Form(alias="deleteBanner")
-        ] = None,
-    ):
-        data = {
-            "firstName": first_name,
-            "lastName": last_name,
-            "countryId": country_id,
-            "cityId": city_id,
-            "headline": headline,
-            "birthdate": birthdate,
-            "bio": bio,
-            "specialization": specialization,
-            "phoneNumber": phone_number,
-            "githubUrl": github_url,
-            "telegramUsername": telegram_username,
-            "followPolicy": follow_policy,
-            "jobSearchStatus": job_search_status,
-            "deleteAvatar": delete_avatar,
-            "deleteBanner": delete_banner,
-        }
-        return cls.model_validate(
-            {key: value for key, value in data.items() if value is not None}
-        )
 
 
 class UserSummaryResponse(BaseNullableLocationModelResponse):

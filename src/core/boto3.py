@@ -1,5 +1,6 @@
 import asyncio
 import json
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import aioboto3
 from aiobotocore.config import AioConfig
 from botocore.exceptions import ClientError
 from fastapi import HTTPException, status
+from types_aiobotocore_s3.client import S3Client
 from types_aiobotocore_s3.type_defs import BucketLifecycleConfigurationTypeDef
 
 from src.core.logger import logger
@@ -18,7 +20,7 @@ session = aioboto3.Session()
 
 
 @asynccontextmanager
-async def s3_client():
+async def s3_client() -> AsyncIterator[S3Client]:
     async with session.client(
         service_name="s3",
         endpoint_url=f"{'http' if settings.debug else 'https'}://{settings.s3.endpoint}",
