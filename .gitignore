@@ -15,3 +15,4 @@ config.json
 .idea
 .pytest_cache
 API.md
+generated
