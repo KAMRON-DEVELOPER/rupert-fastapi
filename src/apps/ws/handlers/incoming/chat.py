@@ -138,7 +138,7 @@ async def handle_create_chat(
             participant_ids,
             {
                 "type": OutgoingEvent.chat_created.value,
-                "payload": item.model_dump_json(),
+                "item": item.model_dump(mode="json"),
             },
         )
 
@@ -177,7 +177,7 @@ async def handle_send_message(
             participant_ids,
             {
                 "type": OutgoingEvent.message_created.value,
-                "payload": message.model_dump_json(),
+                "message": message.model_dump(mode="json"),
             },
         )
 
@@ -215,7 +215,7 @@ async def handle_update_message(
             participant_ids,
             {
                 "type": OutgoingEvent.message_updated.value,
-                "payload": message.model_dump_json(),
+                "message": message.model_dump(mode="json"),
             },
         )
 
