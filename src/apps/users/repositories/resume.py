@@ -52,7 +52,6 @@ class ResumesRepository:
         user_id: UUID,
         resume_id: UUID,
         values: dict,
-        skills: list[dict] | None = None,
     ):
         await ResumesRepository.get_by_id_and_user_id(
             session, user_id, resume_id
@@ -71,17 +70,6 @@ class ResumesRepository:
                 )
                 await session.scalar(stmt)
 
-            if skills:
-                await session.execute(
-                    delete(ResumeSkillLink).where(
-                        ResumeSkillLink.resume_id == resume_id
-                    )
-                )
-                await session.flush()
-
-                for skill in skills:
-                    session.add(ResumeSkillLink(resume_id=resume_id, **skill))
-
             await session.flush()
 
             return await ResumesRepository.get_by_id_and_user_id(
@@ -94,7 +82,7 @@ class ResumesRepository:
             logger.error(f"[ResumesRepository] update integrity: {e}")
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Resume data is invalid or contains duplicate skills",
+                detail="Resume data is invalid",
             )
         except Exception as e:
             await session.rollback()

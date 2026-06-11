@@ -58,7 +58,7 @@ async def test_resume_create_list_detail_update_and_delete(
     ]
 
     replace_skills_res = await client.patch(
-        f"/api/v1/users/resumes/{resume_id}",
+        f"/api/v1/users/resumes/{resume_id}/skills",
         json={
             "skills": [
                 {
@@ -70,9 +70,9 @@ async def test_resume_create_list_detail_update_and_delete(
         },
     )
     assert replace_skills_res.status_code == 200
-    assert len(replace_skills_res.json()["skills"]) == 1
-    assert replace_skills_res.json()["skills"][0]["skill"]["name"] == "FastAPI"
-    assert replace_skills_res.json()["skills"][0]["proficiency"] == "advanced"
+    assert len(replace_skills_res.json()) == 1
+    assert replace_skills_res.json()[0]["skill"]["name"] == "FastAPI"
+    assert replace_skills_res.json()[0]["proficiency"] == "advanced"
 
     delete_res = await client.delete(f"/api/v1/users/resumes/{resume_id}")
     assert delete_res.status_code == 200

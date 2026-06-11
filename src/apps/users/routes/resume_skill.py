@@ -4,9 +4,10 @@ from fastapi import status
 
 from src.apps.shared.schemas import MessageResponse
 from src.apps.shared.schemas.skill import (
-    SkillLinkCreateRequest,
+    SkillLinkBatchCreateRequest,
+    SkillLinkBatchDeleteRequest,
+    SkillLinkBatchUpdateRequest,
     SkillLinkResponse,
-    SkillLinkUpdateRequest,
 )
 from src.apps.users.repositories.resume_skill import ResumeSkillsRepository
 from src.core.database import sessionDep
@@ -17,60 +18,60 @@ from .router import users_router
 
 @users_router.post(
     "/resumes/{resume_id}/skills",
-    response_model=SkillLinkResponse,
+    response_model=list[SkillLinkResponse],
     status_code=status.HTTP_201_CREATED,
 )
-async def create_resume_skill(
+async def create_resume_skills(
     auth: authDep,
     session: sessionDep,
     resume_id: UUID,
-    schm: SkillLinkCreateRequest,
+    schm: SkillLinkBatchCreateRequest,
 ):
     user_id, _, _ = auth
 
-    record = await ResumeSkillsRepository.create(
-        session, user_id, resume_id, schm.model_dump()
+    records = await ResumeSkillsRepository.create_batch(
+        session, user_id, resume_id, [s.model_dump() for s in schm.skills]
     )
     await session.commit()
-    return SkillLinkResponse.model_validate(record)
+    return [SkillLinkResponse.model_validate(r) for r in records]
 
 
 @users_router.patch(
-    "/resumes/{resume_id}/skills/{skill_link_id}",
-    response_model=SkillLinkResponse,
+    "/resumes/{resume_id}/skills",
+    response_model=list[SkillLinkResponse],
 )
-async def update_resume_skill(
+async def update_resume_skills(
     auth: authDep,
     session: sessionDep,
     resume_id: UUID,
-    skill_link_id: UUID,
-    schm: SkillLinkUpdateRequest,
+    schm: SkillLinkBatchUpdateRequest,
 ):
     user_id, _, _ = auth
 
-    record = await ResumeSkillsRepository.update(
+    records = await ResumeSkillsRepository.update_batch(
         session,
         user_id,
         resume_id,
-        skill_link_id,
-        schm.model_dump(exclude_unset=True),
+        [s.model_dump(exclude_unset=True) for s in schm.skills],
     )
     await session.commit()
-    return SkillLinkResponse.model_validate(record)
+    return [SkillLinkResponse.model_validate(r) for r in records]
 
 
 @users_router.delete(
-    "/resumes/{resume_id}/skills/{skill_link_id}",
+    "/resumes/{resume_id}/skills",
     response_model=MessageResponse,
-    status_code=status.HTTP_200_OK,
 )
-async def delete_resume_skill(
-    auth: authDep, session: sessionDep, resume_id: UUID, skill_link_id: UUID
+async def delete_resume_skills(
+    auth: authDep,
+    session: sessionDep,
+    resume_id: UUID,
+    schm: SkillLinkBatchDeleteRequest,
 ):
     user_id, _, _ = auth
 
-    await ResumeSkillsRepository.delete(
-        session, user_id, resume_id, skill_link_id
+    await ResumeSkillsRepository.delete_batch(
+        session, user_id, resume_id, schm.skill_link_ids
     )
     await session.commit()
-    return MessageResponse(message="Resume skill deleted successfully")
+    return MessageResponse(message="Resume skills deleted successfully")

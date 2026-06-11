@@ -25,137 +25,154 @@ class ResumeSkillsRepository:
             )
 
     @staticmethod
-    async def _get_link(
+    async def _get_links(
         session: AsyncSession,
-        user_id: UUID,
         resume_id: UUID,
-        link_id: UUID,
-        required: bool = True,
     ):
-        await ResumeSkillsRepository._ensure_resume_owned(
-            session, user_id, resume_id
-        )
         stmt = (
             select(ResumeSkillLink)
             .options(selectinload(ResumeSkillLink.skill))
-            .where(
-                ResumeSkillLink.id == link_id,
-                ResumeSkillLink.resume_id == resume_id,
-            )
+            .where(ResumeSkillLink.resume_id == resume_id)
+            .order_by(ResumeSkillLink.created_at.desc())
         )
-        record = await session.scalar(stmt)
-        if not record and required:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Resume skill link not found",
-            )
-        return record
+        return (await session.scalars(stmt)).all()
 
     @staticmethod
-    async def create(
-        session: AsyncSession, user_id: UUID, resume_id: UUID, values: dict
+    async def create_batch(
+        session: AsyncSession,
+        user_id: UUID,
+        resume_id: UUID,
+        skills: list[dict],
     ):
         try:
             await ResumeSkillsRepository._ensure_resume_owned(
                 session, user_id, resume_id
             )
-            record = ResumeSkillLink(resume_id=resume_id, **values)
-            session.add(record)
+
+            for skill in skills:
+                session.add(ResumeSkillLink(resume_id=resume_id, **skill))
+
             await session.flush()
-            return await ResumeSkillsRepository._get_link(
-                session, user_id, resume_id, record.id
-            )
+
+            return await ResumeSkillsRepository._get_links(session, resume_id)
         except HTTPException:
             raise
         except IntegrityError as e:
             await session.rollback()
-            logger.error(f"[ResumeSkillsRepository] create integrity: {e}")
+            logger.error(
+                f"[ResumeSkillsRepository] create_batch integrity: {e}"
+            )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Resume skill already exists or references invalid skill",
+                detail="One or more skills already exist or reference invalid skills",
             )
         except Exception as e:
             await session.rollback()
-            logger.error(f"[ResumeSkillsRepository] create: {e}")
+            logger.error(f"[ResumeSkillsRepository] create_batch: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while creating resume skill",
+                detail="Something went wrong while creating resume skills",
             )
 
     @staticmethod
-    async def update(
+    async def update_batch(
         session: AsyncSession,
         user_id: UUID,
         resume_id: UUID,
-        link_id: UUID,
-        values: dict,
+        skills: list[dict],
     ):
         try:
-            await ResumeSkillsRepository._get_link(
-                session, user_id, resume_id, link_id
+            await ResumeSkillsRepository._ensure_resume_owned(
+                session, user_id, resume_id
             )
-            if values:
+
+            for skill in skills:
+                link_id: UUID = skill.pop("id")
+
                 stmt = (
                     update(ResumeSkillLink)
                     .where(
                         ResumeSkillLink.id == link_id,
                         ResumeSkillLink.resume_id == resume_id,
                     )
-                    .values(values)
+                    .values(skill)
                     .returning(ResumeSkillLink.id)
                 )
-                await session.scalar(stmt)
-                await session.flush()
+                updated_id = await session.scalar(stmt)
 
-            return await ResumeSkillsRepository._get_link(
-                session, user_id, resume_id, link_id
-            )
+                if not updated_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Resume skill link {link_id} not found",
+                    )
+
+            await session.flush()
+
+            return await ResumeSkillsRepository._get_links(session, resume_id)
         except HTTPException:
             raise
         except IntegrityError as e:
             await session.rollback()
-            logger.error(f"[ResumeSkillsRepository] update integrity: {e}")
+            logger.error(
+                f"[ResumeSkillsRepository] update_batch integrity: {e}"
+            )
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid resume skill data",
+                status_code=status.HTTP_409_CONFLICT,
+                detail="One or more skills already exist or reference invalid skills",
             )
         except Exception as e:
             await session.rollback()
-            logger.error(f"[ResumeSkillsRepository] update: {e}")
+            logger.error(f"[ResumeSkillsRepository] update_batch: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while updating resume skill",
+                detail="Something went wrong while updating resume skills",
             )
 
     @staticmethod
-    async def delete(
-        session: AsyncSession, user_id: UUID, resume_id: UUID, link_id: UUID
+    async def delete_batch(
+        session: AsyncSession,
+        user_id: UUID,
+        resume_id: UUID,
+        skill_link_ids: list[UUID],
     ):
         try:
             await ResumeSkillsRepository._ensure_resume_owned(
                 session, user_id, resume_id
             )
+
             stmt = (
                 delete(ResumeSkillLink)
                 .where(
-                    ResumeSkillLink.id == link_id,
+                    ResumeSkillLink.id.in_(skill_link_ids),
                     ResumeSkillLink.resume_id == resume_id,
                 )
                 .returning(ResumeSkillLink.id)
             )
-            deleted_id = await session.scalar(stmt)
+            result = await session.execute(stmt)
+            deleted_ids = [row[0] for row in result.all()]
 
-            if not deleted_id:
+            if not deleted_ids:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Resume skill link not found",
+                    detail="No matching resume skill links found",
                 )
+
+            await session.flush()
+
+            not_found_count = len(skill_link_ids) - len(deleted_ids)
+            if not_found_count > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"{not_found_count} skill link(s) not found",
+                )
+
+            return deleted_ids
         except HTTPException:
             raise
         except Exception as e:
             await session.rollback()
-            logger.error(f"[ResumeSkillsRepository] delete: {e}")
+            logger.error(f"[ResumeSkillsRepository] delete_batch: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while deleting resume skill",
+                detail="Something went wrong while deleting resume skills",
             )

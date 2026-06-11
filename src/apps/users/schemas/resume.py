@@ -47,7 +47,6 @@ class ResumeUpdateRequest(NullableLocationRequest):
     salary_currency: SalaryCurrency | None = None
     work_format: WorkFormat | None = None
     employment_type: EmploymentType | None = None
-    skills: list[SkillLinkCreateRequest] | None = None
 
     @field_validator("salary_expectation_max")
     @classmethod

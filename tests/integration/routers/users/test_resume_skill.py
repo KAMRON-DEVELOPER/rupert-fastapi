@@ -9,10 +9,11 @@ from src.apps.users.models import UserModel
 
 
 @pytest.mark.integration
-async def test_resume_skill_crud_and_duplicate_rejected(
+async def test_resume_skill_batch_crud_and_duplicate_rejected(
     client: AsyncClient,
     make_user: Callable[..., Awaitable[UserModel]],
     skill: SkillModel,
+    another_skill: SkillModel,
     resume_payload: Callable[..., dict[str, object]],
 ):
     await make_user()
@@ -23,28 +24,67 @@ async def test_resume_skill_crud_and_duplicate_rejected(
 
     create_res = await client.post(
         f"/api/v1/users/resumes/{resume_id}/skills",
-        json={"skillId": str(skill.id), "proficiency": "intermediate"},
+        json={
+            "skills": [
+                {"skillId": str(skill.id), "proficiency": "intermediate"},
+            ]
+        },
     )
     assert create_res.status_code == 201
-    skill_link_id = create_res.json()["id"]
-    assert create_res.json()["skill"]["name"] == "Python"
+    assert len(create_res.json()) == 1
+    assert create_res.json()[0]["skill"]["name"] == "Python"
+    skill_link_id = create_res.json()[0]["id"]
 
     duplicate_res = await client.post(
         f"/api/v1/users/resumes/{resume_id}/skills",
-        json={"skillId": str(skill.id), "proficiency": "advanced"},
+        json={
+            "skills": [
+                {"skillId": str(skill.id), "proficiency": "advanced"},
+            ]
+        },
     )
     assert duplicate_res.status_code == 409
 
-    patch_res = await client.patch(
-        f"/api/v1/users/resumes/{resume_id}/skills/{skill_link_id}",
-        json={"proficiency": "advanced", "lastUsedAt": "2025-01-01"},
+    update_res = await client.patch(
+        f"/api/v1/users/resumes/{resume_id}/skills",
+        json={
+            "skills": [
+                {
+                    "id": skill_link_id,
+                    "skillId": str(skill.id),
+                    "proficiency": "advanced",
+                    "lastUsedAt": "2025-01-01",
+                },
+                {
+                    "skillId": str(another_skill.id),
+                    "proficiency": "beginner",
+                },
+            ]
+        },
     )
-    assert patch_res.status_code == 200
-    assert patch_res.json()["proficiency"] == "advanced"
-    assert patch_res.json()["lastUsedAt"] == "2025-01-01"
+    assert update_res.status_code == 200
+    assert len(update_res.json()) == 2
 
-    delete_res = await client.delete(
-        f"/api/v1/users/resumes/{resume_id}/skills/{skill_link_id}"
+    updated_skill = next(
+        s for s in update_res.json() if s["id"] == skill_link_id
+    )
+    assert updated_skill["proficiency"] == "advanced"
+    assert updated_skill["lastUsedAt"] == "2025-01-01"
+
+    new_skill = next(
+        s for s in update_res.json() if s["id"] != skill_link_id
+    )
+    assert new_skill["skill"]["name"] == "FastAPI"
+    assert new_skill["proficiency"] == "beginner"
+
+    delete_res = await client.request(
+        "DELETE",
+        f"/api/v1/users/resumes/{resume_id}/skills",
+        json={
+            "skillLinkIds": [
+                s["id"] for s in update_res.json()
+            ]
+        },
     )
     assert delete_res.status_code == 200
 
@@ -83,18 +123,32 @@ async def test_resume_skill_rejects_modifying_another_users_resume(
 
     create_res = await client.post(
         f"/api/v1/users/resumes/{resume_id}/skills",
-        json={"skillId": str(skill.id), "proficiency": "advanced"},
+        json={
+            "skills": [
+                {"skillId": str(skill.id), "proficiency": "advanced"},
+            ]
+        },
     )
     assert create_res.status_code == 404
 
-    patch_res = await client.patch(
-        f"/api/v1/users/resumes/{resume_id}/skills/{skill_link_id}",
-        json={"proficiency": "advanced"},
+    update_res = await client.patch(
+        f"/api/v1/users/resumes/{resume_id}/skills",
+        json={
+            "skills": [
+                {
+                    "id": skill_link_id,
+                    "skillId": str(skill.id),
+                    "proficiency": "advanced",
+                },
+            ]
+        },
     )
-    assert patch_res.status_code == 404
+    assert update_res.status_code == 404
 
-    delete_res = await client.delete(
-        f"/api/v1/users/resumes/{resume_id}/skills/{skill_link_id}"
+    delete_res = await client.request(
+        "DELETE",
+        f"/api/v1/users/resumes/{resume_id}/skills",
+        json={"skillLinkIds": [skill_link_id]},
     )
     assert delete_res.status_code == 404
 

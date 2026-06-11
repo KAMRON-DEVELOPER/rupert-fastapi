@@ -56,10 +56,7 @@ async def update_resume(
 ):
     user_id, _, _ = auth
     payload = schm.model_dump(exclude_unset=True)
-    skills = payload.pop("skills", None)
-    record = await ResumesRepository.update(
-        session, user_id, resume_id, payload, skills
-    )
+    record = await ResumesRepository.update(session, user_id, resume_id, payload)
     await session.commit()
     return ResumeResponse.model_validate(record)
 
