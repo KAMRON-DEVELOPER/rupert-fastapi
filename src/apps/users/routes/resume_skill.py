@@ -4,10 +4,9 @@ from fastapi import status
 
 from src.apps.shared.schemas import MessageResponse
 from src.apps.shared.schemas.skill import (
-    SkillLinkBatchCreateRequest,
-    SkillLinkBatchDeleteRequest,
-    SkillLinkBatchUpdateRequest,
+    SkillLinkCreateRequest,
     SkillLinkResponse,
+    SkillLinkUpdateRequest,
 )
 from src.apps.users.repositories.resume_skill import ResumeSkillsRepository
 from src.core.database import sessionDep
@@ -25,12 +24,12 @@ async def create_resume_skills(
     auth: authDep,
     session: sessionDep,
     resume_id: UUID,
-    schm: SkillLinkBatchCreateRequest,
+    skills: list[SkillLinkCreateRequest],
 ):
     user_id, _, _ = auth
 
     records = await ResumeSkillsRepository.create_batch(
-        session, user_id, resume_id, [s.model_dump() for s in schm.skills]
+        session, user_id, resume_id, [s.model_dump() for s in skills]
     )
     await session.commit()
     return [SkillLinkResponse.model_validate(r) for r in records]
@@ -44,7 +43,7 @@ async def update_resume_skills(
     auth: authDep,
     session: sessionDep,
     resume_id: UUID,
-    schm: SkillLinkBatchUpdateRequest,
+    skills: list[SkillLinkUpdateRequest],
 ):
     user_id, _, _ = auth
 
@@ -52,7 +51,7 @@ async def update_resume_skills(
         session,
         user_id,
         resume_id,
-        [s.model_dump(exclude_unset=True) for s in schm.skills],
+        [s.model_dump(exclude_unset=True) for s in skills],
     )
     await session.commit()
     return [SkillLinkResponse.model_validate(r) for r in records]
@@ -66,12 +65,10 @@ async def delete_resume_skills(
     auth: authDep,
     session: sessionDep,
     resume_id: UUID,
-    schm: SkillLinkBatchDeleteRequest,
+    ids: list[UUID],
 ):
     user_id, _, _ = auth
 
-    await ResumeSkillsRepository.delete_batch(
-        session, user_id, resume_id, schm.skill_link_ids
-    )
+    await ResumeSkillsRepository.delete_batch(session, user_id, resume_id, ids)
     await session.commit()
     return MessageResponse(message="Resume skills deleted successfully")
