@@ -133,11 +133,14 @@ async def handle_create_chat(
             UserId(str(data.participant_id))
         )
 
-        evnt = {
-            "type": OutgoingEvent.chat_created.value,
-            "chat": item.model_dump(mode="json"),
-        }
-        await publish_to_users(broker, participant_ids, evnt)
+        await publish_to_users(
+            broker,
+            participant_ids,
+            {
+                "type": OutgoingEvent.chat_created.value,
+                "payload": item.model_dump_json(),
+            },
+        )
 
     await guard(websocket, connection_id, broker, action)
 
@@ -172,7 +175,10 @@ async def handle_send_message(
         await publish_to_users(
             broker,
             participant_ids,
-            {"type": OutgoingEvent.message_created.value, "message": message},
+            {
+                "type": OutgoingEvent.message_created.value,
+                "payload": message.model_dump_json(),
+            },
         )
 
     await guard(websocket, connection_id, broker, action)
@@ -207,7 +213,10 @@ async def handle_update_message(
         await publish_to_users(
             broker,
             participant_ids,
-            {"type": OutgoingEvent.message_updated.value, "message": message},
+            {
+                "type": OutgoingEvent.message_updated.value,
+                "payload": message.model_dump_json(),
+            },
         )
 
     await guard(websocket, connection_id, broker, action)
