@@ -60,7 +60,7 @@ class ResumeUpdateRequest(NullableLocationRequest):
         return v
 
 
-class ResumeDetailResponse(BaseLocationModelResponse):
+class ResumeResponse(BaseLocationModelResponse):
     user_id: UUID
     title: str
     summary: str | None
@@ -71,14 +71,3 @@ class ResumeDetailResponse(BaseLocationModelResponse):
     work_format: WorkFormat | None
     employment_type: EmploymentType | None
     skills: list[SkillLinkResponse] = Field(validation_alias="skill_links")
-
-
-class ResumeSummaryResponse(BaseLocationModelResponse):
-    user_id: UUID
-    title: str
-    specialization: Specialization
-    salary_expectation_min: int | None
-    salary_expectation_max: int | None
-    salary_currency: SalaryCurrency | None
-    work_format: WorkFormat | None
-    employment_type: EmploymentType | None

@@ -28,7 +28,7 @@ from src.apps.vacancies.models import (
     VacancySkillLink,
 )
 from src.apps.vacancies.schemas.application import (
-    ApplicationDetail,
+    ApplicationDetailResponse,
     applicationListDep,
 )
 from src.apps.vacancies.schemas.vacancy import VacancySummary, vacancyListDep
@@ -515,7 +515,7 @@ class VacanciesRepository:
         session: AsyncSession,
         pagination: paginationDep,
         filters: applicationListDep,
-    ) -> PaginatedResponse[ApplicationDetail]:
+    ) -> PaginatedResponse[ApplicationDetailResponse]:
         stmt = select(ApplicationModel)
 
         if filters:
@@ -567,7 +567,7 @@ class VacanciesRepository:
             stmt = stmt.offset(pagination.offset).limit(pagination.limit)
 
         res = await session.scalars(stmt)
-        data = cast(list[ApplicationDetail], list(res.all()))
+        data = cast(list[ApplicationDetailResponse], list(res.all()))
         return PaginatedResponse(data=data, total=total)
 
     @staticmethod

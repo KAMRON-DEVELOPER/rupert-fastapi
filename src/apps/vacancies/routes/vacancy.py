@@ -10,10 +10,10 @@ from src.apps.shared.schemas import (
 )
 from src.apps.vacancies.repositories.vacancy import VacanciesRepository
 from src.apps.vacancies.schemas.application import (
-    ApplicationDetail,
+    ApplicationDetailResponse,
     ApplicationRequest,
     ApplicationStatusUpdateRequest,
-    ApplicationSummary,
+    ApplicationSummaryResponse,
     applicationListDep,
 )
 from src.apps.vacancies.schemas.skill_links import (
@@ -48,7 +48,8 @@ async def list_vacancies(
 
 
 @vacancies_router.get(
-    "/applications", response_model=PaginatedResponse[ApplicationSummary]
+    "/applications",
+    response_model=PaginatedResponse[ApplicationSummaryResponse],
 )
 async def list_applications(
     pagination: paginationDep, filters: applicationListDep, session: sessionDep
@@ -60,7 +61,7 @@ async def list_applications(
 
 @vacancies_router.post(
     "/applications",
-    response_model=ApplicationDetail,
+    response_model=ApplicationDetailResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def apply_to_vacancy(
@@ -71,18 +72,22 @@ async def apply_to_vacancy(
         session, user_id, schm.model_dump()
     )
     await session.commit()
-    return ApplicationDetail.model_validate(record)
+    return ApplicationDetailResponse.model_validate(record)
 
 
-@vacancies_router.get("/applications/{id}", response_model=ApplicationDetail)
+@vacancies_router.get(
+    "/applications/{id}", response_model=ApplicationDetailResponse
+)
 async def get_application(id: Annotated[UUID, Path()], session: sessionDep):
     record = await VacanciesRepository.get_application_by_id(
         session=session, id=id
     )
-    return ApplicationDetail.model_validate(record)
+    return ApplicationDetailResponse.model_validate(record)
 
 
-@vacancies_router.patch("/applications/{id}", response_model=ApplicationDetail)
+@vacancies_router.patch(
+    "/applications/{id}", response_model=ApplicationDetailResponse
+)
 async def update_application_status(
     auth: authDep,
     session: sessionDep,
@@ -98,7 +103,7 @@ async def update_application_status(
         user_id=user_id,
     )
     await session.commit()
-    return ApplicationDetail.model_validate(record)
+    return ApplicationDetailResponse.model_validate(record)
 
 
 @vacancies_router.post(

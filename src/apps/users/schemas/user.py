@@ -14,7 +14,7 @@ from src.apps.shared.schemas.enums import (
 )
 from src.apps.shared.schemas.location import NullableLocationRequest
 from src.apps.shared.schemas.skill import SkillLinkResponse
-from src.apps.users.schemas.resume import ResumeSummaryResponse
+from src.apps.users.schemas.resume import ResumeResponse
 from src.apps.users.schemas.work_experience import WorkExperienceResponse
 from src.core.exceptions import ValidationException
 
@@ -84,7 +84,7 @@ class UserDetailResponse(BaseNullableLocationModelResponse):
     job_search_status: JobSearchStatus
 
     # Relationships
-    resumes: list[ResumeSummaryResponse]
+    resumes: list[ResumeResponse]
     skills: list[SkillLinkResponse] = Field(validation_alias="skill_links")
     work_experiences: list[WorkExperienceResponse]
 
