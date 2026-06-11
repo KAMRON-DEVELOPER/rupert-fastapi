@@ -133,6 +133,103 @@ class ChatRepository:
         return participant
 
     @classmethod
+    async def get_list_item(
+        cls, session: AsyncSession, chat_id: UUID, user_id: UUID
+    ) -> ChatListItemResponse:
+        current = await session.scalar(
+            select(ChatParticipantModel).where(
+                ChatParticipantModel.chat_id == chat_id,
+                ChatParticipantModel.user_id == user_id,
+                ChatParticipantModel.deleted_at.is_(None),
+            )
+        )
+        if not current:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found"
+            )
+
+        other = await session.scalar(
+            select(ChatParticipantModel).where(
+                ChatParticipantModel.chat_id == chat_id,
+                ChatParticipantModel.user_id != user_id,
+            )
+        )
+        if not other:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Chat participant not found",
+            )
+
+        other_user = await session.scalar(
+            select(UserModel).where(UserModel.id == other.user_id)
+        )
+        if not other_user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
+
+        last_message = await session.scalar(
+            select(ChatMessageModel)
+            .options(
+                selectinload(ChatMessageModel.attachment_links).selectinload(
+                    ChatMessageAttachmentLink.attachment
+                )
+            )
+            .where(ChatMessageModel.chat_id == chat_id)
+            .order_by(ChatMessageModel.created_at.desc())
+            .limit(1)
+        )
+
+        conditions = [
+            ChatMessageModel.chat_id == chat_id,
+            ChatMessageModel.sender_id != user_id,
+        ]
+
+        if current.last_seen_at is not None:
+            conditions.append(
+                ChatMessageModel.created_at > current.last_seen_at
+            )
+
+        if current.cleared_at is not None:
+            conditions.append(ChatMessageModel.created_at > current.cleared_at)
+
+        unread_count = (
+            await session.scalar(
+                select(func.count(ChatMessageModel.id)).where(*conditions)
+            )
+            or 0
+        )
+
+        last_message_response = None
+        if last_message is not None:
+            seen_by_recipient = None
+            if last_message.sender_id == user_id:
+                seen_by_recipient = (
+                    other.last_seen_at is not None
+                    and other.last_seen_at >= last_message.created_at
+                )
+            last_message_response = cls._last_message_response(
+                last_message, seen_by_recipient=seen_by_recipient
+            )
+
+        return ChatListItemResponse(
+            id=chat_id,
+            created_at=current.created_at,
+            updated_at=current.updated_at,
+            user=ChatListUserResponse(
+                id=other_user.id,
+                first_name=other_user.first_name,
+                last_name=other_user.last_name,
+                avatar_url=other_user.avatar_url,
+            ),
+            is_pinned=current.is_pinned,
+            is_muted=current.is_muted,
+            is_archived=current.is_archived,
+            last_message=last_message_response,
+            unread_count=unread_count,
+        )
+
+    @classmethod
     async def get_participant_ids(
         cls, session: AsyncSession, user_id: UUID
     ) -> Sequence[UUID]:

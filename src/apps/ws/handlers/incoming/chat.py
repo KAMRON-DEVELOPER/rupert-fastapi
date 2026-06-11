@@ -30,6 +30,7 @@ from src.apps.ws.schemas.chat import (
 )
 from src.core.websocket.broker import EventBroker
 from src.core.websocket.channels import chat_channel, user_channel
+from src.core.websocket.presence import presence
 from src.core.websocket.registry import connection_registry
 from src.core.websocket.types import ConnectionId, UserId
 
@@ -127,12 +128,14 @@ async def handle_create_chat(
         )
         await session.commit()
 
-        # TODO we might send ChatListItemResponse directly
-        # so frontend does not need to refetch or invalidate cache
+        item = await ChatRepository.get_list_item(session, chat.id, user_uuid)
+        item.user.is_participant_online = await presence.is_online(
+            UserId(str(data.participant_id))
+        )
+
         evnt = {
             "type": OutgoingEvent.chat_created.value,
-            "chat_id": chat.id,
-            "participant_id": data.participant_id,
+            "chat": item.model_dump(mode="json"),
         }
         await publish_to_users(broker, participant_ids, evnt)
 

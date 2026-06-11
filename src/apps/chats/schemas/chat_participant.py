@@ -17,6 +17,7 @@ class ChatListUserResponse(ResponseSchema):
     first_name: str
     last_name: str | None = None
     avatar_url: str | None = None
+    is_participant_online: bool = False
 
     @computed_field
     @property

@@ -15,6 +15,7 @@ from src.apps.ws.handlers.outgoing.chat import (
 from src.apps.ws.helpers import get_websocket_state
 from src.core.logger import logger
 from src.core.websocket.broker import EventBroker
+from src.core.websocket.presence import presence
 from src.core.websocket.registry import connection_registry
 from src.core.websocket.types import ConnectionId
 
@@ -25,6 +26,8 @@ async def connect_handler(
     session, user_uuid, user_id, _ = get_websocket_state(websocket)
     if connection_registry.user_has_connection(user_id, exclude=connection_id):
         return
+
+    await presence.set_online(user_id)
 
     participant_ids = await ChatRepository.get_participant_ids(
         session, user_uuid
@@ -54,6 +57,8 @@ async def disconnect_handler(
     if connection_registry.user_has_connection(user_id, exclude=connection_id):
         logger.debug(f"[chat_ws] disconnected user={user_id}")
         return
+
+    await presence.set_offline(user_id)
 
     last_online_at = datetime.now(UTC)
     try:

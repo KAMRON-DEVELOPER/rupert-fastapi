@@ -60,7 +60,6 @@ class ConnectionRegistry:
 
         return connection_id
 
-    # TODO Really need to store user id? seems not used
     def remove(self, connection_id: ConnectionId) -> WebSocket | None:
         websocket = self._sockets.pop(connection_id, None)
         self._queues.pop(connection_id, None)
