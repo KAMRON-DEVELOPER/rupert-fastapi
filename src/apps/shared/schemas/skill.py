@@ -24,7 +24,7 @@ class SkillLinkCreateRequest(RequestSchema):
 
 class SkillLinkUpdateRequest(RequestSchema):
     id: UUID
-    skill_id: UUID
+    skill_id: UUID | None = None
     proficiency: ProficiencyLevel | None = None
     last_used_at: date | None = None
 
