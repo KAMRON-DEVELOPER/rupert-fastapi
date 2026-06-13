@@ -2,7 +2,11 @@ from uuid import UUID
 
 from fastapi import status
 
-from src.apps.shared.schemas import MessageResponse
+from src.apps.shared.schemas import (
+    MessageResponse,
+    PaginatedResponse,
+    paginationDep,
+)
 from src.apps.shared.schemas.skill import (
     SkillLinkCreateRequest,
     SkillLinkResponse,
@@ -13,6 +17,23 @@ from src.core.database import sessionDep
 from src.dependencies.proactive_refresh import authDep
 
 from .router import users_router
+
+
+@users_router.get(
+    "/resumes/{resume_id}/skills",
+    response_model=PaginatedResponse[SkillLinkResponse],
+)
+async def list_resume_skills(
+    auth: authDep,
+    session: sessionDep,
+    resume_id: UUID,
+    pagination: paginationDep,
+):
+    user_id, _, _ = auth
+    records = await ResumeSkillsRepository.get_many(
+        session, user_id, resume_id, pagination.offset, pagination.limit
+    )
+    return records
 
 
 @users_router.post(

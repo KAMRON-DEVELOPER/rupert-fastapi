@@ -8,12 +8,15 @@ from sqlalchemy.orm import selectinload
 
 from src.apps.shared.models import SkillModel
 from src.apps.shared.schemas import PaginatedResponse
-from src.apps.shared.schemas.skill import SkillLinkCreateRequest
+from src.apps.shared.schemas.skill import (
+    SkillLinkCreateRequest,
+    SkillLinkResponse,
+)
 from src.apps.users.models import UserSkillLink
 from src.core.logger import logger
 
 OPTIONS = selectinload(UserSkillLink.skill).load_only(
-    SkillModel.id, SkillModel.name
+    SkillModel.id, SkillModel.created_at, SkillModel.updated_at, SkillModel.name
 )
 
 
@@ -21,7 +24,7 @@ class UserSkillsRepository:
     @staticmethod
     async def get_many(
         session: AsyncSession, user_id: UUID, offset: int = 0, limit: int = 20
-    ) -> PaginatedResponse[UserSkillLink]:
+    ) -> PaginatedResponse[SkillLinkResponse]:
         clause = UserSkillLink.user_id == user_id
 
         stmt = (
@@ -35,7 +38,10 @@ class UserSkillsRepository:
         total_stmt = select(func.count(UserSkillLink.id)).where(clause)
 
         try:
-            data = (await session.scalars(stmt)).all()
+            records = (await session.scalars(stmt)).all()
+            data = [
+                SkillLinkResponse.model_validate(record) for record in records
+            ]
             total = await session.scalar(total_stmt) or 0
 
             return PaginatedResponse(data=data, total=total)

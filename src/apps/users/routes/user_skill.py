@@ -26,10 +26,9 @@ async def list_user_skills(
     auth: authDep, session: sessionDep, pagination: paginationDep
 ):
     user_id, _, _ = auth
-    records = await UserSkillsRepository.get_many(
+    return await UserSkillsRepository.get_many(
         session, user_id, pagination.offset, pagination.offset
     )
-    return [SkillLinkResponse.model_validate(record) for record in records]
 
 
 @users_router.post(
