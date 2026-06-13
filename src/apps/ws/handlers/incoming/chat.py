@@ -129,7 +129,7 @@ async def handle_create_chat(
         await session.commit()
 
         item = await ChatRepository.get_list_item(session, chat.id, user_uuid)
-        item.user.is_participant_online = await presence.is_online(
+        item.user.is_online = await presence.is_online(
             UserId(str(data.participant_id))
         )
 

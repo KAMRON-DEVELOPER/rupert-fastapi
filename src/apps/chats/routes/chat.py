@@ -19,8 +19,6 @@ async def list_chats(
     user_ids = [UserId(str(item.user.id)) for item in result.data]
     online_map = await presence.are_online(user_ids)
     for item in result.data:
-        item.user.is_participant_online = online_map.get(
-            UserId(str(item.user.id)), False
-        )
+        item.user.is_online = online_map.get(UserId(str(item.user.id)), False)
 
     return result
