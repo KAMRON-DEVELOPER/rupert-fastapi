@@ -18,7 +18,7 @@ from .router import users_router
 @users_router.get("/resumes", response_model=list[ResumeResponse])
 async def list_resumes(auth: authDep, session: sessionDep):
     user_id, _, _ = auth
-    records = await ResumesRepository.list_by_user_id(session, user_id)
+    records = await ResumesRepository.get_many(session, user_id)
     return [ResumeResponse.model_validate(record) for record in records]
 
 
@@ -56,7 +56,9 @@ async def update_resume(
 ):
     user_id, _, _ = auth
     payload = schm.model_dump(exclude_unset=True)
-    record = await ResumesRepository.update(session, user_id, resume_id, payload)
+    record = await ResumesRepository.update(
+        session, user_id, resume_id, payload
+    )
     await session.commit()
     return ResumeResponse.model_validate(record)
 

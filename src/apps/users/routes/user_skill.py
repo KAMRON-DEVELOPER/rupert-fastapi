@@ -2,7 +2,11 @@ from uuid import UUID
 
 from fastapi import status
 
-from src.apps.shared.schemas import MessageResponse
+from src.apps.shared.schemas import (
+    MessageResponse,
+    PaginatedResponse,
+    paginationDep,
+)
 from src.apps.shared.schemas.skill import (
     SkillLinkCreateRequest,
     SkillLinkResponse,
@@ -15,10 +19,16 @@ from src.dependencies.proactive_refresh import authDep
 from .router import users_router
 
 
-@users_router.get("/skills", response_model=list[SkillLinkResponse])
-async def list_user_skills(auth: authDep, session: sessionDep):
+@users_router.get(
+    "/skills", response_model=PaginatedResponse[SkillLinkResponse]
+)
+async def list_user_skills(
+    auth: authDep, session: sessionDep, pagination: paginationDep
+):
     user_id, _, _ = auth
-    records = await UserSkillsRepository.list_by_user_id(session, user_id)
+    records = await UserSkillsRepository.get_many(
+        session, user_id, pagination.offset, pagination.offset
+    )
     return [SkillLinkResponse.model_validate(record) for record in records]
 
 
@@ -31,9 +41,7 @@ async def create_user_skill(
     auth: authDep, session: sessionDep, schm: SkillLinkCreateRequest
 ):
     user_id, _, _ = auth
-    record = await UserSkillsRepository.create(
-        session, user_id, schm.model_dump()
-    )
+    record = await UserSkillsRepository.create(session, user_id, schm)
     await session.commit()
     return SkillLinkResponse.model_validate(record)
 

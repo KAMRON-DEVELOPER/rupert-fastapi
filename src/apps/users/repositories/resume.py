@@ -48,10 +48,7 @@ class ResumesRepository:
 
     @staticmethod
     async def update(
-        session: AsyncSession,
-        user_id: UUID,
-        resume_id: UUID,
-        values: dict,
+        session: AsyncSession, user_id: UUID, resume_id: UUID, values: dict
     ):
         await ResumesRepository.get_by_id_and_user_id(
             session, user_id, resume_id
@@ -119,7 +116,7 @@ class ResumesRepository:
             )
 
     @staticmethod
-    async def list_by_user_id(session: AsyncSession, user_id: UUID):
+    async def get_many(session: AsyncSession, user_id: UUID):
         stmt = (
             select(ResumeModel)
             .options(

@@ -112,7 +112,11 @@ class ResumeSkillLink(BaseModel):
 
     # Relationships
     resume: Mapped[ResumeModel] = relationship(back_populates="skill_links")
-    skill: Mapped[SkillModel] = relationship(back_populates="resume_links")
+    skill: Mapped[SkillModel] = relationship(
+        back_populates="resume_links"
+        # lazy="joined",
+        # innerjoin=True,
+    )
 
     def __repr__(self):
         return "<ResumeSkillLink>"
@@ -186,7 +190,11 @@ class UserSkillLink(BaseModel):
 
     # Relationships
     user: Mapped[UserModel] = relationship(back_populates="skill_links")
-    skill: Mapped[SkillModel] = relationship(back_populates="user_links")
+    skill: Mapped[SkillModel] = relationship(
+        back_populates="user_links"
+        # lazy="joined",
+        # innerjoin=True,
+    )
 
     def __repr__(self):
         return "<UserSkillLink>"

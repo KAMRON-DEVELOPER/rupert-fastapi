@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Annotated, TypeVar
+from typing import Annotated
 
 from fastapi import Depends
 from pydantic import Field
@@ -13,8 +13,6 @@ class PaginationQuery(RequestSchema):
 
 
 paginationDep = Annotated[PaginationQuery, Depends()]
-
-T = TypeVar("T")
 
 
 class PaginatedResponse[T](ResponseSchema):
