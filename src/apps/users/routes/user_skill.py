@@ -40,7 +40,9 @@ async def create_user_skill(
     auth: authDep, session: sessionDep, schm: SkillLinkCreateRequest
 ):
     user_id, _, _ = auth
-    record = await UserSkillsRepository.create(session, user_id, schm)
+    record = await UserSkillsRepository.create(
+        session, user_id, schm.model_dump()
+    )
     await session.commit()
     return SkillLinkResponse.model_validate(record)
 

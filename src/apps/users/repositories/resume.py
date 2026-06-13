@@ -1,36 +1,33 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import delete, func, insert, select, update
+from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.apps.users.models import ResumeModel, ResumeSkillLink
+from src.apps.shared.schemas import PaginatedResponse
+from src.apps.users.models import ResumeModel
+from src.apps.users.schemas.resume import ResumeResponse
 from src.core.logger import logger
+
+OPTIONS = (selectinload(ResumeModel.country), selectinload(ResumeModel.city))
 
 
 class ResumesRepository:
     @staticmethod
     async def create(
-        session: AsyncSession, user_id: UUID, values: dict, skills: list[dict]
-    ):
-        record = ResumeModel(user_id=user_id, **values)
+        session: AsyncSession, user_id: UUID, values: dict
+    ) -> ResumeModel:
+        stmt = (
+            insert(ResumeModel)
+            .values({"user_id": user_id} | values)
+            .returning(ResumeModel)
+            .options(*OPTIONS)
+        )
 
         try:
-            session.add(record)
-            await session.flush()
-
-            for skill in skills:
-                session.add(ResumeSkillLink(resume_id=record.id, **skill))
-
-            await session.flush()
-
-            return await ResumesRepository.get_by_id_and_user_id(
-                session, user_id, record.id
-            )
-        except HTTPException:
-            raise
+            return (await session.scalars(stmt)).one()
         except IntegrityError as e:
             await session.rollback()
             logger.error(f"[ResumesRepository] create integrity: {e}")
@@ -49,31 +46,22 @@ class ResumesRepository:
     @staticmethod
     async def update(
         session: AsyncSession, user_id: UUID, resume_id: UUID, values: dict
-    ):
-        await ResumesRepository.get_by_id_and_user_id(
-            session, user_id, resume_id
+    ) -> ResumeModel:
+
+        stmt = (
+            update(ResumeModel)
+            .where(ResumeModel.id == resume_id, ResumeModel.user_id == user_id)
+            .values(values)
+            .returning(ResumeModel)
+            .options(*OPTIONS)
         )
 
         try:
-            if values:
-                stmt = (
-                    update(ResumeModel)
-                    .where(
-                        ResumeModel.id == resume_id,
-                        ResumeModel.user_id == user_id,
-                    )
-                    .values(values)
-                    .returning(ResumeModel.id)
-                )
-                await session.scalar(stmt)
-
-            await session.flush()
-
-            return await ResumesRepository.get_by_id_and_user_id(
-                session, user_id, resume_id
+            return (await session.scalars(stmt)).one()
+        except NoResultFound:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found"
             )
-        except HTTPException:
-            raise
         except IntegrityError as e:
             await session.rollback()
             logger.error(f"[ResumesRepository] update integrity: {e}")
@@ -98,15 +86,11 @@ class ResumesRepository:
         )
 
         try:
-            deleted_id = await session.scalar(stmt)
-
-            if not deleted_id:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Resume not found",
-                )
-        except HTTPException:
-            raise
+            return (await session.scalars(stmt)).one()
+        except NoResultFound:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found"
+            )
         except Exception as e:
             await session.rollback()
             logger.error(f"[ResumesRepository] delete: {e}")
@@ -116,58 +100,60 @@ class ResumesRepository:
             )
 
     @staticmethod
-    async def get_many(session: AsyncSession, user_id: UUID):
+    async def get_many(
+        session: AsyncSession, user_id: UUID, offset: int = 0, limit: int = 20
+    ) -> PaginatedResponse[ResumeResponse]:
+        clause = ResumeModel.user_id == user_id
+
         stmt = (
             select(ResumeModel)
             .options(
                 selectinload(ResumeModel.country),
                 selectinload(ResumeModel.city),
             )
-            .where(ResumeModel.user_id == user_id)
+            .where(clause)
             .order_by(ResumeModel.updated_at.desc())
-            .execution_options(populate_existing=True)
+            .offset(offset)
+            .limit(limit)
         )
+        total_stmt = select(func.count(ResumeModel.id)).where(clause)
 
         try:
-            return (await session.scalars(stmt)).all()
+            records = (await session.scalars(stmt)).all()
+            data = [ResumeResponse.model_validate(record) for record in records]
+            total = await session.scalar(total_stmt) or 0
+
+            return PaginatedResponse(data=data, total=total)
         except Exception as e:
-            logger.error(f"[ResumesRepository] list_by_user_id: {e}")
+            logger.error(f"[ResumesRepository] get_many: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while retrieving resumes",
             )
 
     @staticmethod
-    async def get_by_id_and_user_id(
-        session: AsyncSession,
-        user_id: UUID,
-        resume_id: UUID,
-        required: bool = True,
-    ):
+    async def get(session: AsyncSession, user_id: UUID, resume_id: UUID):
         stmt = (
             select(ResumeModel)
-            .options(
-                selectinload(ResumeModel.country),
-                selectinload(ResumeModel.city),
-                selectinload(ResumeModel.skill_links).selectinload(
-                    ResumeSkillLink.skill
-                ),
-            )
+            .options(*OPTIONS)
             .where(ResumeModel.id == resume_id, ResumeModel.user_id == user_id)
-            .execution_options(populate_existing=True)
         )
+
         try:
-            record = await session.scalar(stmt)
-
-            if not record and required:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Resume not found",
-                )
-
-            return record
-        except HTTPException:
-            raise
+            return (await session.scalars(stmt)).one()
+        except NoResultFound:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found"
+            )
+        except MultipleResultsFound:
+            logger.error(
+                "[ResumesRepository] get: multiple rows for "
+                f"user_id={user_id}, resume_id={resume_id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving user skill",
+            )
         except Exception as e:
             logger.error(f"[ResumesRepository] get_by_id_and_user_id: {e}")
             raise HTTPException(

@@ -21,7 +21,6 @@ class ResumeCreateRequest(LocationRequest):
     salary_currency: SalaryCurrency | None = None
     work_format: WorkFormat | None = None
     employment_type: EmploymentType | None = None
-    # skills: list[SkillLinkCreateRequest] = Field(default_factory=list)
 
     @field_validator("salary_expectation_max")
     @classmethod
@@ -65,4 +64,3 @@ class ResumeResponse(BaseLocationModelResponse):
     salary_currency: SalaryCurrency | None
     work_format: WorkFormat | None
     employment_type: EmploymentType | None
-    # skills: list[SkillLinkResponse] = Field(validation_alias="skill_links")

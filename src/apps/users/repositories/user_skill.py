@@ -8,10 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from src.apps.shared.models import SkillModel
 from src.apps.shared.schemas import PaginatedResponse
-from src.apps.shared.schemas.skill import (
-    SkillLinkCreateRequest,
-    SkillLinkResponse,
-)
+from src.apps.shared.schemas.skill import SkillLinkResponse
 from src.apps.users.models import UserSkillLink
 from src.core.logger import logger
 
@@ -21,6 +18,99 @@ OPTIONS = selectinload(UserSkillLink.skill).load_only(
 
 
 class UserSkillsRepository:
+    @staticmethod
+    async def create(
+        session: AsyncSession, user_id: UUID, values: dict
+    ) -> UserSkillLink:
+        stmt = (
+            insert(UserSkillLink)
+            .values({"user_id": user_id} | values)
+            .returning(UserSkillLink)
+            .options(OPTIONS)
+        )
+
+        try:
+            return (await session.scalars(stmt)).one()
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[UserSkillsRepository] create integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User skill already exists or references invalid skill",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[UserSkillsRepository] create: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while creating user skill",
+            )
+
+    @staticmethod
+    async def update(
+        session: AsyncSession, user_id: UUID, skill_link_id: UUID, values: dict
+    ) -> UserSkillLink:
+        stmt = (
+            update(UserSkillLink)
+            .where(
+                UserSkillLink.id == skill_link_id,
+                UserSkillLink.user_id == user_id,
+            )
+            .values(values)
+            .returning(UserSkillLink)
+            .options(OPTIONS)
+        )
+
+        try:
+            return (await session.scalars(stmt)).one()
+        except NoResultFound:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User skill link not found",
+            )
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[UserSkillsRepository] update integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid user skill data",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[UserSkillsRepository] update: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while updating user skill",
+            )
+
+    @staticmethod
+    async def delete(
+        session: AsyncSession, user_id: UUID, skill_link_id: UUID
+    ) -> UUID:
+        stmt = (
+            delete(UserSkillLink)
+            .where(
+                UserSkillLink.id == skill_link_id,
+                UserSkillLink.user_id == user_id,
+            )
+            .returning(UserSkillLink.id)
+        )
+
+        try:
+            return (await session.scalars(stmt)).one()
+        except NoResultFound:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User skill link not found",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[UserSkillsRepository] delete: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while deleting user skill",
+            )
+
     @staticmethod
     async def get_many(
         session: AsyncSession, user_id: UUID, offset: int = 0, limit: int = 20
@@ -108,102 +198,4 @@ class UserSkillsRepository:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while retrieving user skill",
-            )
-
-    @staticmethod
-    async def create(
-        session: AsyncSession, user_id: UUID, schm: SkillLinkCreateRequest
-    ) -> UserSkillLink:
-        stmt = (
-            insert(UserSkillLink)
-            .values(
-                user_id=user_id,
-                skill_id=schm.skill_id,
-                proficiency=schm.proficiency,
-                last_used_at=schm.last_used_at,
-            )
-            .returning(UserSkillLink)
-            .options(OPTIONS)
-        )
-
-        try:
-            return (await session.scalars(stmt)).one()
-        except IntegrityError as e:
-            await session.rollback()
-            logger.error(f"[UserSkillsRepository] create integrity: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="User skill already exists or references invalid skill",
-            )
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"[UserSkillsRepository] create: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while creating user skill",
-            )
-
-    @staticmethod
-    async def update(
-        session: AsyncSession, user_id: UUID, skill_link_id: UUID, values: dict
-    ) -> UserSkillLink:
-        stmt = (
-            update(UserSkillLink)
-            .where(
-                UserSkillLink.id == skill_link_id,
-                UserSkillLink.user_id == user_id,
-            )
-            .values(values)
-            .returning(UserSkillLink)
-            .options(OPTIONS)
-        )
-
-        try:
-            return (await session.scalars(stmt)).one()
-        except NoResultFound:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User skill link not found",
-            )
-        except IntegrityError as e:
-            await session.rollback()
-            logger.error(f"[UserSkillsRepository] update integrity: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid user skill data",
-            )
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"[UserSkillsRepository] update: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while updating user skill",
-            )
-
-    @staticmethod
-    async def delete(
-        session: AsyncSession, user_id: UUID, skill_link_id: UUID
-    ) -> UUID:
-        stmt = (
-            delete(UserSkillLink)
-            .where(
-                UserSkillLink.id == skill_link_id,
-                UserSkillLink.user_id == user_id,
-            )
-            .returning(UserSkillLink.id)
-        )
-
-        try:
-            return (await session.scalars(stmt)).one()
-        except NoResultFound:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User skill link not found",
-            )
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"[UserSkillsRepository] delete: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while deleting user skill",
             )
