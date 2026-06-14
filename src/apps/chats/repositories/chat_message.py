@@ -13,7 +13,10 @@ from src.apps.chats.models import (
     ChatParticipantModel,
 )
 from src.apps.chats.repositories.chat import ChatRepository
-from src.apps.chats.schemas.chat_message import ChatMessageResponse
+from src.apps.chats.schemas.chat_message import (
+    ChatListLastMessageResponse,
+    ChatMessageResponse,
+)
 from src.apps.shared.models.attachment import AttachmentModel
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
 from src.apps.shared.schemas.attachment import (
@@ -409,8 +412,8 @@ class ChatMessageRepository:
             )
 
     @staticmethod
-    def to_response(record: ChatMessageModel) -> ChatMessageResponse:
-        return ChatMessageResponse(
+    def to_response(record: ChatMessageModel) -> ChatListLastMessageResponse:
+        return ChatListLastMessageResponse(
             id=record.id,
             created_at=record.created_at,
             updated_at=record.updated_at,
@@ -433,6 +436,7 @@ class ChatMessageRepository:
                 )
                 for link in record.attachment_links
             ],
+            seen_by_recipient=False,
         )
 
     @staticmethod
