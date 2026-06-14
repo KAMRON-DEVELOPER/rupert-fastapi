@@ -158,18 +158,18 @@ class UserSkillsRepository:
         try:
             return (await session.scalars(stmt)).one()
         except NoResultFound:
+            logger.error("[UserSkillsRepository] get: user skill not found")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User skill link not found",
             )
         except MultipleResultsFound:
             logger.error(
-                "[UserSkillsRepository] get: multiple rows for "
-                f"skill_link_id={skill_link_id} user_id={user_id}"
+                "[UserSkillsRepository] get: multiple rows for skill_link_id={skill_link_id} user_id={user_id}"
             )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while retrieving user skill",
+                detail="Multiple user skill rows found",
             )
         except Exception as e:
             logger.error(f"[UserSkillsRepository] get: {e}")

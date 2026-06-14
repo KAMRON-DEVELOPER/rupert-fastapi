@@ -142,17 +142,17 @@ class ResumesRepository:
         try:
             return (await session.scalars(stmt)).one()
         except NoResultFound:
+            logger.error("[ResumesRepository] get: resume not found")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found"
             )
         except MultipleResultsFound:
             logger.error(
-                "[ResumesRepository] get: multiple rows for "
-                f"user_id={user_id}, resume_id={resume_id}"
+                "[ResumesRepository] get: multiple rows for user_id={user_id}, resume_id={resume_id}"
             )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while retrieving user skill",
+                detail="Multiple resume skill rows found",
             )
         except Exception as e:
             logger.error(f"[ResumesRepository] get_by_id_and_user_id: {e}")

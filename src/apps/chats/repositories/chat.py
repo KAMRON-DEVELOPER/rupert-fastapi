@@ -1,10 +1,14 @@
-from collections.abc import Sequence
 from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, delete, func, literal, or_, select, update
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import (
+    IntegrityError,
+    MultipleResultsFound,
+    NoResultFound,
+    SQLAlchemyError,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, selectinload
 
@@ -230,9 +234,9 @@ class ChatRepository:
         )
 
     @classmethod
-    async def get_participant_ids(
-        cls, session: AsyncSession, user_id: UUID
-    ) -> Sequence[UUID]:
+    async def get_user_participant_id(
+        cls, session: AsyncSession, *, user_id: UUID
+    ) -> UUID:
         user = aliased(ChatParticipantModel)
         participant = aliased(ChatParticipantModel)
 
@@ -249,9 +253,25 @@ class ChatRepository:
         )
 
         try:
-            return (await session.scalars(stmt)).all()
+            return (await session.scalars(stmt)).one()
+        except NoResultFound:
+            logger.error(
+                "[ChatRepository] get_user_participant_id: user participant not found"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User participant not found",
+            )
+        except MultipleResultsFound:
+            logger.error(
+                f"[ChatRepository] get_user_participant_id: multiple rows for user_id={user_id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Multiple user participant rows found",
+            )
         except SQLAlchemyError as e:
-            logger.error(f"[ChatRepository] get_participant_ids: {e}")
+            logger.error(f"[ChatRepository] get_user_participant_id: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Could not retrieve chat participants",

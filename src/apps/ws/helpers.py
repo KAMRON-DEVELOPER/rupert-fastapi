@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import WebSocket
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.websocket.types import UserId
+from src.core.websocket.types import ChatId, UserId
 
 
 def get_websocket_state(
@@ -22,7 +22,7 @@ def set_websocket_state(
     session: AsyncSession,
     user_uuid: UUID,
     user_id: UserId,
-    chat_ids: set | None = None,
+    chat_ids: set[ChatId] | None = None,
 ):
     ws.state.session = session
     ws.state.user_uuid = user_uuid

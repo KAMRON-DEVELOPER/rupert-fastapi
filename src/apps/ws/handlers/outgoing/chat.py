@@ -39,8 +39,8 @@ async def publish_typing(
             chat_channel(data.chat_id),
             {
                 "type": event_type.value,
-                "chatId": data.chat_id,
-                "userId": user_uuid,
+                "chatId": str(data.chat_id),
+                "userId": str(user_uuid),
             },
             exclude=connection_id,
         )
@@ -67,7 +67,7 @@ async def leave_chat_channel(
     if notify_self:
         await broker.send(
             connection_id,
-            {"type": OutgoingEvent.chat_left.value, "chatId": chat_id},
+            {"type": OutgoingEvent.chat_left.value, "chatId": str(chat_id)},
         )
 
 
@@ -120,10 +120,6 @@ def validation_detail(error: ValidationError) -> str:
     location = ".".join(str(part) for part in first.get("loc", ()))
     message = str(first.get("msg", "invalid payload"))
     return f"{location}: {message}" if location else message
-
-
-def message_attachment_keys(record: Any) -> list[str]:
-    return [link.attachment.object_key for link in record.attachment_links]
 
 
 async def remove_pending_tags(keys: list[str]) -> None:

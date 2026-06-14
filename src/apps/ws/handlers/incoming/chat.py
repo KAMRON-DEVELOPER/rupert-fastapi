@@ -15,7 +15,6 @@ from src.apps.ws.handlers.outgoing.chat import (
     get_websocket_state,
     guard,
     leave_chat_channel,
-    message_attachment_keys,
     publish_to_users,
     publish_typing,
     remove_pending_tags,
@@ -64,7 +63,10 @@ async def handle_join_chat(
 
         await broker.send(
             connection_id,
-            {"type": OutgoingEvent.chat_joined.value, "chat_id": data.chat_id},
+            {
+                "type": OutgoingEvent.chat_joined.value,
+                "chatId": str(data.chat_id),
+            },
         )
 
     await guard(websocket, connection_id, broker, action)
@@ -125,13 +127,14 @@ async def handle_create_chat(
         chat = await ChatRepository.get_or_create_direct_chat(
             session, user_uuid, data.participant_id
         )
-        participant_ids = await ChatRepository.get_participant_ids(
-            session, user_uuid
+        # Why we need to fetch because we already have all
+        participant_id = await ChatRepository.get_user_participant_id(
+            session, user_id=user_uuid
         )
         await session.commit()
 
         logger.debug(f"chat: {chat}")
-        logger.debug(f"participant_ids: {participant_ids}")
+        logger.debug(f"participant_id: {participant_id}")
 
         item = await ChatRepository.get_list_item(session, chat.id, user_uuid)
         item.user.is_online = await presence.is_online(
@@ -142,10 +145,15 @@ async def handle_create_chat(
 
         await publish_to_users(
             broker,
-            participant_ids,
+            [user_uuid, participant_id],
             {
                 "type": OutgoingEvent.chat_created.value,
-                "item": item.model_dump(mode="json", by_alias=True),
+                "item": item.model_dump(
+                    mode="json",
+                    by_alias=True,
+                    exclude_unset=True,
+                    exclude_none=True,
+                ),
             },
         )
 
@@ -162,29 +170,40 @@ async def handle_send_message(
         data = ChatMessageCreateRequest.model_validate(payload)
         session, user_uuid, _, _ = get_websocket_state(websocket)
 
-        record = await ChatMessageRepository.create(
+        chat_msg = await ChatMessageRepository.create(
             session,
-            user_uuid,
+            sender_id=user_uuid,
             message=data.message,
             chat_id=data.chat_id,
             reply_id=data.reply_id,
-            participant_id=data.participant_id,
             attachments=data.attachments,
         )
-        participant_ids = await ChatRepository.get_participant_ids(
-            session, record.chat_id
+
+        participant_id = await ChatRepository.get_user_participant_id(
+            session, user_id=user_uuid
         )
-        new_keys = message_attachment_keys(record)
-        message = ChatMessageRepository.to_response(record)
+
+        new_keys = [
+            link.attachment.object_key for link in chat_msg.attachment_links
+        ]
+
+        message = ChatMessageRepository.to_response(chat_msg)
+
         await session.commit()
 
         await remove_pending_tags(new_keys)
+
         await publish_to_users(
             broker,
-            participant_ids,
+            [user_uuid, participant_id],
             {
                 "type": OutgoingEvent.message_created.value,
-                "message": message.model_dump(mode="json", by_alias=True),
+                "message": message.model_dump(
+                    mode="json",
+                    by_alias=True,
+                    exclude_unset=True,
+                    exclude_none=True,
+                ),
             },
         )
 
@@ -209,8 +228,8 @@ async def handle_update_message(
             message=data.message,
             attachments=data.attachments,
         )
-        participant_ids = await ChatRepository.get_participant_ids(
-            session, record.chat_id
+        participant_id = await ChatRepository.get_user_participant_id(
+            session, user_id=user_uuid
         )
         message = ChatMessageRepository.to_response(record)
         await session.commit()
@@ -219,10 +238,15 @@ async def handle_update_message(
         await delete_objects(old_keys)
         await publish_to_users(
             broker,
-            participant_ids,
+            [user_uuid, participant_id],
             {
                 "type": OutgoingEvent.message_updated.value,
-                "message": message.model_dump(mode="json", by_alias=True),
+                "message": message.model_dump(
+                    mode="json",
+                    by_alias=True,
+                    exclude_unset=True,
+                    exclude_none=True,
+                ),
             },
         )
 
@@ -239,8 +263,8 @@ async def handle_delete_message(
         data = MessageActionRequest.model_validate(payload)
         session, user_uuid, _, _ = get_websocket_state(websocket)
 
-        participant_ids = await ChatRepository.get_participant_ids(
-            session, data.chat_id
+        participant_id = await ChatRepository.get_user_participant_id(
+            session, user_id=user_uuid
         )
         object_keys = await ChatMessageRepository.attachment_keys(
             session, data.chat_id, data.message_id
@@ -253,11 +277,11 @@ async def handle_delete_message(
         await delete_objects(object_keys)
         await publish_to_users(
             broker,
-            participant_ids,
+            [user_uuid, participant_id],
             {
                 "value": OutgoingEvent.message_deleted.value,
-                "chatId": data.chat_id,
-                "messageId": data.message_id,
+                "chatId": str(data.chat_id),
+                "messageId": str(data.message_id),
             },
         )
 
@@ -277,19 +301,23 @@ async def handle_read_chat(
         participant = await ChatParticipantRepository.set_last_seen_at(
             session, user_uuid, data.chat_id, data.last_seen_at
         )
-        participant_ids = await ChatRepository.get_participant_ids(
-            session, data.chat_id
+        participant_id = await ChatRepository.get_user_participant_id(
+            session, user_id=user_uuid
         )
         await session.commit()
 
         await publish_to_users(
             broker,
-            participant_ids,
+            [user_uuid, participant_id],
             {
                 "type": OutgoingEvent.chat_read.value,
-                "chatId": data.chat_id,
-                "userId": user_uuid,
-                "lastSeenAt": participant.last_seen_at,
+                "chatId": str(data.chat_id),
+                "userId": str(user_uuid),
+                "lastSeenAt": (
+                    participant.last_seen_at.isoformat()
+                    if participant.last_seen_at != None
+                    else None
+                ),
             },
         )
 
@@ -307,8 +335,8 @@ async def handle_clear_chat(
         session, user_uuid, _, _ = get_websocket_state(websocket)
 
         if data.for_participant:
-            participant_ids = await ChatRepository.get_participant_ids(
-                session, data.chat_id
+            participant_id = await ChatRepository.get_user_participant_id(
+                session, user_id=user_uuid
             )
             cleared_at = await ChatParticipantRepository.clear_for_everyone(
                 session, data.chat_id, user_uuid
@@ -324,12 +352,12 @@ async def handle_clear_chat(
             await delete_objects(object_keys)
             await publish_to_users(
                 broker,
-                participant_ids,
+                [user_uuid, participant_id],
                 {
                     "type": OutgoingEvent.chat_cleared.value,
-                    "chatId": data.chat_id,
-                    "userId": user_uuid,
-                    "clearedAt": cleared_at,
+                    "chatId": str(data.chat_id),
+                    "userId": str(user_uuid),
+                    "clearedAt": cleared_at.isoformat(),
                     "forParticipant": True,
                 },
             )
@@ -344,9 +372,13 @@ async def handle_clear_chat(
             user_channel(UserId(str(user_uuid))),
             {
                 "type": OutgoingEvent.chat_cleared.value,
-                "chatId": data.chat_id,
-                "userId": user_uuid,
-                "clearedAt": participant.cleared_at,
+                "chatId": str(data.chat_id),
+                "userId": str(user_uuid),
+                "clearedAt": (
+                    participant.cleared_at.isoformat()
+                    if participant.cleared_at != None
+                    else None
+                ),
                 "forParticipant": False,
             },
         )
@@ -365,8 +397,8 @@ async def handle_delete_chat(
         session, user_uuid, _, _ = get_websocket_state(websocket)
 
         if data.for_participant:
-            participant_ids = await ChatRepository.get_participant_ids(
-                session, data.chat_id
+            participant_id = await ChatRepository.get_user_participant_id(
+                session, user_id=user_uuid
             )
             object_keys = await ChatRepository.attachment_keys(
                 session, data.chat_id
@@ -379,11 +411,11 @@ async def handle_delete_chat(
             await delete_objects(object_keys)
             await publish_to_users(
                 broker,
-                participant_ids,
+                [user_uuid, participant_id],
                 {
                     "type": OutgoingEvent.chat_deleted.value,
-                    "chatId": data.chat_id,
-                    "userId": user_uuid,
+                    "chatId": str(data.chat_id),
+                    "userId": str(user_uuid),
                     "forParticipant": True,
                 },
             )
@@ -398,9 +430,13 @@ async def handle_delete_chat(
             user_channel(UserId(str(user_uuid))),
             {
                 "type": OutgoingEvent.chat_deleted.value,
-                "chatId": data.chat_id,
-                "userId": user_uuid,
-                "deletedAt": participant.deleted_at,
+                "chatId": str(data.chat_id),
+                "userId": str(user_uuid),
+                "deletedAt": (
+                    participant.deleted_at.isoformat()
+                    if participant.deleted_at != None
+                    else None
+                ),
                 "forParticipant": False,
             },
         )
@@ -419,8 +455,9 @@ async def handle_update_chat_settings(
         session, user_uuid, _, _ = get_websocket_state(websocket)
         values = data.model_dump(
             include={"is_pinned", "is_muted", "is_archived"},
-            exclude_none=True,
             by_alias=True,
+            exclude_unset=True,
+            exclude_none=True,
         )
 
         participant = await ChatParticipantRepository.update_settings(
@@ -432,7 +469,7 @@ async def handle_update_chat_settings(
             user_channel(UserId(str(user_uuid))),
             {
                 "type": OutgoingEvent.chat_settings_updated.value,
-                "chatId": data.chat_id,
+                "chatId": str(data.chat_id),
                 "isPinned": participant.is_pinned,
                 "isMuted": participant.is_muted,
                 "isArchived": participant.is_archived,

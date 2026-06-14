@@ -32,30 +32,20 @@ class ChatMessageRepository:
     async def create(
         cls,
         session: AsyncSession,
-        sender_id: UUID,
         *,
+        sender_id: UUID,
         message: str | None = None,
-        chat_id: UUID | None = None,
+        chat_id: UUID,
         reply_id: UUID | None = None,
-        participant_id: UUID | None = None,
-        attachments: list[AttachmentIdWithPositionRequest] | None = None,
+        attachments: list[AttachmentIdWithPositionRequest],
     ) -> ChatMessageModel:
-        if chat_id is None:
-            if participant_id is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="participant_id is required when chat_id is not provided",
-                )
-            chat = await ChatRepository.get_or_create_direct_chat(
-                session, sender_id, participant_id
-            )
-            chat_id = chat.id
-        else:
-            await ChatRepository.assert_participant(session, chat_id, sender_id)
+        await ChatRepository.assert_participant(session, chat_id, sender_id)
 
-        await cls._assert_reply_belongs_to_chat(session, chat_id, reply_id)
+        if reply_id:
+            await cls._assert_reply_belongs_to_chat(session, chat_id, reply_id)
+
         attachment_records = await cls._pending_attachments(
-            session, sender_id, attachments or []
+            session, sender_id, attachments
         )
 
         record = ChatMessageModel(
@@ -69,7 +59,7 @@ class ChatMessageRepository:
             session.add(record)
             await session.flush()
 
-            for item in attachments or []:
+            for item in attachments:
                 attachment = attachment_records[item.attachment_id]
                 attachment.status = AttachmentStatus.ready
                 record.attachment_links.append(
@@ -441,11 +431,8 @@ class ChatMessageRepository:
 
     @staticmethod
     async def _assert_reply_belongs_to_chat(
-        session: AsyncSession, chat_id: UUID, reply_id: UUID | None
+        session: AsyncSession, chat_id: UUID, reply_id: UUID
     ) -> None:
-        if reply_id is None:
-            return
-
         reply_chat_id = await session.scalar(
             select(ChatMessageModel.chat_id).where(
                 ChatMessageModel.id == reply_id

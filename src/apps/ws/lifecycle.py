@@ -29,12 +29,12 @@ async def connect_handler(
 
     await presence.set_online(user_id)
 
-    participant_ids = await ChatRepository.get_participant_ids(
-        session, user_uuid
+    participant_id = await ChatRepository.get_user_participant_id(
+        session, user_id=user_uuid
     )
     await publish_to_users(
         broker,
-        participant_ids,
+        [user_uuid, participant_id],
         {"type": OutgoingEvent.user_online.value, "userId": user_id},
     )
 
@@ -65,8 +65,8 @@ async def disconnect_handler(
         await ChatParticipantRepository.set_last_online_at(
             session, user_uuid, last_online_at
         )
-        participant_ids = await ChatRepository.get_participant_ids(
-            session, user_uuid
+        participant_id = await ChatRepository.get_user_participant_id(
+            session, user_id=user_uuid
         )
         await session.commit()
     except Exception as e:
@@ -76,7 +76,7 @@ async def disconnect_handler(
 
     await publish_to_users(
         broker,
-        participant_ids,
+        [user_uuid, participant_id],
         {
             "type": OutgoingEvent.user_offline.value,
             "userId": user_id,

@@ -12,9 +12,8 @@ from src.apps.shared.schemas.base import RequestSchema
 
 class ChatMessageCreateRequest(RequestSchema):
     message: str | None = None
-    chat_id: UUID | None = None
+    chat_id: UUID
     reply_id: UUID | None = None
-    participant_id: UUID | None = None
     attachments: list[AttachmentIdWithPositionRequest] = Field(
         default_factory=list
     )
@@ -26,9 +25,6 @@ class ChatMessageCreateRequest(RequestSchema):
 
         if not has_text and not has_attachments:
             raise ValueError("message or attachments are required")
-
-        if self.chat_id is None and self.participant_id is None:
-            raise ValueError("chatId or participantId is required")
 
         positions = [item.position for item in self.attachments]
         if len(positions) != len(set(positions)):
