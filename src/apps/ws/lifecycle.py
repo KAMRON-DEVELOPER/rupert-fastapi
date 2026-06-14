@@ -55,7 +55,7 @@ async def disconnect_handler(
         )
 
     if connection_registry.user_has_connection(user_id, exclude=connection_id):
-        logger.debug(f"[chat_ws] disconnected user={user_id}")
+        logger.debug(f"[ws] disconnected user={user_id}")
         return
 
     await presence.set_offline(user_id)
@@ -71,7 +71,7 @@ async def disconnect_handler(
         await session.commit()
     except Exception as e:
         await session.rollback()
-        logger.exception(f"[chat_ws] disconnect presence update failed: {e}")
+        logger.exception(f"[ws] disconnect presence update failed: {e}")
         return
 
     await publish_to_users(
@@ -83,4 +83,4 @@ async def disconnect_handler(
             "lastOnlineAt": last_online_at,
         },
     )
-    logger.debug(f"[chat_ws] disconnected user={user_id}")
+    logger.debug(f"[ws] disconnected user={user_id}")

@@ -67,7 +67,6 @@ class WebSocketConnection:
     async def __aenter__(self) -> Self:
         await self._websocket.accept()
 
-        # TODO really need to pass user id?
         self.connection_id = self._registry.add(
             websocket=self._websocket, user_id=self._user_id
         )
@@ -161,6 +160,9 @@ class WebSocketConnection:
         except ValueError:
             await self._send_error(f"unknown event type: {raw_event!r}")
             return
+
+        if event != IncomingEvent.ping:
+            logger.debug(f"event: {event}")
 
         handler = self._handlers.get(event)
         if handler is None:

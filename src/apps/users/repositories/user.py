@@ -328,7 +328,6 @@ class UsersRepository:
             activity_date: count for activity_date, count in dau_chart_rows
         }
         anonymous_counts = await get_anonymous_dau_counts(start_date, days=30)
-        logger.debug(f"anonymous_counts: {anonymous_counts}")
         dau_chart = [
             DailyActiveUsersBucket(
                 count=dau_counts_by_date.get(day, 0),

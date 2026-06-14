@@ -213,15 +213,9 @@ class ProactiveRefresh:
         auth_cookies: Annotated[Cookies, Cookie()],
         session: sessionDep,
     ):
-        domain = get_cookie_domain()
-        logger.debug(f"domain: {domain}")
-        logger.debug(f"settings.debug: {settings.debug}")
         access_token = auth_cookies.access_token
         refresh_token = auth_cookies.refresh_token
-        logger.debug(f"access_token: {access_token}")
-        logger.debug(f"refresh_token: {refresh_token}")
         dau = auth_cookies.dau
-        logger.debug(f"dau: {dau}")
         user_id: UUID | None = None
         session_verified = False
 
@@ -306,7 +300,6 @@ class ProactiveRefresh:
                 raise HTTPException(status_code=401, detail="Not authenticated")
 
             anonymous_id = auth_cookies.anonymous_id
-            logger.debug(f"anonymous_id: {anonymous_id}")
 
             if not anonymous_id:
                 anonymous_id = str(uuid4())
@@ -319,16 +312,13 @@ class ProactiveRefresh:
                 )
 
             anonymous_dau = auth_cookies.anonymous_dau
-            logger.debug(f"anonymous_dau: {anonymous_dau}")
             today_str = datetime.now(UTC).date().isoformat()
-            logger.debug(f"today_str: {today_str}")
             if anonymous_dau != today_str:
                 await record_anonymous_activity(anonymous_id)
                 set_cookie(
                     res, key="anonymous_dau", value=today_str, max_age=86400
                 )
 
-            logger.debug(res.headers.getlist("set-cookie"))
             return None
 
         if refresh_token and not session_verified:
