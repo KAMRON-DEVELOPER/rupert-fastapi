@@ -131,8 +131,8 @@ class WebSocketConnection:
                 await self._websocket.send_json(event)
         except asyncio.CancelledError:
             pass
-        except Exception:
-            logger.exception("[WebSocketConnection] send loop failed")
+        except Exception as e:
+            logger.exception(f"[WebSocketConnection] send loop failed: {e}")
 
     async def _process_text(self, text: str) -> None:
         assert self.connection_id is not None
@@ -158,16 +158,22 @@ class WebSocketConnection:
         try:
             event = IncomingEvent(raw_event)
         except ValueError:
+            logger.error(
+                "[WebSocketConnection][_process_text] failed to parse raw event into IncomingEvent"
+            )
             await self._send_error(f"unknown event type: {raw_event!r}")
             return
 
-        if event != IncomingEvent.ping:
-            logger.debug(f"event: {event}")
-
         handler = self._handlers.get(event)
         if handler is None:
+            logger.error(
+                "[WebSocketConnection][_process_text] no handler found"
+            )
             await self._send_error(f"no handler for: {raw_event!r}")
             return
+
+        if handler.__name__ != "handle_ping":
+            logger.debug(f"handler: {handler.__name__}")
 
         await handler(
             self._websocket, self.connection_id, self._broker, payload
@@ -176,6 +182,8 @@ class WebSocketConnection:
     async def _send_error(self, detail: str) -> None:
         if self.connection_id is None:
             return
+
+        logger.error(f"[WebSocketConnection] _send_error: {detail}")
 
         await self._broker.send(
             self.connection_id,

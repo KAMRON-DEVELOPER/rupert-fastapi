@@ -334,6 +334,8 @@ class ChatRepository:
         data_stmt = (
             select(
                 ChatModel.id.label("chat_id"),
+                ChatModel.created_at.label("created_at"),
+                ChatModel.updated_at.label("updated_at"),
                 ChatParticipantModel.is_pinned,
                 ChatParticipantModel.is_muted,
                 ChatParticipantModel.is_archived,

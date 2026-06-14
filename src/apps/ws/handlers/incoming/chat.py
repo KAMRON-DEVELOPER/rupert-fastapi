@@ -28,6 +28,7 @@ from src.apps.ws.schemas.chat import (
     UpdateChatSettingsActionRequest,
     UpdateMessageActionRequest,
 )
+from src.core.logger import logger
 from src.core.websocket.broker import EventBroker
 from src.core.websocket.channels import chat_channel, user_channel
 from src.core.websocket.presence import presence
@@ -117,6 +118,7 @@ async def handle_create_chat(
     payload: dict[str, Any],
 ) -> None:
     async def action() -> None:
+        logger.debug(f"[handle_create_chat] payload: {payload}")
         data = CreateChatSchema.model_validate(payload)
         session, user_uuid, _, _ = get_websocket_state(websocket)
 
@@ -124,21 +126,26 @@ async def handle_create_chat(
             session, user_uuid, data.participant_id
         )
         participant_ids = await ChatRepository.get_participant_ids(
-            session, chat.id
+            session, user_uuid
         )
         await session.commit()
+
+        logger.debug(f"chat: {chat}")
+        logger.debug(f"participant_ids: {participant_ids}")
 
         item = await ChatRepository.get_list_item(session, chat.id, user_uuid)
         item.user.is_online = await presence.is_online(
             UserId(str(data.participant_id))
         )
 
+        logger.debug(f"item: {item}")
+
         await publish_to_users(
             broker,
             participant_ids,
             {
                 "type": OutgoingEvent.chat_created.value,
-                "item": item.model_dump(mode="json"),
+                "item": item.model_dump(mode="json", by_alias=True),
             },
         )
 
@@ -177,7 +184,7 @@ async def handle_send_message(
             participant_ids,
             {
                 "type": OutgoingEvent.message_created.value,
-                "message": message.model_dump(mode="json"),
+                "message": message.model_dump(mode="json", by_alias=True),
             },
         )
 
@@ -215,7 +222,7 @@ async def handle_update_message(
             participant_ids,
             {
                 "type": OutgoingEvent.message_updated.value,
-                "message": message.model_dump(mode="json"),
+                "message": message.model_dump(mode="json", by_alias=True),
             },
         )
 
@@ -411,7 +418,9 @@ async def handle_update_chat_settings(
         data = UpdateChatSettingsActionRequest.model_validate(payload)
         session, user_uuid, _, _ = get_websocket_state(websocket)
         values = data.model_dump(
-            include={"is_pinned", "is_muted", "is_archived"}, exclude_none=True
+            include={"is_pinned", "is_muted", "is_archived"},
+            exclude_none=True,
+            by_alias=True,
         )
 
         participant = await ChatParticipantRepository.update_settings(

@@ -3,7 +3,7 @@ from uuid import UUID
 from .types import Channel, UserId
 
 
-def user_channel(user_id: UserId | str) -> Channel:
+def user_channel(user_id: UserId) -> Channel:
     return Channel(f"user:{user_id}")
 
 

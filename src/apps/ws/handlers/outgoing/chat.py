@@ -96,6 +96,7 @@ async def publish_to_users(
     broker: EventBroker, user_ids: Iterable[UUID], event: dict[str, Any]
 ) -> None:
     for user_id in user_ids:
+        logger.debug(f"user_id: {user_id}, event: {event}")
         await broker.publish(user_channel(UserId(str(user_id))), event)
 
 

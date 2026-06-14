@@ -35,7 +35,7 @@ async def connect_handler(
     await publish_to_users(
         broker,
         participant_ids,
-        {"type": OutgoingEvent.user_online.value, "userId": user_uuid},
+        {"type": OutgoingEvent.user_online.value, "userId": user_id},
     )
 
 
@@ -79,8 +79,8 @@ async def disconnect_handler(
         participant_ids,
         {
             "type": OutgoingEvent.user_offline.value,
-            "userId": user_uuid,
-            "lastOnlineAt": last_online_at,
+            "userId": user_id,
+            "lastOnlineAt": last_online_at.isoformat(),
         },
     )
     logger.debug(f"[ws] disconnected user={user_id}")

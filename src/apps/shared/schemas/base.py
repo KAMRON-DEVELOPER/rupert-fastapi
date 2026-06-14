@@ -9,14 +9,14 @@ class Schema(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
         alias_generator=AliasGenerator(validation_alias=to_camel),
-        extra="forbid",
+        extra="ignore",
     )
 
 
 class RequestSchema(BaseModel):
     model_config = ConfigDict(
         alias_generator=AliasGenerator(validation_alias=to_camel),
-        extra="forbid",
+        extra="ignore",
     )
 
 
@@ -24,6 +24,7 @@ class ResponseSchema(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
         alias_generator=AliasGenerator(serialization_alias=to_camel),
+        extra="ignore",
     )
 
 
