@@ -16,7 +16,7 @@ from src.apps.companies.schemas.company import (
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
 from src.apps.shared.schemas.enums import CompanyMemberRole, VacancyStatus
 from src.apps.stats.schemas import CompaniesStatsResponse, CompanyTypeBucket
-from src.apps.vacancies.models import VacancyModel, VacancySkillLink
+from src.apps.vacancies.models import VacancyModel
 from src.core.helpers import percentage
 from src.core.logger import logger
 
@@ -27,6 +27,7 @@ class CompaniesRepository:
         session: AsyncSession,
         pagination: paginationDep,
         filters: companyListDep | None,
+        user_id: UUID | None = None,
     ) -> PaginatedResponse[CompanySummary]:
         # Correlated scalar subquery: counts open vacancies for each company
         # in the outer query. SQLAlchemy auto-correlates this because CompanyModel.id
@@ -42,14 +43,18 @@ class CompaniesRepository:
             .label("open_vacancies_count")
         )
 
-        stmt = (
-            select(CompanyModel, open_vacancies_count)
-            .options(
-                selectinload(CompanyModel.country),
-                selectinload(CompanyModel.city),
-            )
-            .execution_options(populate_existing=True)
+        stmt = select(CompanyModel, open_vacancies_count).options(
+            selectinload(CompanyModel.country),
+            selectinload(CompanyModel.city),
         )
+
+        if user_id is not None:
+            owned_company_exists = exists().where(
+                CompanyMemberModel.company_id == CompanyModel.id,
+                CompanyMemberModel.user_id == user_id,
+                CompanyMemberModel.role == CompanyMemberRole.owner,
+            )
+            stmt = stmt.where(owned_company_exists)
 
         if filters:
             if filters.name:
@@ -71,13 +76,6 @@ class CompaniesRepository:
                     stmt = stmt.where(open_vacancy_exists)
                 else:
                     stmt = stmt.where(~open_vacancy_exists)
-            if filters.skill_ids:
-                skill_exists = exists().where(
-                    VacancyModel.company_id == CompanyModel.id,
-                    VacancySkillLink.vacancy_id == VacancyModel.id,
-                    VacancySkillLink.skill_id.in_(filters.skill_ids),
-                )
-                stmt = stmt.where(skill_exists)
 
         count_stmt = select(func.count()).select_from(
             stmt.order_by(None).subquery()
@@ -104,7 +102,7 @@ class CompaniesRepository:
             company.open_vacancies_count = open_count
             companies.append(company)
 
-        data = cast(list[CompanySummary], companies)
+        data = [CompanySummary.model_validate(company) for company in companies]
         return PaginatedResponse(data=data, total=total)
 
     @staticmethod

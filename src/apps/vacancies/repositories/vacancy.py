@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from typing import cast
 from uuid import UUID
 
@@ -60,8 +61,11 @@ class VacanciesRepository:
         )
 
         if filters:
-            if filters.company_id:
-                stmt = stmt.where(VacancyModel.company_id == filters.company_id)
+            if posted_within_days := filters.posted_within_days:
+                boundary = datetime.now(UTC) - timedelta(
+                    days=posted_within_days
+                )
+                stmt = stmt.where(VacancyModel.updated_at > boundary)
             if filters.title:
                 stmt = stmt.where(
                     VacancyModel.title.ilike(f"%{filters.title}%")
@@ -72,7 +76,7 @@ class VacanciesRepository:
                 )
             if filters.specialization:
                 stmt = stmt.where(
-                    VacancyModel.specialization == filters.specialization
+                    VacancyModel.specialization.in_(filters.specialization)
                 )
             if filters.salary_min is not None:
                 stmt = stmt.where(VacancyModel.salary_max.is_not(None))

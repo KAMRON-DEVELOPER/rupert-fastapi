@@ -1,7 +1,6 @@
 from typing import Annotated
-from uuid import UUID
 
-from fastapi import Depends, Query
+from fastapi import Depends
 from pydantic import AnyUrl, EmailStr, Field
 
 from src.apps.companies.schemas.company_member import CompanyMemberResponse
@@ -39,7 +38,6 @@ class CompanyListParams(NullableLocationRequest):
     type: CompanyType | None = None
     status: CompanyStatus | None = None
     has_open_vacancies: bool | None = None
-    skill_ids: list[UUID] | None = Query(None)
 
 
 companyListDep = Annotated[CompanyListParams, Depends()]

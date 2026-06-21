@@ -36,9 +36,9 @@ from .router import vacancies_router
 
 @vacancies_router.get("/", response_model=PaginatedResponse[VacancySummary])
 async def list_vacancies(
+    auth: authProbeDep,
     pagination: paginationDep,
     filters: vacancyListDep,
-    auth: authProbeDep,
     session: sessionDep,
 ):
     user_id = auth[0] if auth else None

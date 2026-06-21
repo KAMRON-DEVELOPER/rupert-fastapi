@@ -79,10 +79,9 @@ class VacancyUpdateRequest(NullableLocationRequest):
 
 
 class VacancyListParams(RequestSchema):
-    company_id: UUID | None = None
     title: str | None = None
     submission_type: SubmissionType | None = None
-    specialization: Specialization | None = None
+    specialization: list[Specialization] | None = Query(None)
     salary_min: int | None = None
     salary_max: int | None = None
     salary_currency: SalaryCurrency | None = None
@@ -93,6 +92,7 @@ class VacancyListParams(RequestSchema):
     country_id: UUID | None = None
     city_id: UUID | None = None
     skill_ids: list[UUID] | None = Query(None)
+    posted_within_days: int | None = None
 
 
 vacancyListDep = Annotated[VacancyListParams, Depends()]

@@ -1,6 +1,7 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import status
+from fastapi import Query, status
 
 from src.apps.companies.repositories.company import CompaniesRepository
 from src.apps.companies.schemas.company import (
@@ -21,18 +22,9 @@ from src.apps.shared.schemas import (
     paginationDep,
 )
 from src.core.database import sessionDep
-from src.dependencies.proactive_refresh import authDep
+from src.dependencies.proactive_refresh import authDep, authProbeDep
 
 from .router import companies_router
-
-
-@companies_router.get("/", response_model=PaginatedResponse[CompanySummary])
-async def list_companies(
-    pagination: paginationDep, filters: companyListDep, session: sessionDep
-):
-    return await CompaniesRepository.get_many(
-        session=session, pagination=pagination, filters=filters
-    )
 
 
 @companies_router.post(
@@ -46,12 +38,6 @@ async def create_company(
         session, user_id, schm.model_dump(mode="json")
     )
     await session.commit()
-    return CompanyDetail.model_validate(record)
-
-
-@companies_router.get("/{company_id}", response_model=CompanyDetail)
-async def get_company(company_id: UUID, session: sessionDep):
-    record = await CompaniesRepository.get_by_id(session, company_id)
     return CompanyDetail.model_validate(record)
 
 
@@ -83,6 +69,26 @@ async def delete_company(auth: authDep, session: sessionDep, company_id: UUID):
     await CompaniesRepository.delete(session, user_id, company_id)
     await session.commit()
     return MessageResponse(message="Company deleted successfully")
+
+
+@companies_router.get("/", response_model=PaginatedResponse[CompanySummary])
+async def list_companies(
+    auth: authProbeDep,
+    pagination: paginationDep,
+    filters: companyListDep,
+    session: sessionDep,
+    own: Annotated[bool, Query()] = False,
+):
+    user_id = auth[0] if auth and own else None
+    return await CompaniesRepository.get_many(
+        session=session, pagination=pagination, filters=filters, user_id=user_id
+    )
+
+
+@companies_router.get("/{company_id}", response_model=CompanyDetail)
+async def get_company(company_id: UUID, session: sessionDep):
+    record = await CompaniesRepository.get_by_id(session, company_id)
+    return CompanyDetail.model_validate(record)
 
 
 @companies_router.post(
