@@ -27,7 +27,7 @@ async def list_user_skills(
 ):
     user_id, _, _ = auth
     return await UserSkillsRepository.get_many(
-        session, user_id, pagination.offset, pagination.offset
+        session, user_id, pagination.offset, pagination.limit
     )
 
 
