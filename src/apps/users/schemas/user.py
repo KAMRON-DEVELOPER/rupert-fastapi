@@ -13,9 +13,6 @@ from src.apps.shared.schemas.enums import (
     UserStatus,
 )
 from src.apps.shared.schemas.location import NullableLocationRequest
-from src.apps.shared.schemas.skill import SkillLinkResponse
-from src.apps.users.schemas.resume import ResumeResponse
-from src.apps.users.schemas.work_experience import WorkExperienceResponse
 from src.core.exceptions import ValidationException
 
 
@@ -82,11 +79,6 @@ class UserDetailResponse(BaseNullableLocationModelResponse):
     status: UserStatus
     follow_policy: FollowPolicy
     job_search_status: JobSearchStatus
-
-    # Relationships
-    resumes: list[ResumeResponse]
-    skills: list[SkillLinkResponse] = Field(validation_alias="skill_links")
-    work_experiences: list[WorkExperienceResponse]
 
     # Computed
     followers_count: int

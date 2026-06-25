@@ -15,12 +15,7 @@ from src.apps.stats.schemas import (
     SpecializationBucket,
     UsersStatsResponse,
 )
-from src.apps.users.models import (
-    ActivityModel,
-    ResumeModel,
-    UserModel,
-    UserSkillLink,
-)
+from src.apps.users.models import ActivityModel, UserModel
 from src.core.anonymous_activity import get_anonymous_dau_counts
 from src.core.helpers import percentage
 from src.core.logger import logger
@@ -201,16 +196,7 @@ class UsersRepository:
         stmt = (
             select(UserModel)
             .options(
-                selectinload(UserModel.country),
-                selectinload(UserModel.city),
-                selectinload(UserModel.resumes).selectinload(
-                    ResumeModel.country
-                ),
-                selectinload(UserModel.resumes).selectinload(ResumeModel.city),
-                selectinload(UserModel.skill_links).selectinload(
-                    UserSkillLink.skill
-                ),
-                selectinload(UserModel.work_experiences),
+                selectinload(UserModel.country), selectinload(UserModel.city)
             )
             .where(UserModel.id == id)
         )
