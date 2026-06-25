@@ -7,7 +7,6 @@ from sqlalchemy.exc import IntegrityError, MultipleResultsFound, NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from apps.users.repositories.resume import ResumesRepository
 from src.apps.companies.models import CompanyModel
 from src.apps.companies.repositories.company import CompaniesRepository
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
@@ -17,6 +16,7 @@ from src.apps.shared.schemas.enums import (
     VacancyStatus,
 )
 from src.apps.users.models import ResumeModel, UserModel
+from src.apps.users.repositories.resume import ResumesRepository
 from src.apps.vacancies.models import ApplicationModel, VacancyModel
 from src.apps.vacancies.repositories.vacancy import VacanciesRepository
 from src.apps.vacancies.schemas.application import (
