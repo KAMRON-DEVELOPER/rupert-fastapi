@@ -2,6 +2,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import delete, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.users.models import SessionModel
@@ -9,26 +10,6 @@ from src.core.logger import logger
 
 
 class SessionsRepository:
-    @staticmethod
-    async def list_by_user_id(session: AsyncSession, user_id: UUID):
-        stmt = (
-            select(SessionModel)
-            .where(
-                SessionModel.user_id == user_id,
-                SessionModel.is_active.is_(True),
-            )
-            .order_by(SessionModel.last_activity_at.desc())
-        )
-
-        try:
-            return (await session.scalars(stmt)).all()
-        except Exception as e:
-            logger.error(f"[SessionsRepository] list_by_user_id: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while retrieving sessions",
-            )
-
     @staticmethod
     async def create(
         session: AsyncSession,
@@ -50,6 +31,13 @@ class SessionsRepository:
             session.add(record)
             await session.flush()
             return record
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[SessionsRepository] create integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Session data conflicts with existing records",
+            )
         except Exception as e:
             await session.rollback()
             logger.error(f"[SessionsRepository] create: {e}")
@@ -82,12 +70,39 @@ class SessionsRepository:
                 )
         except HTTPException:
             raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[SessionsRepository] delete integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete session due to related records",
+            )
         except Exception as e:
             await session.rollback()
             logger.error(f"[SessionsRepository] delete: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while deleting session",
+            )
+
+    @staticmethod
+    async def list_by_user_id(session: AsyncSession, user_id: UUID):
+        stmt = (
+            select(SessionModel)
+            .where(
+                SessionModel.user_id == user_id,
+                SessionModel.is_active.is_(True),
+            )
+            .order_by(SessionModel.last_activity_at.desc())
+        )
+
+        try:
+            return (await session.scalars(stmt)).all()
+        except Exception as e:
+            logger.error(f"[SessionsRepository] list_by_user_id: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving sessions",
             )
 
     @staticmethod
@@ -117,6 +132,13 @@ class SessionsRepository:
             return deleted_refresh_token
         except HTTPException:
             raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[SessionsRepository] delete_by_id integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete session due to related records",
+            )
         except Exception as e:
             await session.rollback()
             logger.error(f"[SessionsRepository] delete_by_id: {e}")
@@ -146,6 +168,15 @@ class SessionsRepository:
             deleted_ids = (await session.scalars(stmt)).all()
             await session.flush()
             return len(deleted_ids)
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(
+                f"[SessionsRepository] delete_all_by_user_id integrity: {e}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete sessions due to related records",
+            )
         except Exception as e:
             await session.rollback()
             logger.error(f"[SessionsRepository] delete_all_by_user_id: {e}")
@@ -184,6 +215,15 @@ class SessionsRepository:
             await session.flush()
         except HTTPException:
             raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(
+                f"[SessionsRepository] replace_refresh_token integrity: {e}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Session data conflicts with existing records",
+            )
         except Exception as e:
             await session.rollback()
             logger.error(f"[SessionsRepository] replace_refresh_token: {e}")

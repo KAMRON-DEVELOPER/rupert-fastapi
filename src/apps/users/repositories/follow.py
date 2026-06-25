@@ -66,16 +66,55 @@ class FollowsRepository:
             )
 
     @staticmethod
-    async def get_by_id(session: AsyncSession, follow_id: UUID):
-        stmt = (
-            select(FollowModel)
-            .options(
-                selectinload(FollowModel.follower),
-                selectinload(FollowModel.following),
+    async def update_request_status(
+        session: AsyncSession,
+        user_id: UUID,
+        follow_id: UUID,
+        status_value: FollowStatus,
+    ):
+        if status_value not in (FollowStatus.accepted, FollowStatus.declined):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Follow request can only be accepted or declined",
             )
-            .where(FollowModel.id == follow_id)
+
+        stmt = (
+            update(FollowModel)
+            .where(
+                FollowModel.id == follow_id,
+                FollowModel.following_id == user_id,
+                FollowModel.status == FollowStatus.pending,
+            )
+            .values(status=status_value)
+            .returning(FollowModel.id)
         )
-        return await session.scalar(stmt)
+        try:
+            updated_id = await session.scalar(stmt)
+            if not updated_id:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Pending follow request not found",
+                )
+            await session.flush()
+            return await FollowsRepository.get_by_id(session, follow_id)
+        except HTTPException:
+            raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(
+                f"[FollowsRepository] update_request_status integrity: {e}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Follow request data conflicts with existing records",
+            )
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"[FollowsRepository] update_request_status: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while updating follow request",
+            )
 
     @staticmethod
     async def unfollow(
@@ -99,6 +138,13 @@ class FollowsRepository:
                 )
         except HTTPException:
             raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[FollowsRepository] unfollow integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot unfollow due to related records",
+            )
         except Exception as e:
             await session.rollback()
             logger.error(f"[FollowsRepository] unfollow: {e}")
@@ -106,6 +152,18 @@ class FollowsRepository:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while unfollowing user",
             )
+
+    @staticmethod
+    async def get_by_id(session: AsyncSession, follow_id: UUID):
+        stmt = (
+            select(FollowModel)
+            .options(
+                selectinload(FollowModel.follower),
+                selectinload(FollowModel.following),
+            )
+            .where(FollowModel.id == follow_id)
+        )
+        return await session.scalar(stmt)
 
     @staticmethod
     async def _paginate(
@@ -198,46 +256,4 @@ class FollowsRepository:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while retrieving follow requests",
-            )
-
-    @staticmethod
-    async def update_request_status(
-        session: AsyncSession,
-        user_id: UUID,
-        follow_id: UUID,
-        status_value: FollowStatus,
-    ):
-        if status_value not in (FollowStatus.accepted, FollowStatus.declined):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Follow request can only be accepted or declined",
-            )
-
-        stmt = (
-            update(FollowModel)
-            .where(
-                FollowModel.id == follow_id,
-                FollowModel.following_id == user_id,
-                FollowModel.status == FollowStatus.pending,
-            )
-            .values(status=status_value)
-            .returning(FollowModel.id)
-        )
-        try:
-            updated_id = await session.scalar(stmt)
-            if not updated_id:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Pending follow request not found",
-                )
-            await session.flush()
-            return await FollowsRepository.get_by_id(session, follow_id)
-        except HTTPException:
-            raise
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"[FollowsRepository] update_request_status: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while updating follow request",
             )

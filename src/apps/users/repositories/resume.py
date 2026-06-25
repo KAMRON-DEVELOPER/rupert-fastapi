@@ -155,7 +155,26 @@ class ResumesRepository:
                 detail="Multiple resume skill rows found",
             )
         except Exception as e:
-            logger.error(f"[ResumesRepository] get_by_id_and_user_id: {e}")
+            logger.error(f"[ResumesRepository] get: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving resume",
+            )
+
+    @staticmethod
+    async def get_optional(
+        session: AsyncSession, user_id: UUID, resume_id: UUID
+    ):
+        stmt = (
+            select(ResumeModel)
+            .options(*OPTIONS)
+            .where(ResumeModel.id == resume_id, ResumeModel.user_id == user_id)
+        )
+
+        try:
+            return await session.scalar(stmt)
+        except Exception as e:
+            logger.error(f"[ResumesRepository] get_optional: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while retrieving resume",

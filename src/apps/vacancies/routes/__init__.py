@@ -1,4 +1,4 @@
-from . import vacancy
+from . import application, vacancy, vacancy_skill
 from .router import vacancies_router
 
-__all__ = ["vacancies_router", "vacancy"]
+__all__ = ["application", "vacancies_router", "vacancy", "vacancy_skill"]

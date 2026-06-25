@@ -1,4 +1,3 @@
-from typing import cast
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -8,11 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.apps.companies.models import CompanyMemberModel, CompanyModel
-from src.apps.companies.schemas.company import (
-    CompanyDetail,
-    CompanySummary,
-    companyListDep,
-)
+from src.apps.companies.schemas.company import CompanySummary, companyListDep
 from src.apps.shared.schemas import PaginatedResponse, paginationDep
 from src.apps.shared.schemas.enums import CompanyMemberRole, VacancyStatus
 from src.apps.stats.schemas import CompaniesStatsResponse, CompanyTypeBucket
@@ -22,146 +17,6 @@ from src.core.logger import logger
 
 
 class CompaniesRepository:
-    @staticmethod
-    async def get_many(
-        session: AsyncSession,
-        pagination: paginationDep,
-        filters: companyListDep | None,
-        user_id: UUID | None = None,
-    ) -> PaginatedResponse[CompanySummary]:
-        # Correlated scalar subquery: counts open vacancies for each company
-        # in the outer query. SQLAlchemy auto-correlates this because CompanyModel.id
-        # is referenced from the outer SELECT.
-        open_vacancies_count = (
-            select(func.count(VacancyModel.id))
-            .where(
-                VacancyModel.company_id == CompanyModel.id,
-                VacancyModel.status == VacancyStatus.open,
-            )
-            .correlate(CompanyModel)
-            .scalar_subquery()
-            .label("open_vacancies_count")
-        )
-
-        stmt = select(CompanyModel, open_vacancies_count).options(
-            selectinload(CompanyModel.country),
-            selectinload(CompanyModel.city),
-        )
-
-        if user_id is not None:
-            owned_company_exists = exists().where(
-                CompanyMemberModel.company_id == CompanyModel.id,
-                CompanyMemberModel.user_id == user_id,
-                CompanyMemberModel.role == CompanyMemberRole.owner,
-            )
-            stmt = stmt.where(owned_company_exists)
-
-        if filters:
-            if filters.name:
-                stmt = stmt.where(CompanyModel.name.like(f"%{filters.name}%"))
-            if filters.type:
-                stmt = stmt.where(CompanyModel.type == filters.type)
-            if filters.status:
-                stmt = stmt.where(CompanyModel.status == filters.status)
-            if filters.country_id:
-                stmt = stmt.where(CompanyModel.country_id == filters.country_id)
-            if filters.city_id:
-                stmt = stmt.where(CompanyModel.city_id == filters.city_id)
-            if filters.has_open_vacancies is not None:
-                open_vacancy_exists = exists().where(
-                    VacancyModel.company_id == CompanyModel.id,
-                    VacancyModel.status == VacancyStatus.open,
-                )
-                if filters.has_open_vacancies:
-                    stmt = stmt.where(open_vacancy_exists)
-                else:
-                    stmt = stmt.where(~open_vacancy_exists)
-
-        count_stmt = select(func.count()).select_from(
-            stmt.order_by(None).subquery()
-        )
-        total = await session.scalar(count_stmt) or 0
-
-        stmt = stmt.order_by(CompanyModel.created_at.desc())
-
-        if pagination:
-            stmt = stmt.offset(pagination.offset).limit(pagination.limit)
-
-        # res: Sequence[Tuple[CompanyModel, int]]
-        try:
-            res = (await session.execute(stmt)).tuples().all()
-        except Exception as e:
-            logger.error(f"[CompaniesRepository] get_many: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while retrieving companies",
-            )
-
-        companies: list[CompanyModel] = []
-        for company, open_count in res:
-            company.open_vacancies_count = open_count
-            companies.append(company)
-
-        data = [CompanySummary.model_validate(company) for company in companies]
-        return PaginatedResponse(data=data, total=total)
-
-    @staticmethod
-    async def get_by_id(
-        session: AsyncSession, company_id: UUID
-    ) -> CompanyDetail:
-        open_vacancies_count = (
-            select(func.count(VacancyModel.id))
-            .where(
-                VacancyModel.company_id == CompanyModel.id,
-                VacancyModel.status == VacancyStatus.open,
-            )
-            .correlate(CompanyModel)
-            .scalar_subquery()
-            .label("open_vacancies_count")
-        )
-
-        member_count = (
-            select(func.count(CompanyMemberModel.id))
-            .where(CompanyMemberModel.company_id == CompanyModel.id)
-            .correlate(CompanyModel)
-            .scalar_subquery()
-            .label("member_count")
-        )
-
-        stmt = (
-            select(CompanyModel, open_vacancies_count, member_count)
-            .options(
-                selectinload(CompanyModel.members).selectinload(
-                    CompanyMemberModel.user
-                ),
-                selectinload(CompanyModel.vacancies),
-                selectinload(CompanyModel.country),
-                selectinload(CompanyModel.city),
-            )
-            .where(CompanyModel.id == company_id)
-            .execution_options(populate_existing=True)
-        )
-
-        try:
-            res = (await session.execute(stmt)).one_or_none()
-        except Exception as e:
-            logger.error(f"[CompaniesRepository] get_by_id: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Something went wrong while retrieving company",
-            )
-
-        if not res:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Company not found",
-            )
-
-        company, open_count, member_count_value = res._tuple()
-        company.open_vacancies_count = open_count
-        company.member_count = member_count_value
-        return cast(CompanyDetail, company)
-
     @staticmethod
     async def create(session: AsyncSession, user_id: UUID, values: dict):
         record = CompanyModel(**values)
@@ -177,7 +32,7 @@ class CompaniesRepository:
                 )
             )
             await session.flush()
-            return await CompaniesRepository.get_by_id(session, record.id)
+            return await CompaniesRepository.get(session, record.id)
         except HTTPException:
             raise
         except IntegrityError as e:
@@ -214,7 +69,7 @@ class CompaniesRepository:
                 await session.scalar(stmt)
                 await session.flush()
 
-            return await CompaniesRepository.get_by_id(session, company_id)
+            return await CompaniesRepository.get(session, company_id)
         except HTTPException:
             raise
         except IntegrityError as e:
@@ -261,6 +116,193 @@ class CompaniesRepository:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while deleting company",
             )
+
+    @staticmethod
+    async def get_many(
+        session: AsyncSession,
+        pagination: paginationDep,
+        filters: companyListDep | None,
+        user_id: UUID | None = None,
+    ) -> PaginatedResponse[CompanySummary]:
+        open_vacancies_count = (
+            select(func.count(VacancyModel.id))
+            .where(
+                VacancyModel.company_id == CompanyModel.id,
+                VacancyModel.status == VacancyStatus.open,
+            )
+            .correlate(CompanyModel)
+            .scalar_subquery()
+            .label("open_vacancies_count")
+        )
+
+        stmt = select(CompanyModel, open_vacancies_count).options(
+            selectinload(CompanyModel.country), selectinload(CompanyModel.city)
+        )
+
+        if user_id is not None:
+            owned_company_exists = exists().where(
+                CompanyMemberModel.company_id == CompanyModel.id,
+                CompanyMemberModel.user_id == user_id,
+                CompanyMemberModel.role == CompanyMemberRole.owner,
+            )
+            stmt = stmt.where(owned_company_exists)
+
+        if filters:
+            if filters.name:
+                stmt = stmt.where(CompanyModel.name.like(f"%{filters.name}%"))
+            if filters.type:
+                stmt = stmt.where(CompanyModel.type == filters.type)
+            if filters.status:
+                stmt = stmt.where(CompanyModel.status == filters.status)
+            if filters.country_id:
+                stmt = stmt.where(CompanyModel.country_id == filters.country_id)
+            if filters.city_id:
+                stmt = stmt.where(CompanyModel.city_id == filters.city_id)
+            if filters.has_open_vacancies is not None:
+                open_vacancy_exists = exists().where(
+                    VacancyModel.company_id == CompanyModel.id,
+                    VacancyModel.status == VacancyStatus.open,
+                )
+                if filters.has_open_vacancies:
+                    stmt = stmt.where(open_vacancy_exists)
+                else:
+                    stmt = stmt.where(~open_vacancy_exists)
+
+        count_stmt = select(func.count()).select_from(
+            stmt.order_by(None).subquery()
+        )
+        total = await session.scalar(count_stmt) or 0
+
+        stmt = stmt.order_by(CompanyModel.created_at.desc())
+
+        if pagination:
+            stmt = stmt.offset(pagination.offset).limit(pagination.limit)
+
+        try:
+            res = (await session.execute(stmt)).tuples().all()
+        except Exception as e:
+            logger.error(f"[CompaniesRepository] get_many: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving companies",
+            )
+
+        companies: list[CompanyModel] = []
+        for company, open_count in res:
+            company.open_vacancies_count = open_count
+            companies.append(company)
+
+        data = [CompanySummary.model_validate(company) for company in companies]
+        return PaginatedResponse(data=data, total=total)
+
+    @staticmethod
+    async def get(session: AsyncSession, company_id: UUID) -> CompanyModel:
+        open_vacancies_count = (
+            select(func.count(VacancyModel.id))
+            .where(
+                VacancyModel.company_id == CompanyModel.id,
+                VacancyModel.status == VacancyStatus.open,
+            )
+            .correlate(CompanyModel)
+            .scalar_subquery()
+            .label("open_vacancies_count")
+        )
+
+        member_count = (
+            select(func.count(CompanyMemberModel.id))
+            .where(CompanyMemberModel.company_id == CompanyModel.id)
+            .correlate(CompanyModel)
+            .scalar_subquery()
+            .label("member_count")
+        )
+
+        stmt = (
+            select(CompanyModel, open_vacancies_count, member_count)
+            .options(
+                selectinload(CompanyModel.members).selectinload(
+                    CompanyMemberModel.user
+                ),
+                selectinload(CompanyModel.vacancies),
+                selectinload(CompanyModel.country),
+                selectinload(CompanyModel.city),
+            )
+            .where(CompanyModel.id == company_id)
+            .execution_options(populate_existing=True)
+        )
+
+        try:
+            res = (await session.execute(stmt)).one_or_none()
+        except Exception as e:
+            logger.error(f"[CompaniesRepository] get: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving company",
+            )
+
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Company not found",
+            )
+
+        company, open_count, member_count_value = res._tuple()
+        company.open_vacancies_count = open_count
+        company.member_count = member_count_value
+        return company
+
+    @staticmethod
+    async def get_optional(
+        session: AsyncSession, company_id: UUID
+    ) -> CompanyModel | None:
+        open_vacancies_count = (
+            select(func.count(VacancyModel.id))
+            .where(
+                VacancyModel.company_id == CompanyModel.id,
+                VacancyModel.status == VacancyStatus.open,
+            )
+            .correlate(CompanyModel)
+            .scalar_subquery()
+            .label("open_vacancies_count")
+        )
+
+        member_count = (
+            select(func.count(CompanyMemberModel.id))
+            .where(CompanyMemberModel.company_id == CompanyModel.id)
+            .correlate(CompanyModel)
+            .scalar_subquery()
+            .label("member_count")
+        )
+
+        stmt = (
+            select(CompanyModel, open_vacancies_count, member_count)
+            .options(
+                selectinload(CompanyModel.members).selectinload(
+                    CompanyMemberModel.user
+                ),
+                selectinload(CompanyModel.vacancies),
+                selectinload(CompanyModel.country),
+                selectinload(CompanyModel.city),
+            )
+            .where(CompanyModel.id == company_id)
+            .execution_options(populate_existing=True)
+        )
+
+        try:
+            res = (await session.execute(stmt)).one_or_none()
+        except Exception as e:
+            logger.error(f"[CompaniesRepository] get_optional: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving company",
+            )
+
+        if not res:
+            return None
+
+        company, open_count, member_count_value = res._tuple()
+        company.open_vacancies_count = open_count
+        company.member_count = member_count_value
+        return company
 
     @staticmethod
     async def ensure_member(
@@ -448,7 +490,6 @@ class CompaniesRepository:
             .group_by(CompanyModel.type)
             .order_by(CompanyModel.type)
         )
-        # by_type_rows: Sequence[Row[Tuple[CompanyType, int]]]
         by_type_rows = (await session.execute(by_type_stmt)).all()
         by_type = [
             CompanyTypeBucket(

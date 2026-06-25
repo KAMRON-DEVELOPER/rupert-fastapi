@@ -87,7 +87,7 @@ async def list_companies(
 
 @companies_router.get("/{company_id}", response_model=CompanyDetail)
 async def get_company(company_id: UUID, session: sessionDep):
-    record = await CompaniesRepository.get_by_id(session, company_id)
+    record = await CompaniesRepository.get(session, company_id)
     return CompanyDetail.model_validate(record)
 
 

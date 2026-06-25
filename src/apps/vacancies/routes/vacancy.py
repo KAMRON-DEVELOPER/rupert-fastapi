@@ -9,18 +9,6 @@ from src.apps.shared.schemas import (
     paginationDep,
 )
 from src.apps.vacancies.repositories.vacancy import VacanciesRepository
-from src.apps.vacancies.schemas.application import (
-    ApplicationDetailResponse,
-    ApplicationRequest,
-    ApplicationStatusUpdateRequest,
-    ApplicationSummaryResponse,
-    applicationListDep,
-)
-from src.apps.vacancies.schemas.skill_links import (
-    VacancySkillLinkRequest,
-    VacancySkillLinkResponse,
-    VacancySkillLinkUpdateRequest,
-)
 from src.apps.vacancies.schemas.vacancy import (
     VacancyCreateRequest,
     VacancyDetail,
@@ -32,78 +20,6 @@ from src.core.database import sessionDep
 from src.dependencies.proactive_refresh import authDep, authProbeDep
 
 from .router import vacancies_router
-
-
-@vacancies_router.get("/", response_model=PaginatedResponse[VacancySummary])
-async def list_vacancies(
-    auth: authProbeDep,
-    pagination: paginationDep,
-    filters: vacancyListDep,
-    session: sessionDep,
-):
-    user_id = auth[0] if auth else None
-    return await VacanciesRepository.get_many(
-        session=session, user_id=user_id, pagination=pagination, filters=filters
-    )
-
-
-@vacancies_router.get(
-    "/applications",
-    response_model=PaginatedResponse[ApplicationSummaryResponse],
-)
-async def list_applications(
-    pagination: paginationDep, filters: applicationListDep, session: sessionDep
-):
-    return await VacanciesRepository.get_applications(
-        session=session, pagination=pagination, filters=filters
-    )
-
-
-@vacancies_router.post(
-    "/applications",
-    response_model=ApplicationDetailResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def apply_to_vacancy(
-    auth: authDep, session: sessionDep, schm: ApplicationRequest
-):
-    user_id, _, _ = auth
-    record = await VacanciesRepository.apply_to_vacancy(
-        session, user_id, schm.model_dump()
-    )
-    await session.commit()
-    return ApplicationDetailResponse.model_validate(record)
-
-
-@vacancies_router.get(
-    "/applications/{id}", response_model=ApplicationDetailResponse
-)
-async def get_application(id: Annotated[UUID, Path()], session: sessionDep):
-    record = await VacanciesRepository.get_application_by_id(
-        session=session, id=id
-    )
-    return ApplicationDetailResponse.model_validate(record)
-
-
-@vacancies_router.patch(
-    "/applications/{id}", response_model=ApplicationDetailResponse
-)
-async def update_application_status(
-    auth: authDep,
-    session: sessionDep,
-    id: Annotated[UUID, Path()],
-    schm: ApplicationStatusUpdateRequest,
-):
-    user_id, _, _ = auth
-    record = await VacanciesRepository.update_application_status(
-        session=session,
-        application_id=id,
-        application_status=schm.status,
-        recruiter_note=schm.recruiter_note,
-        user_id=user_id,
-    )
-    await session.commit()
-    return ApplicationDetailResponse.model_validate(record)
 
 
 @vacancies_router.post(
@@ -122,17 +38,6 @@ async def create_vacancy(
         session, user_id, company_id, schm.model_dump(mode="json")
     )
     await session.commit()
-    return VacancyDetail.model_validate(record)
-
-
-@vacancies_router.get("/{id}", response_model=VacancyDetail)
-async def get_vacancy(
-    id: Annotated[UUID, Path()], auth: authProbeDep, session: sessionDep
-):
-    user_id = auth[0] if auth else None
-    record = await VacanciesRepository.get_by_id(
-        session=session, id=id, user_id=user_id
-    )
     return VacancyDetail.model_validate(record)
 
 
@@ -163,62 +68,28 @@ async def delete_vacancy(
     return MessageResponse(message="Vacancy deleted successfully")
 
 
-@vacancies_router.post(
-    "/{vacancy_id}/skills",
-    response_model=VacancySkillLinkResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_vacancy_skill(
-    auth: authDep,
+@vacancies_router.get("/", response_model=PaginatedResponse[VacancySummary])
+async def list_vacancies(
+    auth: authProbeDep,
+    pagination: paginationDep,
+    filters: vacancyListDep,
     session: sessionDep,
-    vacancy_id: UUID,
-    schm: VacancySkillLinkRequest,
 ):
-    user_id, _, _ = auth
-    record = await VacanciesRepository.create_skill_link(
-        session, user_id, vacancy_id, schm.model_dump()
+    user_id = auth[0] if auth else None
+    return await VacanciesRepository.get_many(
+        session=session, user_id=user_id, pagination=pagination, filters=filters
     )
-    await session.commit()
-    return VacancySkillLinkResponse.model_validate(record)
 
 
-@vacancies_router.patch(
-    "/{vacancy_id}/skills/{skill_link_id}",
-    response_model=VacancySkillLinkResponse,
-)
-async def update_vacancy_skill(
-    auth: authDep,
-    session: sessionDep,
-    vacancy_id: UUID,
-    skill_link_id: UUID,
-    schm: VacancySkillLinkUpdateRequest,
+@vacancies_router.get("/{id}", response_model=VacancyDetail)
+async def get_vacancy(
+    id: Annotated[UUID, Path()], auth: authProbeDep, session: sessionDep
 ):
-    user_id, _, _ = auth
-    record = await VacanciesRepository.update_skill_link(
-        session,
-        user_id,
-        vacancy_id,
-        skill_link_id,
-        schm.model_dump(exclude_unset=True),
+    user_id = auth[0] if auth else None
+    record = await VacanciesRepository.get(
+        session=session, id=id, user_id=user_id
     )
-    await session.commit()
-    return VacancySkillLinkResponse.model_validate(record)
-
-
-@vacancies_router.delete(
-    "/{vacancy_id}/skills/{skill_link_id}",
-    response_model=MessageResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def delete_vacancy_skill(
-    auth: authDep, session: sessionDep, vacancy_id: UUID, skill_link_id: UUID
-):
-    user_id, _, _ = auth
-    await VacanciesRepository.delete_skill_link(
-        session, user_id, vacancy_id, skill_link_id
-    )
-    await session.commit()
-    return MessageResponse(message="Vacancy skill deleted successfully")
+    return VacancyDetail.model_validate(record)
 
 
 @vacancies_router.post(

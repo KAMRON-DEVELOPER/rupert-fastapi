@@ -10,12 +10,6 @@ from src.apps.users.schemas.user import UserSummaryResponse
 from src.apps.vacancies.schemas.vacancy import VacancySummary
 
 
-class ApplicationRequest(RequestSchema):
-    vacancy_id: UUID
-    resume_id: UUID | None = None
-    cover_letter: str | None = None
-
-
 class ApplicationListParams(RequestSchema):
     vacancy_id: UUID | None = None
     applicant_id: UUID | None = None
@@ -23,6 +17,16 @@ class ApplicationListParams(RequestSchema):
 
 
 applicationListDep = Annotated[ApplicationListParams, Depends()]
+
+
+class ApplicationCreateRequest(RequestSchema):
+    resume_id: UUID | None = None
+    cover_letter: str | None = None
+
+
+class ApplicationUpdateRequest(RequestSchema):
+    resume_id: UUID | None = None
+    cover_letter: str | None = None
 
 
 class ApplicationStatusUpdateRequest(RequestSchema):

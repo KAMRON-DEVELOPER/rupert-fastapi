@@ -315,7 +315,7 @@ async def handle_read_chat(
                 "userId": str(user_uuid),
                 "lastSeenAt": (
                     participant.last_seen_at.isoformat()
-                    if participant.last_seen_at != None
+                    if participant.last_seen_at is not None
                     else None
                 ),
             },
@@ -376,7 +376,7 @@ async def handle_clear_chat(
                 "userId": str(user_uuid),
                 "clearedAt": (
                     participant.cleared_at.isoformat()
-                    if participant.cleared_at != None
+                    if participant.cleared_at is not None
                     else None
                 ),
                 "forParticipant": False,
@@ -434,7 +434,7 @@ async def handle_delete_chat(
                 "userId": str(user_uuid),
                 "deletedAt": (
                     participant.deleted_at.isoformat()
-                    if participant.deleted_at != None
+                    if participant.deleted_at is not None
                     else None
                 ),
                 "forParticipant": False,

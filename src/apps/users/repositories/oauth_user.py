@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.apps.shared.schemas.enums import Provider
@@ -34,6 +35,13 @@ class OAuthUsersRepository:
             session.add(record)
             await session.flush()
             return record
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[OAuthUsersRepository] create integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="OAuth user data conflicts with existing records",
+            )
         except Exception as e:
             await session.rollback()
             logger.error(f"[OAuthUsersRepository] create: {e}")

@@ -22,25 +22,6 @@ OPTIONS = selectinload(ResumeSkillLink.skill).load_only(
 
 class ResumeSkillsRepository:
     @staticmethod
-    async def _enforce_ownership(
-        session: AsyncSession, user_id: UUID, resume_id: UUID
-    ) -> None:
-        """
-        Verifies that the resume exists and belongs to the current user.
-        Raises an HTTP 404 error if the record is missing or unauthorized.
-        """
-        stmt = select(ResumeModel.id).where(
-            ResumeModel.id == resume_id, ResumeModel.user_id == user_id
-        )
-
-        resume_exists = await session.scalar(stmt)
-
-        if not resume_exists:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found"
-            )
-
-    @staticmethod
     async def create(
         session: AsyncSession,
         user_id: UUID,
@@ -197,4 +178,86 @@ class ResumeSkillsRepository:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while retrieving resume skills",
+            )
+
+    @staticmethod
+    async def get(
+        session: AsyncSession,
+        user_id: UUID,
+        resume_id: UUID,
+        skill_link_id: UUID,
+    ):
+        await ResumeSkillsRepository._enforce_ownership(
+            session, user_id, resume_id
+        )
+
+        stmt = (
+            select(ResumeSkillLink)
+            .options(OPTIONS)
+            .where(
+                ResumeSkillLink.id == skill_link_id,
+                ResumeSkillLink.resume_id == resume_id,
+            )
+        )
+
+        try:
+            return (await session.scalars(stmt)).one()
+        except NoResultFound:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resume skill link not found",
+            )
+        except Exception as e:
+            logger.error(f"[ResumeSkillsRepository] get: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving resume skill",
+            )
+
+    @staticmethod
+    async def get_optional(
+        session: AsyncSession,
+        user_id: UUID,
+        resume_id: UUID,
+        skill_link_id: UUID,
+    ):
+        await ResumeSkillsRepository._enforce_ownership(
+            session, user_id, resume_id
+        )
+
+        stmt = (
+            select(ResumeSkillLink)
+            .options(OPTIONS)
+            .where(
+                ResumeSkillLink.id == skill_link_id,
+                ResumeSkillLink.resume_id == resume_id,
+            )
+        )
+
+        try:
+            return await session.scalar(stmt)
+        except Exception as e:
+            logger.error(f"[ResumeSkillsRepository] get_optional: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving resume skill",
+            )
+
+    @staticmethod
+    async def _enforce_ownership(
+        session: AsyncSession, user_id: UUID, resume_id: UUID
+    ) -> None:
+        """
+        Verifies that the resume exists and belongs to the current user.
+        Raises an HTTP 404 error if the record is missing or unauthorized.
+        """
+        stmt = select(ResumeModel.id).where(
+            ResumeModel.id == resume_id, ResumeModel.user_id == user_id
+        )
+
+        resume_exists = await session.scalar(stmt)
+
+        if not resume_exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found"
             )

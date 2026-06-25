@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -43,6 +44,13 @@ class UsersRepository:
             session.add(record)
             await session.flush()
             return record
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[UsersRepository] create integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User data conflicts with existing records",
+            )
         except Exception as e:
             await session.rollback()
             logger.error(f"[UsersRepository] create: {e}")
@@ -72,6 +80,13 @@ class UsersRepository:
             await session.flush()
         except HTTPException:
             raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[UsersRepository] update integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User data conflicts with existing records",
+            )
         except Exception as e:
             await session.rollback()
             logger.error(f"[UsersRepository] update: {e}")
@@ -96,12 +111,67 @@ class UsersRepository:
                 )
         except HTTPException:
             raise
+        except IntegrityError as e:
+            await session.rollback()
+            logger.error(f"[UsersRepository] delete integrity: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete user due to related records",
+            )
         except Exception as e:
             await session.rollback()
             logger.error(f"[UsersRepository] delete: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Something went wrong while deleting user",
+            )
+
+    @staticmethod
+    async def get(session: AsyncSession, id: UUID):
+        stmt = (
+            select(UserModel)
+            .options(
+                selectinload(UserModel.country), selectinload(UserModel.city)
+            )
+            .where(UserModel.id == id)
+        )
+
+        try:
+            record = await session.scalar(stmt)
+
+            if not record:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found",
+                )
+
+            return record
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"[UsersRepository] get: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving user",
+            )
+
+    @staticmethod
+    async def get_optional(session: AsyncSession, id: UUID):
+        stmt = (
+            select(UserModel)
+            .options(
+                selectinload(UserModel.country), selectinload(UserModel.city)
+            )
+            .where(UserModel.id == id)
+        )
+
+        try:
+            return await session.scalar(stmt)
+        except Exception as e:
+            logger.error(f"[UsersRepository] get_optional: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Something went wrong while retrieving user",
             )
 
     @staticmethod
@@ -289,12 +359,10 @@ class UsersRepository:
             .filter(UserModel.job_search_status.in_(looking_statuses))
             .label("looking_for_job_count"),
         )
-        # row: Row[Tuple[int, int]]
         row = (await session.execute(totals_stmt)).one()
         total, looking_for_job_count = row
         looking_for_job_percentage = percentage(looking_for_job_count, total)
 
-        # dau_chart_rows: Sequence[Tuple[date, int]]
         dau_chart_rows = (
             (
                 await session.execute(
@@ -332,7 +400,6 @@ class UsersRepository:
             .group_by(UserModel.job_search_status)
             .order_by(UserModel.job_search_status)
         )
-        # by_status_rows: Sequence[Row[Tuple[JobSearchStatus, int]]]
         by_status_rows = (await session.execute(by_status_stmt)).all()
         by_job_search_status = [
             JobSearchStatusBucket(
@@ -350,7 +417,6 @@ class UsersRepository:
             .group_by(UserModel.specialization)
             .order_by(func.count(UserModel.id).desc(), UserModel.specialization)
         )
-        # by_specialization_rows: Sequence[Row[Tuple[Specialization | None, int]]]
         by_specialization_rows = (
             await session.execute(by_specialization_stmt)
         ).all()
