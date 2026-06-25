@@ -25,6 +25,8 @@ class BaseModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         default=func.now(),
+        server_default=func.now(),
         onupdate=func.now(),
+        server_onupdate=func.now(),
         index=True,
     )

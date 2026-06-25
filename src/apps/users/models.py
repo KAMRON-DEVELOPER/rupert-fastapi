@@ -232,7 +232,7 @@ class OAuthUserModel(BaseModel):
         UniqueConstraint("user_id", "provider", name="uq_oauth_user_provider"),
     )
 
-    provider_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    provider_id: Mapped[str] = mapped_column(String(255))
     user_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE")
     )
@@ -400,7 +400,7 @@ class SessionModel(BaseModel):
     refresh_token: Mapped[str] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_activity_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), default=func.now()
+        TIMESTAMP(timezone=True), default=func.now(), server_default=func.now()
     )
 
     # Relationships
@@ -425,7 +425,7 @@ class ActivityModel(BaseModel):
     )
     activity_date: Mapped[date] = mapped_column(Date, index=True)
     last_activity_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), default=func.now()
+        TIMESTAMP(timezone=True), default=func.now(), server_default=func.now()
     )
 
     # Relationships
