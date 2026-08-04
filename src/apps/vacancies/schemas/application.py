@@ -11,7 +11,6 @@ from src.apps.vacancies.schemas.vacancy import VacancySummary
 
 
 class ApplicationListParams(RequestSchema):
-    vacancy_id: UUID | None = None
     applicant_id: UUID | None = None
     status: ApplicationStatus | None = None
 

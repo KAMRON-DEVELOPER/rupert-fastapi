@@ -235,8 +235,44 @@ class ChatRepository:
 
     @classmethod
     async def get_user_participant_id(
-        cls, session: AsyncSession, *, user_id: UUID
+        cls, session: AsyncSession, *, chat_id: UUID, user_id: UUID
     ) -> UUID:
+        stmt = select(ChatParticipantModel.user_id).where(
+            ChatParticipantModel.chat_id == chat_id,
+            ChatParticipantModel.user_id != user_id,
+            ChatParticipantModel.deleted_at.is_(None),
+        )
+
+        try:
+            return (await session.scalars(stmt)).one()
+        except NoResultFound:
+            logger.error(
+                "[ChatRepository] get_user_participant_id: user participant not found "
+                f"for user_id={user_id} chat_id={chat_id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User participant not found",
+            )
+        except MultipleResultsFound:
+            logger.error(
+                f"[ChatRepository] get_user_participant_id: multiple rows for user_id={user_id} chat_id={chat_id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Multiple user participant rows found",
+            )
+        except SQLAlchemyError as e:
+            logger.error(f"[ChatRepository] get_user_participant_id: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not retrieve chat participants",
+            )
+
+    @classmethod
+    async def get_user_participant_ids(
+        cls, session: AsyncSession, *, user_id: UUID
+    ) -> list[UUID]:
         user = aliased(ChatParticipantModel)
         participant = aliased(ChatParticipantModel)
 
@@ -247,31 +283,16 @@ class ChatRepository:
             .join(participant, participant.chat_id == user.chat_id)
             .where(
                 user.user_id == user_id,
+                user.deleted_at.is_(None),
                 participant.user_id != user_id,
                 participant.deleted_at.is_(None),
             )
         )
 
         try:
-            return (await session.scalars(stmt)).one()
-        except NoResultFound:
-            logger.error(
-                "[ChatRepository] get_user_participant_id: user participant not found"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User participant not found",
-            )
-        except MultipleResultsFound:
-            logger.error(
-                f"[ChatRepository] get_user_participant_id: multiple rows for user_id={user_id}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Multiple user participant rows found",
-            )
+            return list((await session.scalars(stmt)).all())
         except SQLAlchemyError as e:
-            logger.error(f"[ChatRepository] get_user_participant_id: {e}")
+            logger.error(f"[ChatRepository] get_user_participant_ids: {e}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Could not retrieve chat participants",

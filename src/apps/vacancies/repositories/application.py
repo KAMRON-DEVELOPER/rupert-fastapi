@@ -135,11 +135,14 @@ class ApplicationsRepository:
             )
 
     @staticmethod
-    async def get(session: AsyncSession, id: UUID) -> ApplicationModel:
+    async def get(
+        session: AsyncSession, vacancy_id: UUID, application_id: UUID
+    ) -> ApplicationModel:
         stmt = (
             select(ApplicationModel)
             .options(*OPTIONS)
-            .where(ApplicationModel.id == id)
+            .where(ApplicationModel.id == application_id)
+            .where(ApplicationModel.vacancy_id == vacancy_id)
             .execution_options(populate_existing=True)
         )
 
@@ -190,15 +193,14 @@ class ApplicationsRepository:
     async def get_many(
         session: AsyncSession,
         pagination: paginationDep,
+        vacancy_id: UUID,
         filters: applicationListDep,
     ) -> PaginatedResponse[ApplicationDetailResponse]:
-        stmt = select(ApplicationModel)
+        stmt = select(ApplicationModel).where(
+            ApplicationModel.vacancy_id == vacancy_id
+        )
 
         if filters:
-            if filters.vacancy_id:
-                stmt = stmt.where(
-                    ApplicationModel.vacancy_id == filters.vacancy_id
-                )
             if filters.applicant_id:
                 stmt = stmt.where(
                     ApplicationModel.applicant_id == filters.applicant_id
@@ -247,12 +249,16 @@ class ApplicationsRepository:
     @staticmethod
     async def update_application_status(
         session: AsyncSession,
+        vacancy_id: UUID,
         application_id: UUID,
         application_status: ApplicationStatus,
         recruiter_note: str | None = None,
         user_id: UUID | None = None,
     ) -> ApplicationModel | None:
-        application = await ApplicationsRepository.get(session, application_id)
+        application = await ApplicationsRepository.get(
+            session, vacancy_id=vacancy_id, application_id=application_id
+        )
+
         if user_id:
             await CompaniesRepository.ensure_member(
                 session,
@@ -274,7 +280,9 @@ class ApplicationsRepository:
             )
             await session.scalar(stmt)
             await session.flush()
-            return await ApplicationsRepository.get(session, application_id)
+            return await ApplicationsRepository.get(
+                session, vacancy_id=vacancy_id, application_id=application_id
+            )
         except HTTPException:
             raise
         except Exception as e:

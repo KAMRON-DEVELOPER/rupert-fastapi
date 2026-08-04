@@ -63,27 +63,22 @@ async def update(
     return ApplicationDetailResponse.model_validate(record)
 
 
-@vacancies_router.get(
-    "/applications/{id}", response_model=ApplicationDetailResponse
-)
-async def get_application(id: Annotated[UUID, Path()], session: sessionDep):
-    record = await ApplicationsRepository.get(session=session, id=id)
-    return ApplicationDetailResponse.model_validate(record)
-
-
 @vacancies_router.patch(
-    "/applications/{id}", response_model=ApplicationDetailResponse
+    "/{vacancy_id}/applications/{application_id}",
+    response_model=ApplicationDetailResponse,
 )
 async def update_application_status(
     auth: authDep,
     session: sessionDep,
-    id: Annotated[UUID, Path()],
+    application_id: Annotated[UUID, Path()],
+    vacancy_id: UUID,
     schm: ApplicationStatusUpdateRequest,
 ):
     user_id, _, _ = auth
     record = await ApplicationsRepository.update_application_status(
         session=session,
-        application_id=id,
+        vacancy_id=vacancy_id,
+        application_id=application_id,
         application_status=schm.status,
         recruiter_note=schm.recruiter_note,
         user_id=user_id,
@@ -93,12 +88,33 @@ async def update_application_status(
 
 
 @vacancies_router.get(
-    "/applications",
+    "/{vacancy_id}/applications",
     response_model=PaginatedResponse[ApplicationSummaryResponse],
 )
 async def list_applications(
-    pagination: paginationDep, filters: applicationListDep, session: sessionDep
+    session: sessionDep,
+    pagination: paginationDep,
+    filters: applicationListDep,
+    vacancy_id: UUID,
 ):
     return await ApplicationsRepository.get_many(
-        session=session, pagination=pagination, filters=filters
+        session=session,
+        pagination=pagination,
+        vacancy_id=vacancy_id,
+        filters=filters,
     )
+
+
+@vacancies_router.get(
+    "/{vacancy_id}/applications/{application_id}",
+    response_model=ApplicationDetailResponse,
+)
+async def get_application(
+    application_id: Annotated[UUID, Path()],
+    session: sessionDep,
+    vacancy_id: UUID,
+):
+    record = await ApplicationsRepository.get(
+        session=session, vacancy_id=vacancy_id, application_id=application_id
+    )
+    return ApplicationDetailResponse.model_validate(record)

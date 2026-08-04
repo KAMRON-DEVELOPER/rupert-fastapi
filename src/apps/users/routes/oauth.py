@@ -106,7 +106,7 @@ async def github_oauth_callback(
             session,
             str(github_user.id),
             user.id,
-            Provider.google,
+            Provider.github,
             github_user.login,
         )
 

@@ -29,12 +29,12 @@ async def connect_handler(
 
     await presence.set_online(user_id)
 
-    participant_id = await ChatRepository.get_user_participant_id(
+    participant_ids = await ChatRepository.get_user_participant_ids(
         session, user_id=user_uuid
     )
     await publish_to_users(
         broker,
-        [user_uuid, participant_id],
+        [user_uuid, *participant_ids],
         {"type": OutgoingEvent.user_online.value, "userId": user_id},
     )
 
@@ -65,7 +65,7 @@ async def disconnect_handler(
         await ChatParticipantRepository.set_last_online_at(
             session, user_uuid, last_online_at
         )
-        participant_id = await ChatRepository.get_user_participant_id(
+        participant_ids = await ChatRepository.get_user_participant_ids(
             session, user_id=user_uuid
         )
         await session.commit()
@@ -76,7 +76,7 @@ async def disconnect_handler(
 
     await publish_to_users(
         broker,
-        [user_uuid, participant_id],
+        [user_uuid, *participant_ids],
         {
             "type": OutgoingEvent.user_offline.value,
             "userId": user_id,

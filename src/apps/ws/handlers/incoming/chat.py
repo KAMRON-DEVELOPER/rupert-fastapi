@@ -127,14 +127,10 @@ async def handle_create_chat(
         chat = await ChatRepository.get_or_create_direct_chat(
             session, user_uuid, data.participant_id
         )
-        # Why we need to fetch because we already have all
-        participant_id = await ChatRepository.get_user_participant_id(
-            session, user_id=user_uuid
-        )
         await session.commit()
 
         logger.debug(f"chat: {chat}")
-        logger.debug(f"participant_id: {participant_id}")
+        logger.debug(f"participant_id: {data.participant_id}")
 
         item = await ChatRepository.get_list_item(session, chat.id, user_uuid)
         item.user.is_online = await presence.is_online(
@@ -145,7 +141,7 @@ async def handle_create_chat(
 
         await publish_to_users(
             broker,
-            [user_uuid, participant_id],
+            [user_uuid, data.participant_id],
             {
                 "type": OutgoingEvent.chat_created.value,
                 "item": item.model_dump(
@@ -180,7 +176,7 @@ async def handle_send_message(
         )
 
         participant_id = await ChatRepository.get_user_participant_id(
-            session, user_id=user_uuid
+            session, chat_id=data.chat_id, user_id=user_uuid
         )
 
         new_keys = [
@@ -229,7 +225,7 @@ async def handle_update_message(
             attachments=data.attachments,
         )
         participant_id = await ChatRepository.get_user_participant_id(
-            session, user_id=user_uuid
+            session, chat_id=data.chat_id, user_id=user_uuid
         )
         message = ChatMessageRepository.to_response(record)
         await session.commit()
@@ -264,7 +260,7 @@ async def handle_delete_message(
         session, user_uuid, _, _ = get_websocket_state(websocket)
 
         participant_id = await ChatRepository.get_user_participant_id(
-            session, user_id=user_uuid
+            session, chat_id=data.chat_id, user_id=user_uuid
         )
         object_keys = await ChatMessageRepository.attachment_keys(
             session, data.chat_id, data.message_id
@@ -302,7 +298,7 @@ async def handle_read_chat(
             session, user_uuid, data.chat_id, data.last_seen_at
         )
         participant_id = await ChatRepository.get_user_participant_id(
-            session, user_id=user_uuid
+            session, chat_id=data.chat_id, user_id=user_uuid
         )
         await session.commit()
 
@@ -336,7 +332,7 @@ async def handle_clear_chat(
 
         if data.for_participant:
             participant_id = await ChatRepository.get_user_participant_id(
-                session, user_id=user_uuid
+                session, chat_id=data.chat_id, user_id=user_uuid
             )
             cleared_at = await ChatParticipantRepository.clear_for_everyone(
                 session, data.chat_id, user_uuid
@@ -398,7 +394,7 @@ async def handle_delete_chat(
 
         if data.for_participant:
             participant_id = await ChatRepository.get_user_participant_id(
-                session, user_id=user_uuid
+                session, chat_id=data.chat_id, user_id=user_uuid
             )
             object_keys = await ChatRepository.attachment_keys(
                 session, data.chat_id
