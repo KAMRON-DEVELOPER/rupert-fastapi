@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.apps.shared.models import BaseLocationModel, BaseModel
+from src.apps.shared.schemas import PermissionSchema
 from src.apps.shared.schemas.enums import (
     CompanyMemberRole,
     CompanyStatus,
@@ -70,8 +71,10 @@ class CompanyModel(BaseLocationModel):
         back_populates="company", passive_deletes=True
     )
 
+    # Non-mapped attributes
     open_vacancies_count: int | None = None
     member_count: int | None = None
+    permission: PermissionSchema | None = None
 
     def __repr__(self):
         return f"<CompanyModel {self.name}>"

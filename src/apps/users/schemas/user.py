@@ -4,7 +4,10 @@ from datetime import date
 from dateutil.relativedelta import relativedelta
 from pydantic import Field, field_validator
 
-from src.apps.shared.schemas import BaseNullableLocationModelResponse
+from src.apps.shared.schemas import (
+    BaseNullableLocationModelResponse,
+    PermissionSchema,
+)
 from src.apps.shared.schemas.enums import (
     FollowPolicy,
     JobSearchStatus,
@@ -83,3 +86,4 @@ class UserDetailResponse(BaseNullableLocationModelResponse):
     # Computed
     followers_count: int
     followings_count: int
+    permission: PermissionSchema

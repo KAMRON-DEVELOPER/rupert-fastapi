@@ -20,6 +20,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.apps.shared.models import BaseModel, BaseNullableLocationModel
+from src.apps.shared.schemas import PermissionSchema
 from src.apps.shared.schemas.enums import (
     ApplicationStatus,
     EmploymentType,
@@ -132,6 +133,7 @@ class VacancyModel(BaseNullableLocationModel):
     # Non-mapped attributes
     is_saved: bool | None = None
     has_applied: bool | None = None
+    permission: PermissionSchema | None = None
 
     def __repr__(self):
         return f"<VacancyModel {self.title}>"

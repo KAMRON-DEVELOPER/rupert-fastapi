@@ -12,6 +12,7 @@ from .location import (
 )
 from .message import MessageResponse
 from .pagination import PaginatedResponse, PaginationQuery, paginationDep
+from .permission import PermissionSchema
 from .skill import SkillRequest, SkillResponse
 from .tag import TagRequest, TagResponse
 
@@ -28,6 +29,7 @@ __all__ = [
     "MessageResponse",
     "PaginatedResponse",
     "PaginationQuery",
+    "PermissionSchema",
     "RequestSchema",
     "ResponseSchema",
     "SkillRequest",

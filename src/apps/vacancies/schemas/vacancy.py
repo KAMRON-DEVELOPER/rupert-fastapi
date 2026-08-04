@@ -8,6 +8,7 @@ from src.apps.companies.schemas.company import CompanySummary
 from src.apps.shared.schemas import (
     BaseLocationModelResponse,
     LocationRequest,
+    PermissionSchema,
     RequestSchema,
 )
 from src.apps.shared.schemas.enums import (
@@ -120,3 +121,4 @@ class VacancyDetail(VacancySummary):
     work_hours_per_week: int | None = None
     payment_frequency: PaymentFrequency | None
     skill_links: list[VacancySkillLinkResponse]
+    permission: PermissionSchema

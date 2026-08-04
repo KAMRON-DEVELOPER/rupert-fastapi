@@ -27,6 +27,7 @@ from src.apps.shared.models import (
     BaseModel,
     BaseNullableLocationModel,
 )
+from src.apps.shared.schemas import PermissionSchema
 from src.apps.shared.schemas.enums import (
     EmploymentType,
     FollowPolicy,
@@ -383,6 +384,9 @@ class UserModel(BaseNullableLocationModel):
         .correlate_except(FollowModel)
         .scalar_subquery()
     )
+
+    # Non-mapped attributes
+    permission: PermissionSchema | None = None
 
     def __repr__(self):
         return f"<UserModel {self.first_name} {self.last_name}>"

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.apps.chats.schemas.chat_participant import ChatListUserResponse
-from src.apps.shared.schemas import PaginatedResponse
+from src.apps.shared.schemas import PaginatedResponse, PermissionSchema
 from src.apps.shared.schemas.enums import JobSearchStatus
 from src.apps.stats.schemas import (
     DailyActiveUsersBucket,
@@ -262,7 +262,12 @@ class UsersRepository:
             )
 
     @staticmethod
-    async def get_detail(session: AsyncSession, id: UUID, required=True):
+    async def get_detail(
+        session: AsyncSession,
+        id: UUID,
+        current_user_id: UUID | None = None,
+        required=True,
+    ):
         stmt = (
             select(UserModel)
             .options(
@@ -279,6 +284,12 @@ class UsersRepository:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="User not found",
                 )
+
+            if record:
+                is_self = (
+                    current_user_id is not None and record.id == current_user_id
+                )
+                record.permission = PermissionSchema(is_owner=is_self)
 
             return record
         except HTTPException:

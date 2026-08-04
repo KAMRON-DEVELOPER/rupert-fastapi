@@ -4,7 +4,11 @@ from fastapi import Depends
 from pydantic import AnyUrl, EmailStr, Field
 
 from src.apps.companies.schemas.company_member import CompanyMemberResponse
-from src.apps.shared.schemas import BaseLocationModelResponse, LocationRequest
+from src.apps.shared.schemas import (
+    BaseLocationModelResponse,
+    LocationRequest,
+    PermissionSchema,
+)
 from src.apps.shared.schemas.enums import CompanyStatus, CompanyType
 from src.apps.shared.schemas.location import NullableLocationRequest
 
@@ -59,3 +63,4 @@ class CompanyDetail(CompanySummary):
     contact_phone: str | None
     member_count: int | None = None
     members: list[CompanyMemberResponse] = Field(default_factory=list)
+    permission: PermissionSchema

@@ -8,9 +8,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.apps.companies.models import CompanyModel
+from src.apps.companies.models import CompanyMemberModel, CompanyModel
 from src.apps.companies.repositories.company import CompaniesRepository
-from src.apps.shared.schemas import PaginatedResponse, paginationDep
+from src.apps.shared.schemas import (
+    PaginatedResponse,
+    PermissionSchema,
+    paginationDep,
+)
 from src.apps.shared.schemas.enums import CompanyMemberRole, VacancyStatus
 from src.apps.stats.schemas import (
     SpecializationBucket,
@@ -51,7 +55,7 @@ class VacanciesRepository:
                 session, vacancy.id, skills_data
             )
             await session.flush()
-            return await VacanciesRepository.get(session, vacancy.id)
+            return await VacanciesRepository.get(session, vacancy.id, user_id)
         except HTTPException:
             raise
         except IntegrityError as e:
@@ -73,7 +77,7 @@ class VacanciesRepository:
     async def update(
         session: AsyncSession, user_id: UUID, vacancy_id: UUID, data: dict
     ) -> VacancyModel:
-        vacancy = await VacanciesRepository.get(session, vacancy_id)
+        vacancy = await VacanciesRepository.get(session, vacancy_id, user_id)
         await CompaniesRepository.ensure_member(
             session,
             user_id,
@@ -99,7 +103,7 @@ class VacanciesRepository:
                 )
 
             await session.flush()
-            return await VacanciesRepository.get(session, vacancy_id)
+            return await VacanciesRepository.get(session, vacancy_id, user_id)
         except HTTPException:
             raise
         except IntegrityError as e:
@@ -121,7 +125,7 @@ class VacanciesRepository:
     async def delete(
         session: AsyncSession, user_id: UUID, vacancy_id: UUID
     ) -> bool:
-        vacancy = await VacanciesRepository.get(session, vacancy_id)
+        vacancy = await VacanciesRepository.get(session, vacancy_id, user_id)
         await CompaniesRepository.ensure_member(
             session,
             user_id,
@@ -319,20 +323,33 @@ class VacanciesRepository:
             vacancy, is_saved, has_applied = row._tuple()
             vacancy.is_saved = is_saved
             vacancy.has_applied = has_applied
-            return vacancy
-
-        stmt = (
-            select(VacancyModel)
-            .options(*load_options)
-            .where(VacancyModel.id == id)
-            .execution_options(populate_existing=True)
-        )
-        vacancy = await session.scalar(stmt)
-        if not vacancy:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Vacancy not found",
+        else:
+            stmt = (
+                select(VacancyModel)
+                .options(*load_options)
+                .where(VacancyModel.id == id)
+                .execution_options(populate_existing=True)
             )
+            vacancy = await session.scalar(stmt)
+            if not vacancy:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Vacancy not found",
+                )
+
+        if user_id is not None:
+            perm_stmt = select(CompanyMemberModel.id).where(
+                CompanyMemberModel.user_id == user_id,
+                CompanyMemberModel.company_id == vacancy.company_id,
+                CompanyMemberModel.role.in_(
+                    (CompanyMemberRole.owner, CompanyMemberRole.recruiter)
+                ),
+            )
+            can_manage = await session.scalar(perm_stmt) is not None
+        else:
+            can_manage = False
+
+        vacancy.permission = PermissionSchema(is_owner=can_manage)
         return vacancy
 
     @staticmethod
@@ -377,15 +394,31 @@ class VacanciesRepository:
             vacancy, is_saved, has_applied = row._tuple()
             vacancy.is_saved = is_saved
             vacancy.has_applied = has_applied
-            return vacancy
+        else:
+            stmt = (
+                select(VacancyModel)
+                .options(*load_options)
+                .where(VacancyModel.id == id)
+                .execution_options(populate_existing=True)
+            )
+            vacancy = await session.scalar(stmt)
+            if not vacancy:
+                return None
 
-        stmt = (
-            select(VacancyModel)
-            .options(*load_options)
-            .where(VacancyModel.id == id)
-            .execution_options(populate_existing=True)
-        )
-        return await session.scalar(stmt)
+        if user_id is not None:
+            perm_stmt = select(CompanyMemberModel.id).where(
+                CompanyMemberModel.user_id == user_id,
+                CompanyMemberModel.company_id == vacancy.company_id,
+                CompanyMemberModel.role.in_(
+                    (CompanyMemberRole.owner, CompanyMemberRole.recruiter)
+                ),
+            )
+            can_manage = await session.scalar(perm_stmt) is not None
+        else:
+            can_manage = False
+
+        vacancy.permission = PermissionSchema(is_owner=can_manage)
+        return vacancy
 
     @staticmethod
     async def _replace_skills(

@@ -50,7 +50,9 @@ async def get_user(
         user = await UsersRepository.get_summary(session, user_id)
         return UserSummaryResponse.model_validate(user)
     else:
-        user = await UsersRepository.get_detail(session, user_id)
+        user = await UsersRepository.get_detail(
+            session, user_id, current_user_id=user_id
+        )
         return UserDetailResponse.model_validate(user)
 
 

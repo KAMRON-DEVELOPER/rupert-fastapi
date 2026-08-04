@@ -8,7 +8,11 @@ from sqlalchemy.orm import selectinload
 
 from src.apps.companies.models import CompanyMemberModel, CompanyModel
 from src.apps.companies.schemas.company import CompanySummary, companyListDep
-from src.apps.shared.schemas import PaginatedResponse, paginationDep
+from src.apps.shared.schemas import (
+    PaginatedResponse,
+    PermissionSchema,
+    paginationDep,
+)
 from src.apps.shared.schemas.enums import CompanyMemberRole, VacancyStatus
 from src.apps.stats.schemas import CompaniesStatsResponse, CompanyTypeBucket
 from src.apps.vacancies.models import VacancyModel
@@ -32,7 +36,7 @@ class CompaniesRepository:
                 )
             )
             await session.flush()
-            return await CompaniesRepository.get(session, record.id)
+            return await CompaniesRepository.get(session, record.id, user_id)
         except HTTPException:
             raise
         except IntegrityError as e:
@@ -69,7 +73,7 @@ class CompaniesRepository:
                 await session.scalar(stmt)
                 await session.flush()
 
-            return await CompaniesRepository.get(session, company_id)
+            return await CompaniesRepository.get(session, company_id, user_id)
         except HTTPException:
             raise
         except IntegrityError as e:
@@ -196,7 +200,9 @@ class CompaniesRepository:
         return PaginatedResponse(data=data, total=total)
 
     @staticmethod
-    async def get(session: AsyncSession, company_id: UUID) -> CompanyModel:
+    async def get(
+        session: AsyncSession, company_id: UUID, user_id: UUID | None = None
+    ) -> CompanyModel:
         open_vacancies_count = (
             select(func.count(VacancyModel.id))
             .where(
@@ -248,11 +254,23 @@ class CompaniesRepository:
         company, open_count, member_count_value = res._tuple()
         company.open_vacancies_count = open_count
         company.member_count = member_count_value
+
+        if user_id is not None:
+            owner_stmt = select(CompanyMemberModel.id).where(
+                CompanyMemberModel.company_id == company_id,
+                CompanyMemberModel.user_id == user_id,
+                CompanyMemberModel.role == CompanyMemberRole.owner,
+            )
+            is_owner = await session.scalar(owner_stmt) is not None
+        else:
+            is_owner = False
+
+        company.permission = PermissionSchema(is_owner=is_owner)
         return company
 
     @staticmethod
     async def get_optional(
-        session: AsyncSession, company_id: UUID
+        session: AsyncSession, company_id: UUID, user_id: UUID | None = None
     ) -> CompanyModel | None:
         open_vacancies_count = (
             select(func.count(VacancyModel.id))
@@ -302,6 +320,18 @@ class CompaniesRepository:
         company, open_count, member_count_value = res._tuple()
         company.open_vacancies_count = open_count
         company.member_count = member_count_value
+
+        if user_id is not None:
+            owner_stmt = select(CompanyMemberModel.id).where(
+                CompanyMemberModel.company_id == company_id,
+                CompanyMemberModel.user_id == user_id,
+                CompanyMemberModel.role == CompanyMemberRole.owner,
+            )
+            is_owner = await session.scalar(owner_stmt) is not None
+        else:
+            is_owner = False
+
+        company.permission = PermissionSchema(is_owner=is_owner)
         return company
 
     @staticmethod
