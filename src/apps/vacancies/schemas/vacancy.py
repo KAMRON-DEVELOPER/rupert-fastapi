@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, Query
+from fastapi import Depends
 from pydantic import AnyUrl, Field, ValidationInfo, field_validator
 
 from src.apps.companies.schemas.company import CompanySummary
@@ -82,7 +82,7 @@ class VacancyUpdateRequest(NullableLocationRequest):
 class VacancyListParams(RequestSchema):
     title: str | None = None
     submission_type: SubmissionType | None = None
-    specialization: list[Specialization] | None = Query(None)
+    specialization: list[Specialization] | None = None
     salary_min: int | None = None
     salary_max: int | None = None
     salary_currency: SalaryCurrency | None = None
@@ -92,7 +92,7 @@ class VacancyListParams(RequestSchema):
     status: VacancyStatus | None = None
     country_id: UUID | None = None
     city_id: UUID | None = None
-    skill_ids: list[UUID] | None = Query(None)
+    skill_ids: list[UUID] | None = None
     posted_within_days: int | None = None
 
 
